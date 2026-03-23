@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teep Saúde - App de Saúde</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="root">
+        <div class="mobile-container">
+            <!-- Header -->
+            <div class="header" id="header">
+                <div>
+                    <div class="greeting" id="greeting">Olá!</div>
+                    <div class="date" id="date"></div>
+                </div>
+            </div>
+
+            <!-- Screens -->
+            <div class="app-content">
+                <!-- Home Screen -->
+                <div class="screen active" id="homeScreen">
+                    <div class="section-title">Sinais Vitais</div>
+                    <div id="homeVitals"></div>
+                    
+                    <div class="section-title">Medicações</div>
+                    <div id="homeMeds"></div>
+                    
+                    <div class="section-title">Próxima Consulta</div>
+                    <div id="homeConsulta"></div>
+                </div>
+
+                <!-- Saúde Screen -->
+                <div class="screen" id="saudeScreen">
+                    <div id="saudeContent"></div>
+                </div>
+
+                <!-- Medicações Screen -->
+                <div class="screen" id="medicacoesScreen">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div class="section-title" style="margin: 0;">Minhas Medicações</div>
+                        <button class="add-button" id="addMedBtn" style="width: 40px; height: 40px; font-size: 20px;">+</button>
+                    </div>
+                    <div id="medicacoesContent"></div>
+                </div>
+
+                <!-- Agenda Screen -->
+                <div class="screen" id="agendaScreen">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div class="section-title" style="margin: 0;">Minha Agenda</div>
+                        <button class="add-button" id="addAgendaBtn" style="width: 40px; height: 40px; font-size: 20px;">+</button>
+                    </div>
+                    <div id="agendaContent"></div>
+                </div>
+
+                <!-- Perfil Screen -->
+                <div class="screen" id="perfilScreen">
+                    <div id="perfilContent"></div>
+                </div>
+            </div>
+
+            <!-- Bottom Navigation -->
+            <div class="bottom-nav">
+                <button class="nav-item active" data-screen="homeScreen">
+                    <div class="nav-icon">🏠</div>
+                    <div>Home</div>
+                </button>
+                <button class="nav-item" data-screen="saudeScreen">
+                    <div class="nav-icon">❤️</div>
+                    <div>Saúde</div>
+                </button>
+                <button class="nav-item" data-screen="medicacoesScreen">
+                    <div class="nav-icon">💊</div>
+                    <div>Medicações</div>
+                </button>
+                <button class="nav-item" data-screen="agendaScreen">
+                    <div class="nav-icon">📅</div>
+                    <div>Agenda</div>
+                </button>
+                <button class="nav-item" data-screen="perfilScreen">
+                    <div class="nav-icon">👤</div>
+                    <div>Perfil</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Despertador -->
+    <div class="alarm-modal" id="alarmModal">
+        <div class="alarm-content">
+            <div class="alarm-icon">🔔</div>
+            <div class="alarm-title">Hora do Remédio!</div>
+            <div class="alarm-med" id="alarmMedName">Dipirona 500mg</div>
+            <div class="alarm-time" id="alarmTime">14:30</div>
+            <div class="alarm-buttons">
+                <button class="alarm-btn alarm-btn-dismiss" id="dismissAlarmBtn">Adiar</button>
+                <button class="alarm-btn alarm-btn-take" id="takeAlarmBtn">✅ Já Tomei</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Adicionar Medicação -->
+    <div class="modal" id="addMedicacaoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Adicionar Medicação</span>
+                <button class="modal-close" id="closeAddModal">✕</button>
+            </div>
+            <form id="addMedicacaoForm">
+                <div class="form-group">
+                    <label class="form-label">Nome da Medicação</label>
+                    <input type="text" class="form-input" id="nomeMedInput" placeholder="Ex: Paracetamol" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Dosagem</label>
+                    <input type="text" class="form-input" id="dosagemMedInput" placeholder="Ex: 500mg" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Frequência</label>
+                    <select class="form-select" id="frequenciaMedInput" required>
+                        <option value="">Selecione</option>
+                        <option value="1x ao dia">1x ao dia</option>
+                        <option value="2x ao dia">2x ao dia</option>
+                        <option value="3x ao dia">3x ao dia</option>
+                        <option value="4x ao dia">4x ao dia</option>
+                        <option value="Conforme necessário">Conforme necessário</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Horário</label>
+                    <input type="time" class="form-input" id="horarioMedInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data Início</label>
+                    <input type="date" class="form-input" id="dataInicioMedInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data Fim</label>
+                    <input type="date" class="form-input" id="dataFimMedInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quantidade na Embalagem</label>
+                    <input type="number" class="form-input" id="estoqueMedInput" placeholder="Ex: 30" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estoque Mínimo para Aviso</label>
+                    <input type="number" class="form-input" id="estoqueMinMedInput" placeholder="Ex: 7" min="1" required>
+                    <small style="color: #999999; font-size: 11px; margin-top: 4px; display: block;">Você receberá aviso quando atingir esta quantidade</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Valor (R$)</label>
+                    <input type="number" class="form-input" id="valorMedInput" placeholder="Ex: 15.50" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Foto da Medicacao</label>
+                    <div class="photo-upload-area" id="photoUploadArea">
+                        <input type="file" class="form-input" id="fotoMedInput" accept="image/*" style="display: none;">
+                        <div class="photo-upload-placeholder" onclick="document.getElementById('fotoMedInput').click()">
+                            <div style="font-size: 32px; margin-bottom: 8px;">camera</div>
+                            <div style="font-size: 14px; color: #999999;">Clique para adicionar foto</div>
+                        </div>
+                        <div class="photo-preview" id="photoPreview" style="display: none;">
+                            <img id="photoPreviewImg" src="" alt="Preview">
+                            <button type="button" class="photo-remove-btn" onclick="removerFoto()">X</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelAddBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Adicionar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Editar Medicação -->
+    <div class="modal" id="editMedicacaoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Editar Medicação</span>
+                <button class="modal-close" id="closeEditModal">✕</button>
+            </div>
+            <form id="editMedicacaoForm">
+                <div class="form-group">
+                    <label class="form-label">Nome da Medicação</label>
+                    <input type="text" class="form-input" id="editNomeMedInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Dosagem</label>
+                    <input type="text" class="form-input" id="editDosagemMedInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Frequência</label>
+                    <select class="form-select" id="editFrequenciaMedInput" required>
+                        <option value="1x ao dia">1x ao dia</option>
+                        <option value="2x ao dia">2x ao dia</option>
+                        <option value="3x ao dia">3x ao dia</option>
+                        <option value="4x ao dia">4x ao dia</option>
+                        <option value="Conforme necessário">Conforme necessário</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Horário</label>
+                    <input type="time" class="form-input" id="editHorarioMedInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data Fim</label>
+                    <input type="date" class="form-input" id="editDataFimMedInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estoque Mínimo para Aviso</label>
+                    <input type="number" class="form-input" id="editEstoqueMinMedInput" min="1" required>
+                    <small style="color: #999999; font-size: 11px; margin-top: 4px; display: block;">Você receberá aviso quando atingir esta quantidade</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Valor (R$)</label>
+                    <input type="number" class="form-input" id="editValorMedInput" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Foto da Medicacao</label>
+                    <div class="photo-upload-area" id="editPhotoUploadArea">
+                        <input type="file" class="form-input" id="editFotoMedInput" accept="image/*" style="display: none;">
+                        <div class="photo-upload-placeholder" onclick="document.getElementById('editFotoMedInput').click()">
+                            <div style="font-size: 32px; margin-bottom: 8px;">camera</div>
+                            <div style="font-size: 14px; color: #999999;">Clique para adicionar foto</div>
+                        </div>
+                        <div class="photo-preview" id="editPhotoPreview" style="display: none;">
+                            <img id="editPhotoPreviewImg" src="" alt="Preview">
+                            <button type="button" class="photo-remove-btn" onclick="removerFotoEdit()">X</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelEditBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Adicionar Agendamento -->
+    <div class="modal" id="addAgendaModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Adicionar Agendamento</span>
+                <button class="modal-close" id="closeAddAgendaModal">✕</button>
+            </div>
+            <form id="addAgendaForm">
+                <div class="form-group">
+                    <label class="form-label">Tipo</label>
+                    <select class="form-select" id="tipoAgendaInput" required>
+                        <option value="">Selecione</option>
+                        <option value="consulta">Consulta</option>
+                        <option value="exame">Exame</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nome/Descrição</label>
+                    <input type="text" class="form-input" id="nomeAgendaInput" placeholder="Ex: Consulta com Dr. Silva" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Médico/Especialista</label>
+                    <input type="text" class="form-input" id="medicoAgendaInput" placeholder="Ex: Dr. Carlos Silva" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Especialidade</label>
+                    <input type="text" class="form-input" id="especialidadeAgendaInput" placeholder="Ex: Cardiologia" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data</label>
+                    <input type="date" class="form-input" id="dataAgendaInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Horário</label>
+                    <input type="time" class="form-input" id="horarioAgendaInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Local</label>
+                    <input type="text" class="form-input" id="localAgendaInput" placeholder="Ex: Clínica Central" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tipo de Atendimento</label>
+                    <select class="form-select" id="tipoAtendimentoInput" required>
+                        <option value="">Selecione</option>
+                        <option value="Presencial">Presencial</option>
+                        <option value="Online">Online</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Motivo/Observações</label>
+                    <input type="text" class="form-input" id="motivoAgendaInput" placeholder="Ex: Acompanhamento cardíaco">
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelAddAgendaBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Adicionar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Compartilhamento -->
+    <div class="modal" id="addCompartilhamentoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Compartilhar com Médico</span>
+                <button class="modal-close" id="closeCompartilhamentoModal">✕</button>
+            </div>
+            <form id="addCompartilhamentoForm">
+                <div class="form-group">
+                    <label class="form-label">Nome do Médico/Clínica</label>
+                    <input type="text" class="form-input" id="medicoCompartilhamentoInput" placeholder="Ex: Dr. Carlos Silva" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Especialidade</label>
+                    <input type="text" class="form-input" id="especialidadeCompartilhamentoInput" placeholder="Ex: Cardiologia" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Dados a Compartilhar</label>
+                    <div class="form-checkbox-group">
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="sinais_vitais" id="check_vitais">
+                            <label for="check_vitais">Sinais Vitais</label>
+                        </div>
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="medicacoes" id="check_meds">
+                            <label for="check_meds">Medicações</label>
+                        </div>
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="exames" id="check_exames">
+                            <label for="check_exames">Exames</label>
+                        </div>
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="agenda" id="check_agenda">
+                            <label for="check_agenda">Agenda</label>
+                        </div>
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="historico" id="check_historico">
+                            <label for="check_historico">Histórico Completo</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelCompartilhamentoBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Compartilhar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Adicionar Sinal Vital -->
+    <div class="modal" id="addVitalModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Adicionar Sinal Vital</span>
+                <button class="modal-close" id="closeAddVitalModal">✕</button>
+            </div>
+            <form id="addVitalForm">
+                <div class="form-group">
+                    <label class="form-label">Tipo de Sinal</label>
+                    <input type="text" class="form-input" id="tipoVitalInput" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Valor</label>
+                    <input type="text" class="form-input" id="valorVitalInput" placeholder="Ex: 120" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unidade</label>
+                    <input type="text" class="form-input" id="unidadeVitalInput" placeholder="Ex: mmHg" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fonte</label>
+                    <select class="form-select" id="fonteVitalInput" required>
+                        <option value="">Selecione</option>
+                        <option value="Manual">Manual</option>
+                        <option value="Pulseira">Pulseira</option>
+                        <option value="Google Fit">Google Fit</option>
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelAddVitalBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Adicionar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Histórico de Sinal Vital -->
+    <div class="modal" id="vitalHistoryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="historyTitle">Histórico de Sinal Vital</span>
+                <button class="modal-close" id="closeHistoryModal">✕</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Filtrar por Fonte</label>
+                <select class="form-select" id="filterFonteInput" onchange="filterVitalHistory()">
+                    <option value="">Todas</option>
+                    <option value="Manual">Manual</option>
+                    <option value="Pulseira">Pulseira</option>
+                    <option value="Google Fit">Google Fit</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Data Início</label>
+                <input type="date" class="form-input" id="filterDataInicio" onchange="filterVitalHistory()">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Data Fim</label>
+                <input type="date" class="form-input" id="filterDataFim" onchange="filterVitalHistory()">
+            </div>
+            <div id="historyContent" style="max-height: 400px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="data.js"></script>
+    <script src="components.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
