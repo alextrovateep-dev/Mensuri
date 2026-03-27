@@ -1,1956 +1,983 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Teep Saúde</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>
-:root {
-  --purple: #7C3AED;
-  --purple-light: #A78BFA;
-  --purple-soft: #EDE9FE;
-  --purple-dark: #5B21B6;
-  --blue: #3B82F6;
-  --blue-soft: #DBEAFE;
-  --green: #10B981;
-  --green-soft: #D1FAE5;
-  --red: #EF4444;
-  --red-soft: #FEE2E2;
-  --orange: #F59E0B;
-  --orange-soft: #FEF3C7;
-  --bg: #F8F7FF;
-  --surface: #FFFFFF;
-  --surface2: #F3F0FF;
-  --text: #1A1033;
-  --text-2: #6B5F8A;
-  --text-3: #A89EC0;
-  --border: #E8E3F5;
-  --shadow: 0 2px 16px rgba(124,58,237,0.08);
-  --shadow-lg: 0 8px 32px rgba(124,58,237,0.15);
-  --radius: 16px;
-  --radius-sm: 10px;
-  --nav-h: 72px;
-}
-
-* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-
-body {
-  font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  overflow: hidden;
-}
-
-/* ─── SHELL ─── */
-#shell {
-  width: 100%;
-  max-width: 430px;
-  height: 100vh;
-  max-height: 900px;
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
-  box-shadow: 0 0 60px rgba(124,58,237,0.18);
-  border-radius: 0;
-}
-
-/* ─── HEADER ─── */
-.app-header {
-  padding: 52px 20px 16px;
-  background: var(--surface);
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
-  position: relative;
-  overflow: hidden;
-}
-.app-header::before {
-  content: '';
-  position: absolute;
-  top: -40px; right: -40px;
-  width: 160px; height: 160px;
-  background: radial-gradient(circle, var(--purple-soft) 0%, transparent 70%);
-  border-radius: 50%;
-}
-.header-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  position: relative;
-}
-.greeting {
-  font-family: 'Sora', sans-serif;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1.2;
-}
-.date-line {
-  font-size: 13px;
-  color: var(--text-3);
-  margin-top: 3px;
-  font-weight: 400;
-}
-.avatar {
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--purple), var(--purple-light));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(124,58,237,0.3);
-}
-
-/* Screen header variations */
-.screen-header {
-  display: flex; align-items: center; justify-content: space-between;
-  position: relative;
-}
-.screen-title {
-  font-family: 'Sora', sans-serif;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text);
-}
-.add-btn {
-  width: 38px; height: 38px;
-  border-radius: 50%;
-  background: var(--purple);
-  border: none;
-  color: white;
-  font-size: 22px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(124,58,237,0.35);
-  transition: transform .15s, box-shadow .15s;
-  line-height: 1;
-}
-.add-btn:active { transform: scale(.93); box-shadow: 0 2px 6px rgba(124,58,237,0.25); }
-
-/* ─── SCROLL AREA ─── */
-.app-body {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  padding: 0 16px calc(var(--nav-h) + 12px);
-}
-.app-body::-webkit-scrollbar { width: 0; }
-
-/* ─── SCREENS ─── */
-.screen { display: none; padding-top: 16px; animation: fadeIn .22s ease; }
-.screen.active { display: block; }
-@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-
-/* ─── SECTION LABEL ─── */
-.section-label {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  margin: 20px 0 10px;
-}
-.section-label:first-child { margin-top: 4px; }
-
-/* ─── CARDS ─── */
-.card {
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  margin-bottom: 10px;
-  box-shadow: var(--shadow);
-  border: 1px solid var(--border);
-  transition: transform .18s, box-shadow .18s;
-  position: relative;
-  overflow: hidden;
-}
-.card:active { transform: scale(.99); }
-
-/* Vital Card */
-.vital-card {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-}
-.vital-icon-wrap {
-  width: 48px; height: 48px;
-  border-radius: 14px;
-  background: var(--purple-soft);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px;
-  flex-shrink: 0;
-}
-.vital-info { min-width: 0; }
-.vital-name {
-  font-size: 12px;
-  color: var(--text-3);
-  font-weight: 500;
-  margin-bottom: 2px;
-}
-.vital-val {
-  font-family: 'Sora', sans-serif;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1.1;
-}
-.vital-unit { font-size: 12px; color: var(--text-3); font-weight: 400; }
-.vital-meta {
-  font-size: 11px; color: var(--text-3); margin-top: 2px;
-}
-.vital-badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 20px;
-  background: var(--green-soft);
-  color: var(--green);
-  flex-shrink: 0;
-}
-.vital-actions-row {
-  display: flex; gap: 6px; margin-top: 10px; padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-.vital-action {
-  flex: 1;
-  padding: 7px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--purple);
-  font-size: 11px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background .15s, color .15s;
-}
-.vital-action:hover { background: var(--purple-soft); }
-
-/* Med Card */
-.med-card { padding: 14px 16px; }
-.med-top { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
-.med-thumb {
-  width: 52px; height: 52px;
-  border-radius: 12px;
-  background: var(--purple-soft);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 24px;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-.med-thumb img { width:100%; height:100%; object-fit:cover; }
-.med-meta { flex: 1; min-width: 0; }
-.med-name {
-  font-family: 'Sora', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.med-dose {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--purple);
-  margin-top: 1px;
-}
-.med-btns { display: flex; gap: 5px; flex-shrink: 0; }
-.icon-btn {
-  width: 32px; height: 32px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: transparent;
-  font-size: 14px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  transition: background .15s;
-}
-.icon-btn:hover { background: var(--purple-soft); }
-.icon-btn.taken { background: var(--green-soft); border-color: var(--green); }
-.med-pills {
-  display: flex; gap: 6px; flex-wrap: wrap;
-}
-.pill {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: var(--surface2);
-  border-radius: 20px;
-  padding: 4px 10px;
-  font-size: 11px;
-  color: var(--text-2);
-  font-weight: 500;
-}
-.pill-warn {
-  background: var(--red-soft);
-  color: var(--red);
-  font-weight: 600;
-}
-
-/* Consulta / Agenda Card */
-.agenda-card { padding: 14px 16px; }
-.agenda-row {
-  display: flex; align-items: flex-start; gap: 12px;
-}
-.agenda-date-block {
-  width: 46px; height: 50px;
-  border-radius: 12px;
-  background: var(--purple-soft);
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.agenda-day {
-  font-family: 'Sora', sans-serif;
-  font-size: 20px; font-weight: 800;
-  color: var(--purple);
-  line-height: 1;
-}
-.agenda-mon {
-  font-size: 10px; font-weight: 600;
-  color: var(--purple-light);
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-.agenda-info { flex: 1; min-width: 0; }
-.agenda-title {
-  font-family: 'Sora', sans-serif;
-  font-size: 14px; font-weight: 700;
-  color: var(--text);
-}
-.agenda-sub {
-  font-size: 12px; color: var(--text-3);
-  margin-top: 2px; line-height: 1.4;
-}
-.tag {
-  display: inline-flex; align-items: center;
-  padding: 2px 8px; border-radius: 20px;
-  font-size: 10px; font-weight: 600;
-  margin-top: 5px;
-}
-.tag-blue { background: var(--blue-soft); color: var(--blue); }
-.tag-green { background: var(--green-soft); color: var(--green); }
-.tag-orange { background: var(--orange-soft); color: var(--orange); }
-.tag-purple { background: var(--purple-soft); color: var(--purple); }
-
-/* Exame Card */
-.exame-card {
-  border-left: 3px solid var(--orange);
-}
-.exame-done { border-left-color: var(--green); }
-.resultado-box {
-  margin-top: 10px; padding: 10px 12px;
-  background: var(--green-soft);
-  border-radius: 10px;
-  font-size: 12px; color: #065F46;
-  line-height: 1.5;
-}
-
-/* ─── HOME SUMMARY CARDS ─── */
-.summary-strip {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.sum-card {
-  background: var(--surface);
-  border-radius: 14px;
-  padding: 14px 10px 12px;
-  text-align: center;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-}
-.sum-icon { font-size: 22px; margin-bottom: 6px; }
-.sum-val {
-  font-family: 'Sora', sans-serif;
-  font-size: 16px; font-weight: 800;
-  color: var(--text);
-  line-height: 1;
-}
-.sum-lbl {
-  font-size: 10px; color: var(--text-3); margin-top: 3px;
-  font-weight: 500;
-}
-
-/* Med adherence bar */
-.adh-bar {
-  height: 4px;
-  background: var(--border);
-  border-radius: 4px;
-  margin-top: 8px;
-  overflow: hidden;
-}
-.adh-fill {
-  height: 100%;
-  border-radius: 4px;
-  background: linear-gradient(90deg, var(--purple), var(--purple-light));
-  transition: width .6s ease;
-}
-
-/* Compartilhamento */
-.comp-card {
-  background: linear-gradient(135deg, var(--purple-soft) 0%, #EEF2FF 100%);
-  border: 1px solid var(--purple-light);
-}
-.comp-header { display: flex; align-items: center; gap: 10px; }
-.comp-avatar {
-  width: 40px; height: 40px;
-  border-radius: 50%;
-  background: var(--purple);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 18px;
-}
-.comp-name { font-weight: 700; font-size: 14px; color: var(--text); }
-.comp-spec { font-size: 12px; color: var(--text-3); }
-.comp-chips {
-  display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px;
-}
-.comp-chip {
-  font-size: 10px; font-weight: 600;
-  padding: 3px 9px; border-radius: 20px;
-  background: white;
-  color: var(--purple);
-  border: 1px solid var(--purple-light);
-}
-
-/* ─── PERFIL ─── */
-.profile-hero {
-  background: linear-gradient(135deg, var(--purple) 0%, var(--purple-dark) 100%);
-  border-radius: var(--radius);
-  padding: 20px;
-  color: white;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 4px;
-}
-.profile-big-avatar {
-  width: 60px; height: 60px;
-  border-radius: 50%;
-  background: rgba(255,255,255,.25);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28px;
-  flex-shrink: 0;
-}
-.profile-name {
-  font-family: 'Sora', sans-serif;
-  font-size: 18px; font-weight: 700;
-}
-.profile-email { font-size: 12px; opacity: .8; margin-top: 2px; }
-.profile-badge {
-  display: inline-flex; align-items: center;
-  background: rgba(255,255,255,.2);
-  border-radius: 20px; padding: 3px 10px;
-  font-size: 11px; font-weight: 600;
-  margin-top: 6px;
-}
-
-.config-row {
-  display: flex; align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border);
-  gap: 12px;
-  cursor: pointer;
-}
-.config-row:last-child { border-bottom: none; }
-.config-icon-wrap {
-  width: 36px; height: 36px;
-  border-radius: 10px;
-  background: var(--purple-soft);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 16px;
-  flex-shrink: 0;
-}
-.config-text { flex: 1; }
-.config-title { font-size: 14px; font-weight: 600; color: var(--text); }
-.config-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
-.config-chevron { color: var(--text-3); font-size: 16px; }
-
-/* Toggle */
-.toggle-wrap { display: flex; align-items: center; }
-.toggle {
-  width: 44px; height: 26px;
-  border-radius: 13px;
-  border: none;
-  background: var(--border);
-  position: relative;
-  cursor: pointer;
-  transition: background .2s;
-}
-.toggle.on { background: var(--purple); }
-.toggle::after {
-  content: '';
-  position: absolute;
-  width: 20px; height: 20px;
-  border-radius: 50%;
-  background: white;
-  top: 3px; left: 3px;
-  transition: left .2s;
-  box-shadow: 0 1px 4px rgba(0,0,0,.2);
-}
-.toggle.on::after { left: 21px; }
-
-/* ─── BOTTOM NAV ─── */
-.bottom-nav {
-  height: var(--nav-h);
-  display: flex;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-  padding: 0 8px 8px;
-}
-.nav-btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 12px;
-  padding: 8px 4px 4px;
-  transition: background .15s;
-  color: var(--text-3);
-  gap: 3px;
-}
-.nav-btn.active { color: var(--purple); }
-.nav-btn:active { background: var(--purple-soft); }
-.nav-icon {
-  font-size: 22px;
-  transition: transform .15s;
-}
-.nav-btn.active .nav-icon { transform: scale(1.1); }
-.nav-label { font-size: 10px; font-weight: 600; letter-spacing: .02em; }
-.nav-dot {
-  width: 4px; height: 4px;
-  border-radius: 50%;
-  background: var(--purple);
-  display: none;
-}
-.nav-btn.active .nav-dot { display: block; }
-
-/* ─── MODALS ─── */
-.modal-overlay {
-  display: none;
-  position: fixed; inset: 0;
-  background: rgba(26,16,51,.55);
-  backdrop-filter: blur(4px);
-  z-index: 200;
-  align-items: flex-end;
-  justify-content: center;
-  animation: overlayIn .2s ease;
-}
-.modal-overlay.open { display: flex; }
-@keyframes overlayIn { from { opacity:0; } to { opacity:1; } }
-
-.modal-sheet {
-  background: var(--surface);
-  border-radius: 24px 24px 0 0;
-  width: 100%;
-  max-width: 430px;
-  max-height: 90vh;
-  overflow-y: auto;
-  padding: 0 20px 36px;
-  animation: sheetUp .25s cubic-bezier(.22,.68,0,1.2);
-}
-.modal-sheet::-webkit-scrollbar { width:0; }
-@keyframes sheetUp {
-  from { transform: translateY(40px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.modal-handle {
-  width: 36px; height: 4px;
-  border-radius: 2px;
-  background: var(--border);
-  margin: 14px auto 20px;
-}
-.modal-title {
-  font-family: 'Sora', sans-serif;
-  font-size: 18px; font-weight: 700;
-  color: var(--text);
-  margin-bottom: 20px;
-}
-
-/* Forms */
-.form-group { margin-bottom: 14px; }
-.form-label {
-  font-size: 12px; font-weight: 600;
-  color: var(--text-2);
-  display: block; margin-bottom: 6px;
-  text-transform: uppercase; letter-spacing: .05em;
-}
-.form-input, .form-select {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1.5px solid var(--border);
-  border-radius: 12px;
-  font-family: inherit;
-  font-size: 14px;
-  color: var(--text);
-  background: var(--surface);
-  outline: none;
-  transition: border-color .15s, box-shadow .15s;
-}
-.form-input:focus, .form-select:focus {
-  border-color: var(--purple);
-  box-shadow: 0 0 0 3px rgba(124,58,237,.12);
-}
-.form-select { cursor: pointer; }
-
-.btn-row { display: flex; gap: 10px; margin-top: 20px; }
-.btn {
-  flex: 1; padding: 13px;
-  border-radius: 12px;
-  border: none;
-  font-family: inherit;
-  font-size: 14px; font-weight: 600;
-  cursor: pointer;
-  transition: transform .15s, box-shadow .15s;
-}
-.btn:active { transform: scale(.98); }
-.btn-primary {
-  background: linear-gradient(135deg, var(--purple) 0%, var(--purple-dark) 100%);
-  color: white;
-  box-shadow: 0 4px 12px rgba(124,58,237,.3);
-}
-.btn-secondary {
-  background: var(--surface2);
-  color: var(--text-2);
-}
-.check-group { display: flex; flex-direction: column; gap: 8px; }
-.check-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px;
-  background: var(--surface2);
-  border-radius: 10px;
-  cursor: pointer;
-}
-.check-item input { width:16px; height:16px; accent-color: var(--purple); }
-.check-item label { font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; }
-
-/* ─── ALARM MODAL ─── */
-.alarm-overlay {
-  display: none;
-  position: fixed; inset: 0;
-  background: rgba(26,16,51,.8);
-  backdrop-filter: blur(8px);
-  z-index: 300;
-  align-items: center;
-  justify-content: center;
-}
-.alarm-overlay.open { display: flex; }
-.alarm-box {
-  background: var(--surface);
-  border-radius: 24px;
-  padding: 36px 28px 28px;
-  width: 88%;
-  max-width: 340px;
-  text-align: center;
-  animation: bounceIn .35s cubic-bezier(.22,.68,0,1.4);
-  box-shadow: var(--shadow-lg);
-}
-@keyframes bounceIn {
-  from { transform: scale(.8); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-.alarm-ring {
-  font-size: 64px;
-  display: block;
-  animation: ring 0.6s ease-in-out infinite;
-  margin-bottom: 16px;
-}
-@keyframes ring {
-  0%,100% { transform: rotate(0); }
-  25% { transform: rotate(-12deg); }
-  75% { transform: rotate(12deg); }
-}
-.alarm-t { font-family:'Sora',sans-serif; font-size:22px; font-weight:800; color:var(--text); }
-.alarm-med { font-size:16px; font-weight:600; color:var(--purple); margin:6px 0 4px; }
-.alarm-time { font-size:13px; color:var(--text-3); margin-bottom:24px; }
-.alarm-btns { display:flex; gap:10px; }
-.alarm-btn {
-  flex:1; padding:13px;
-  border-radius:12px; border:none;
-  font-family:inherit; font-size:14px; font-weight:700;
-  cursor:pointer; transition:transform .15s;
-}
-.alarm-btn:active { transform:scale(.97); }
-.alarm-snooze { background:var(--surface2); color:var(--text-2); }
-.alarm-take { background:var(--green); color:white; box-shadow:0 4px 12px rgba(16,185,129,.3); }
-
-/* ─── HISTORY MODAL ─── */
-.hist-entry {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-.hist-entry:last-child { border-bottom: none; }
-.hist-status {
-  width: 30px; height: 30px;
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 14px; flex-shrink: 0;
-}
-.hist-taken { background: var(--green-soft); }
-.hist-pending { background: var(--orange-soft); }
-.hist-miss { background: var(--red-soft); }
-.hist-info { flex:1; }
-.hist-date { font-size:13px; font-weight:600; color:var(--text); }
-.hist-hour { font-size:11px; color:var(--text-3); }
-
-/* ─── VITAL HISTORY CHART ─── */
-.mini-chart {
-  display: flex; align-items: flex-end; gap: 4px;
-  height: 50px; margin-top: 10px;
-}
-.bar {
-  flex: 1;
-  border-radius: 4px 4px 0 0;
-  background: var(--purple-soft);
-  position: relative;
-  min-height: 8px;
-  transition: background .15s;
-}
-.bar.hi { background: var(--purple); }
-
-/* ─── EMPTY STATE ─── */
-.empty {
-  text-align: center;
-  padding: 48px 20px;
-}
-.empty-icon { font-size: 48px; margin-bottom: 12px; }
-.empty-title { font-size: 16px; font-weight: 600; color: var(--text); }
-.empty-sub { font-size: 13px; color: var(--text-3); margin-top: 4px; }
-
-.tipo-opt {
-  display: flex; flex-direction: column; align-items: center;
-  padding: 12px 8px;
-  border-radius: 12px;
-  border: 1.5px solid var(--border);
-  background: var(--surface2);
-  cursor: pointer; transition: all .15s;
-  font-family: inherit;
-  color: var(--text-2);
-}
-.tipo-opt.active {
-  border-color: var(--purple);
-  background: var(--purple-soft);
-  color: var(--purple);
-}
-
-/* ─── COMPARTILHAMENTO CARDS ─── */
-.comp-card {
-  background: linear-gradient(135deg, var(--purple-soft) 0%, #EEF2FF 100%);
-  border: 1px solid var(--purple-light);
-}
-.comp-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.comp-avatar {
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px; flex-shrink: 0;
-}
-.comp-avatar.medico   { background: #DBEAFE; }
-.comp-avatar.familiar { background: #D1FAE5; }
-.comp-avatar.cuidador { background: #FEF3C7; }
-.comp-name { font-weight: 700; font-size: 14px; color: var(--text); }
-.comp-spec { font-size: 12px; color: var(--text-3); }
-.comp-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
-.comp-chip {
-  font-size: 10px; font-weight: 600;
-  padding: 3px 9px; border-radius: 20px;
-  background: white; color: var(--purple);
-  border: 1px solid var(--purple-light);
-}
-.comp-footer {
-  display: flex; align-items: center; justify-content: space-between;
-  padding-top: 10px; border-top: 1px solid rgba(124,58,237,.15);
-}
-.comp-since { font-size: 11px; color: var(--text-3); }
-.comp-actions { display: flex; gap: 6px; }
-.comp-btn {
-  font-size: 11px; font-weight: 600;
-  padding: 5px 10px; border-radius: 8px; border: none;
-  cursor: pointer; transition: opacity .15s;
-  font-family: inherit;
-}
-.comp-btn:active { opacity: .75; }
-.comp-btn-pause  { background: var(--orange-soft); color: var(--orange); }
-.comp-btn-remove { background: var(--red-soft);    color: var(--red); }
-.comp-btn-resume { background: var(--green-soft);  color: var(--green); }
-
-.tipo-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 10px; font-weight: 700;
-  padding: 3px 8px; border-radius: 20px;
-  margin-bottom: 4px;
-}
-.tipo-medico   { background: #DBEAFE; color: var(--blue); }
-.tipo-familiar { background: #D1FAE5; color: var(--green); }
-.tipo-cuidador { background: #FEF3C7; color: var(--orange); }
-
-/* ─── DASHBOARD CUSTOMIZATION ─── */
-.dash-card-toggle {
-  display: flex; align-items: center;
-  padding: 12px 14px;
-  background: var(--surface);
-  border-radius: 12px;
-  border: 1.5px solid var(--border);
-  margin-bottom: 8px;
-  gap: 12px;
-  transition: border-color .15s;
-}
-.dash-card-toggle.enabled { border-color: var(--purple-light); background: var(--purple-soft); }
-.dash-icon-box {
-  width: 40px; height: 40px;
-  border-radius: 10px;
-  background: var(--surface2);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 18px; flex-shrink: 0;
-}
-.dash-card-toggle.enabled .dash-icon-box { background: white; }
-.dash-info { flex: 1; }
-.dash-name { font-size: 13px; font-weight: 600; color: var(--text); }
-.dash-desc { font-size: 11px; color: var(--text-3); margin-top: 1px; }
-
-/* ─── SECTION TABS ─── */
-.section-tabs {
-  display: flex; gap: 6px;
-  margin-bottom: 14px; overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-}
-.section-tabs::-webkit-scrollbar { display: none; }
-.stab {
-  flex-shrink: 0;
-  padding: 7px 14px;
-  border-radius: 20px;
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  font-size: 12px; font-weight: 600;
-  color: var(--text-3);
-  cursor: pointer; transition: all .15s;
-  font-family: inherit;
-}
-.stab.active {
-  background: var(--purple);
-  border-color: var(--purple);
-  color: white;
-}
-
-/* ─── TOAST ─── */
-#toast {
-  position: fixed;
-  bottom: calc(var(--nav-h) + 12px);
-  left: 50%; transform: translateX(-50%) translateY(20px);
-  background: var(--text);
-  color: white;
-  padding: 10px 20px;
-  border-radius: 20px;
-  font-size: 13px; font-weight: 500;
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity .2s, transform .2s;
-  z-index: 500;
-  pointer-events: none;
-}
-#toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teep Saúde - App de Saúde</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div id="root">
+        <div class="mobile-container">
+            <!-- Header -->
+            <div class="header" id="header">
+                <div>
+                    <div class="greeting" id="greeting">Olá!</div>
+                    <div class="date" id="date"></div>
+                </div>
+            </div>
 
-<div id="shell">
-  <!-- HEADER -->
-  <div class="app-header">
-    <div class="header-row">
-      <div>
-        <div class="greeting" id="greeting">Olá, João! 👋</div>
-        <div class="date-line" id="dateLine"></div>
-      </div>
-      <div class="avatar">👤</div>
-    </div>
-  </div>
+            <!-- Screens -->
+            <div class="app-content">
+                <!-- Home Screen -->
+                <div class="screen active" id="homeScreen">
+                    <div class="section-title">Sinais Vitais</div>
+                    <div id="homeVitals"></div>
+                    
+                    <div class="section-title">Medicações</div>
+                    <div id="homeMeds"></div>
+                    
+                    <div class="section-title">Próxima Consulta</div>
+                    <div id="homeConsulta"></div>
+                </div>
 
-  <!-- BODY -->
-  <div class="app-body">
+                <!-- Saúde Screen -->
+                <div class="screen" id="saudeScreen">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <div class="section-title" style="margin: 0;">Sinais Vitais</div>
+                        <button class="config-gear-btn" onclick="openVitaisConfigModal()">⚙️</button>
+                    </div>
+                    <div id="saudeContent"></div>
+                </div>
 
-    <!-- ── HOME ── -->
-    <div class="screen active" id="homeScreen">
-      <div class="summary-strip" id="summaryStrip"></div>
+                <!-- Composição Corporal Screen -->
+                <div class="screen" id="composicaoScreen">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div class="section-title" style="margin: 0;">Composição Corporal</div>
+                        <button class="config-gear-btn" onclick="openComposicaoConfigModal()">⚙️</button>
+                    </div>
+                    <div id="composicaoContent"></div>
+                </div>
 
-      <div id="homeVitaisSection">
-        <div class="section-label">Sinais Vitais</div>
-        <div id="homeVitals"></div>
-      </div>
+                <!-- Medicações Screen -->
+                <div class="screen" id="medicacoesScreen">
+                    <div class="med-calendar-bar" onclick="openMedicationCalendarModal()">
+                        <div class="med-calendar-left">
+                            <span class="med-calendar-icon">🗓️</span>
+                            <div class="med-calendar-texts">
+                                <div class="med-calendar-title">Calendário de Medicações</div>
+                                <div class="med-calendar-subtitle" id="medCalendarTodayLabel">Hoje</div>
+                            </div>
+                        </div>
+                        <span class="med-calendar-open">Ver por dia</span>
+                    </div>
 
-      <div id="homeMedsSection">
-        <div class="section-label">Medicações de Hoje</div>
-        <div id="homeMeds"></div>
-      </div>
+                    <div class="med-header-widget">
+                        <div class="clock-widget" id="clockWidget" onclick="openDailyScheduleModal()">
+                            <div class="clock-time" id="clockTime">14:30</div>
+                            <div class="clock-label">Agenda do Dia</div>
+                            <span class="clock-widget-plus" aria-hidden="true">+</span>
+                        </div>
+                        <div class="med-summary">
+                            <div class="summary-item">
+                                <span class="summary-label">Tomadas</span>
+                                <span class="summary-value" id="medTomadas">3</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Pendentes</span>
+                                <span class="summary-value" id="medPendentes">2</span>
+                            </div>
+                        </div>
+                    </div>
 
-      <div id="homeConsultaSection">
-        <div class="section-label">Próxima Consulta</div>
-        <div id="homeConsulta"></div>
-      </div>
+                    <div class="med-page-divider"></div>
 
-      <div id="homeExamesSection">
-        <div class="section-label">Exames</div>
-        <div id="homeExames"></div>
-      </div>
-    </div>
+                    <div class="med-actions-row">
+                        <div class="section-title med-section-title">Minhas Medicações</div>
+                        <div class="med-actions-group">
+                            <button class="med-chip-btn med-chip-btn-success" id="takeAllPendingBtn" title="Tomar todas as pendentes de hoje">✅ Pendentes</button>
+                            <button class="med-icon-btn med-icon-btn-warning" id="reportBtn" title="Relatório de Aderência">📊</button>
+                            <button class="med-icon-btn med-icon-btn-primary" id="addMedBtn" title="Adicionar medicação">+</button>
+                        </div>
+                    </div>
+                    <div id="medicationsOverdueNow"></div>
+                    <div id="medicacoesContent"></div>
+                </div>
 
-    <!-- ── SAÚDE ── -->
-    <div class="screen" id="saudeScreen">
-      <div class="screen-header">
-        <div class="screen-title">Sinais Vitais</div>
-      </div>
-      <div id="saudeContent" style="margin-top:14px;"></div>
-    </div>
+                <!-- Agenda Screen -->
+                <div class="screen" id="agendaScreen">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div class="section-title" style="margin: 0;">Minha Agenda</div>
+                        <button class="add-button" id="addAgendaBtn" style="width: 40px; height: 40px; font-size: 20px;">+</button>
+                    </div>
+                    <div id="agendaContent"></div>
+                </div>
 
-    <!-- ── MEDICAÇÕES ── -->
-    <div class="screen" id="medicacoesScreen">
-      <div class="screen-header">
-        <div class="screen-title">Medicações</div>
-        <button class="add-btn" id="addMedBtn">+</button>
-      </div>
-      <div id="medicacoesContent" style="margin-top:14px;"></div>
-    </div>
+                <!-- Perfil Screen -->
+                <div class="screen" id="perfilScreen">
+                    <div id="perfilContent"></div>
+                </div>
+            </div>
 
-    <!-- ── AGENDA ── -->
-    <div class="screen" id="agendaScreen">
-      <div class="screen-header">
-        <div class="screen-title">Agenda</div>
-        <button class="add-btn" id="addAgendaBtn">+</button>
-      </div>
-      <div id="agendaContent" style="margin-top:14px;"></div>
-    </div>
-
-    <!-- ── PERFIL ── -->
-    <div class="screen" id="perfilScreen">
-      <div id="perfilContent"></div>
-    </div>
-
-  </div><!-- /app-body -->
-
-  <!-- BOTTOM NAV -->
-  <nav class="bottom-nav">
-    <button class="nav-btn active" data-screen="homeScreen">
-      <span class="nav-icon">🏠</span>
-      <span class="nav-label">Início</span>
-      <span class="nav-dot"></span>
-    </button>
-    <button class="nav-btn" data-screen="saudeScreen">
-      <span class="nav-icon">❤️</span>
-      <span class="nav-label">Saúde</span>
-      <span class="nav-dot"></span>
-    </button>
-    <button class="nav-btn" data-screen="medicacoesScreen">
-      <span class="nav-icon">💊</span>
-      <span class="nav-label">Remédios</span>
-      <span class="nav-dot"></span>
-    </button>
-    <button class="nav-btn" data-screen="agendaScreen">
-      <span class="nav-icon">📅</span>
-      <span class="nav-label">Agenda</span>
-      <span class="nav-dot"></span>
-    </button>
-    <button class="nav-btn" data-screen="perfilScreen">
-      <span class="nav-icon">👤</span>
-      <span class="nav-label">Perfil</span>
-      <span class="nav-dot"></span>
-    </button>
-  </nav>
-</div><!-- /shell -->
-
-<!-- TOAST -->
-<div id="toast"></div>
-
-<!-- ALARM -->
-<div class="alarm-overlay" id="alarmOverlay">
-  <div class="alarm-box">
-    <span class="alarm-ring">🔔</span>
-    <div class="alarm-t">Hora do Remédio!</div>
-    <div class="alarm-med" id="alarmMedName"></div>
-    <div class="alarm-time" id="alarmTime"></div>
-    <div class="alarm-btns">
-      <button class="alarm-btn alarm-snooze" id="alarmSnooze">⏰ Adiar</button>
-      <button class="alarm-btn alarm-take" id="alarmTake">✅ Já Tomei</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL ADD MED -->
-<div class="modal-overlay" id="addMedModal">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title">💊 Adicionar Medicação</div>
-    <form id="addMedForm">
-      <div class="form-group">
-        <label class="form-label">Nome</label>
-        <input class="form-input" id="inNome" placeholder="Ex: Paracetamol" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Dosagem</label>
-        <input class="form-input" id="inDose" placeholder="Ex: 500mg" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Frequência</label>
-        <select class="form-select" id="inFreq" required>
-          <option value="">Selecione</option>
-          <option>1x ao dia</option>
-          <option>2x ao dia</option>
-          <option>3x ao dia</option>
-          <option>4x ao dia</option>
-          <option>Conforme necessário</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Horário Principal</label>
-        <input type="time" class="form-input" id="inHorario" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Quantidade na Embalagem</label>
-        <input type="number" class="form-input" id="inEstoque" placeholder="Ex: 30" min="1" required>
-      </div>
-      <div class="btn-row">
-        <button type="button" class="btn btn-secondary" id="cancelAddMed">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Adicionar</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- MODAL EDIT MED -->
-<div class="modal-overlay" id="editMedModal">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title">✏️ Editar Medicação</div>
-    <form id="editMedForm">
-      <div class="form-group">
-        <label class="form-label">Nome</label>
-        <input class="form-input" id="eNome" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Dosagem</label>
-        <input class="form-input" id="eDose" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Frequência</label>
-        <select class="form-select" id="eFreq" required>
-          <option>1x ao dia</option>
-          <option>2x ao dia</option>
-          <option>3x ao dia</option>
-          <option>4x ao dia</option>
-          <option>Conforme necessário</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Horário</label>
-        <input type="time" class="form-input" id="eHorario" required>
-      </div>
-      <div class="btn-row">
-        <button type="button" class="btn btn-secondary" id="cancelEditMed">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Salvar</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- MODAL ADD AGENDA -->
-<div class="modal-overlay" id="addAgendaModal">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title">📅 Novo Agendamento</div>
-    <form id="addAgendaForm">
-      <div class="form-group">
-        <label class="form-label">Tipo</label>
-        <select class="form-select" id="agTipo" required onchange="toggleAgendaFields()">
-          <option value="">Selecione</option>
-          <option value="consulta">Consulta</option>
-          <option value="exame">Exame</option>
-        </select>
-      </div>
-      <div id="agConsultaFields">
-        <div class="form-group">
-          <label class="form-label">Médico</label>
-          <input class="form-input" id="agMedico" placeholder="Dr. Nome">
+            <!-- Bottom Navigation -->
+            <div class="bottom-nav">
+                <button class="nav-item active" data-screen="homeScreen">
+                    <div class="nav-icon">🏠</div>
+                    <div>Home</div>
+                </button>
+                <button class="nav-item" data-screen="saudeScreen">
+                    <div class="nav-icon">❤️</div>
+                    <div>Saúde</div>
+                </button>
+                <button class="nav-item" data-screen="composicaoScreen">
+                    <div class="nav-icon">📊</div>
+                    <div>Corpo</div>
+                </button>
+                <button class="nav-item" data-screen="medicacoesScreen">
+                    <div class="nav-icon">💊</div>
+                    <div>Medicações</div>
+                </button>
+                <button class="nav-item" data-screen="agendaScreen">
+                    <div class="nav-icon">📅</div>
+                    <div>Agenda</div>
+                </button>
+                <button class="nav-item" data-screen="perfilScreen">
+                    <div class="nav-icon">👤</div>
+                    <div>Perfil</div>
+                </button>
+            </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Especialidade</label>
-          <input class="form-input" id="agEspec" placeholder="Ex: Cardiologia">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Tipo de Atendimento</label>
-          <select class="form-select" id="agAtend">
-            <option value="Presencial">🏥 Presencial</option>
-            <option value="Online">💻 Online</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Motivo</label>
-          <input class="form-input" id="agMotivo" placeholder="Ex: Acompanhamento">
-        </div>
-      </div>
-      <div id="agExameFields" style="display:none;">
-        <div class="form-group">
-          <label class="form-label">Nome do Exame</label>
-          <input class="form-input" id="agExameNome" placeholder="Ex: Hemograma Completo">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Solicitado por</label>
-          <input class="form-input" id="agExameMedico" placeholder="Dr. Nome">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Data</label>
-        <input type="date" class="form-input" id="agData" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Horário</label>
-        <input type="time" class="form-input" id="agHora">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Local</label>
-        <input class="form-input" id="agLocal" placeholder="Ex: Clínica Central">
-      </div>
-      <div class="btn-row">
-        <button type="button" class="btn btn-secondary" id="cancelAddAgenda">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Agendar</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- MODAL ADD VITAL -->
-<div class="modal-overlay" id="addVitalModal">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title" id="addVitalTitle">Adicionar Leitura</div>
-    <form id="addVitalForm">
-      <div class="form-group">
-        <label class="form-label">Valor</label>
-        <input class="form-input" id="vValor" placeholder="Ex: 78" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Fonte</label>
-        <select class="form-select" id="vFonte" required>
-          <option value="Manual">Manual</option>
-          <option value="Pulseira">⌚ Pulseira</option>
-          <option value="Google Fit">📱 Google Fit</option>
-        </select>
-      </div>
-      <div class="btn-row">
-        <button type="button" class="btn btn-secondary" id="cancelAddVital">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Salvar</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- MODAL VITAL HISTORY -->
-<div class="modal-overlay" id="vitalHistModal">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title" id="histTitle">Histórico</div>
-    <div id="histContent"></div>
-    <button class="btn btn-secondary" style="margin-top:16px;width:100%;" id="closeHistModal">Fechar</button>
-  </div>
-</div>
-
-<!-- MODAL COMPARTILHAMENTO -->
-<div class="modal-overlay" id="compModal">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title">🔗 Novo Compartilhamento</div>
-    <form id="compForm">
-      <div class="form-group">
-        <label class="form-label">Tipo de Acesso</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:4px;" id="tipoSelector">
-          <button type="button" class="tipo-opt active" data-tipo="medico"   onclick="selectTipo('medico',this)">
-            <div style="font-size:24px;margin-bottom:4px;">👨‍⚕️</div>
-            <div style="font-size:11px;font-weight:600;">Médico</div>
-          </button>
-          <button type="button" class="tipo-opt" data-tipo="familiar" onclick="selectTipo('familiar',this)">
-            <div style="font-size:24px;margin-bottom:4px;">👨‍👩‍👧</div>
-            <div style="font-size:11px;font-weight:600;">Familiar</div>
-          </button>
-          <button type="button" class="tipo-opt" data-tipo="cuidador" onclick="selectTipo('cuidador',this)">
-            <div style="font-size:24px;margin-bottom:4px;">🧑‍🦺</div>
-            <div style="font-size:11px;font-weight:600;">Cuidador</div>
-          </button>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Nome</label>
-        <input class="form-input" id="compNome" placeholder="Nome completo" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label" id="compSubtituloLabel">Especialidade</label>
-        <input class="form-input" id="compSubtitulo" placeholder="Ex: Cardiologia" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Dados que esta pessoa poderá ver</label>
-        <div class="check-group">
-          <label class="check-item"><input type="checkbox" name="compDados" value="Sinais Vitais"  checked><span>❤️ Sinais Vitais</span></label>
-          <label class="check-item"><input type="checkbox" name="compDados" value="Medicações"     checked><span>💊 Medicações</span></label>
-          <label class="check-item"><input type="checkbox" name="compDados" value="Exames"         checked><span>🔬 Exames e Resultados</span></label>
-          <label class="check-item"><input type="checkbox" name="compDados" value="Agenda"              ><span>📅 Agenda de Consultas</span></label>
-          <label class="check-item"><input type="checkbox" name="compDados" value="Histórico"           ><span>📋 Histórico Completo</span></label>
-        </div>
-      </div>
-      <div class="btn-row">
-        <button type="button" class="btn btn-secondary" id="cancelComp">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Compartilhar</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<script>
-// ───── DATA ─────
-const db = {
-  usuario: {
-    nome: 'João Silva',
-    email: 'joao@email.com',
-    cpf: '123.456.789-00',
-    telefone: '(11) 98765-4321',
-    nascimento: '1985-05-15'
-  },
-  vitais: [
-    { id:1, tipo:'Batimento Cardíaco', valor:78,      unidade:'bpm',    ideal:'60–100',    fonte:'Pulseira',   icon:'🫀', dataHora:'25/03/2026 14:30', historico:[{val:75},{val:77},{val:78},{val:80},{val:76},{val:78}] },
-    { id:2, tipo:'Pressão Arterial',   valor:'125/82', unidade:'mmHg',   ideal:'120/80',    fonte:'Manual',     icon:'🩸', dataHora:'25/03/2026 12:15', historico:[{val:125},{val:122},{val:128},{val:124},{val:127},{val:125}] },
-    { id:3, tipo:'Temperatura',        valor:36.8,     unidade:'°C',     ideal:'36–37.5',   fonte:'Manual',     icon:'🌡️', dataHora:'25/03/2026 15:45', historico:[{val:36.5},{val:36.8},{val:36.9},{val:36.7},{val:36.8},{val:36.8}] },
-    { id:4, tipo:'Passos',             valor:8234,     unidade:'passos', ideal:'5k–15k',    fonte:'Google Fit', icon:'👟', dataHora:'25/03/2026 23:59', historico:[{val:6000},{val:9000},{val:7500},{val:10200},{val:8234},{val:8234}] },
-    { id:5, tipo:'Oxigenação',         valor:98,       unidade:'%',      ideal:'95–100',    fonte:'Pulseira',   icon:'💨', dataHora:'25/03/2026 16:00', historico:[{val:97},{val:98},{val:99},{val:97},{val:98},{val:98}] },
-    { id:6, tipo:'Calorias',           valor:2100,     unidade:'kcal',   ideal:'1800–2500', fonte:'Google Fit', icon:'🔥', dataHora:'25/03/2026 23:59', historico:[{val:1900},{val:2200},{val:2050},{val:2300},{val:2100},{val:2100}] }
-  ],
-  medicacoes: [
-    { id:1, nome:'Dipirona',       dosagem:'500mg', horario:'14:30', frequencia:'3x ao dia', estoque:30, estoqueMin:7, aderencia:95, historico:[{data:'25/03/2026',hora:'08:00',status:'tomado'},{data:'25/03/2026',hora:'14:30',status:'tomado'},{data:'25/03/2026',hora:'20:00',status:'pendente'}] },
-    { id:2, nome:'Losartana',      dosagem:'50mg',  horario:'08:00', frequencia:'1x ao dia', estoque:28, estoqueMin:5, aderencia:93, historico:[] },
-    { id:3, nome:'Metformina',     dosagem:'850mg', horario:'08:00', frequencia:'2x ao dia', estoque:60, estoqueMin:10, aderencia:98, historico:[] },
-    { id:4, nome:'Atorvastatina',  dosagem:'20mg',  horario:'20:00', frequencia:'1x ao dia', estoque:6,  estoqueMin:5, aderencia:96, historico:[] },
-    { id:5, nome:'Omeprazol',      dosagem:'20mg',  horario:'07:00', frequencia:'1x ao dia', estoque:28, estoqueMin:7, aderencia:94, historico:[] }
-  ],
-  consultas: [
-    { id:1, medico:'Dr. Carlos Silva', especialidade:'Cardiologia',  data:'10/04/2026', hora:'14:30', tipo:'Presencial', local:'Clínica Central',  motivo:'Acompanhamento cardíaco' },
-    { id:2, medico:'Dra. Ana Santos',  especialidade:'Clínica Geral', data:'15/04/2026', hora:'10:00', tipo:'Online',     local:'Telemedicina',    motivo:'Consulta de rotina' }
-  ],
-  examesAgendados: [
-    { id:1, nome:'Hemograma Completo',  data:'05/04/2026', local:'Laboratório ABC',  medico:'Dr. Carlos Silva' },
-    { id:2, nome:'Eletrocardiograma',   data:'12/04/2026', local:'Clínica Central',  medico:'Dr. Carlos Silva' }
-  ],
-  examesRealizados: [
-    { id:1, nome:'Hemograma Completo',  data:'28/01/2026', local:'Laboratório ABC',  resultado:'Resultado normal. Todos os valores dentro dos limites esperados.' },
-    { id:2, nome:'Eletrocardiograma',   data:'20/01/2026', local:'Clínica Central',  resultado:'Ritmo cardíaco normal. Sem alterações detectadas.' }
-  ],
-  compartilhamentos: [
-    { id:1, tipo:'medico',   nome:'Dr. Carlos Silva',   subtitulo:'Cardiologia',          dados:['Sinais Vitais','Medicações','Exames'], ativo:true,  desde:'Jan 2026' },
-    { id:2, tipo:'familiar', nome:'Maria Silva',         subtitulo:'Esposa',               dados:['Sinais Vitais','Medicações'],          ativo:true,  desde:'Fev 2026' },
-    { id:3, tipo:'cuidador', nome:'Roberto Souza',       subtitulo:'Cuidador Profissional', dados:['Sinais Vitais','Agenda'],             ativo:false, desde:'Mar 2026' }
-  ]
-};
-
-// ───── DASHBOARD PREFS ─────
-const dashCards = [
-  { id:'resumo',   icon:'📊', nome:'Resumo do Dia',    desc:'Cards de visão geral rápida',     ativo:true  },
-  { id:'vitais',   icon:'❤️', nome:'Sinais Vitais',    desc:'Batimento, pressão, temperatura', ativo:true  },
-  { id:'meds',     icon:'💊', nome:'Medicações',        desc:'Remédios e aderência do dia',     ativo:true  },
-  { id:'consulta', icon:'📅', nome:'Próxima Consulta', desc:'Agendamento mais próximo',         ativo:true  },
-  { id:'exames',   icon:'🔬', nome:'Exames',            desc:'Exames agendados',                ativo:false },
-  { id:'passos',   icon:'👟', nome:'Atividade Física', desc:'Passos e calorias do dia',         ativo:true  },
-];
-
-// ───── HELPERS ─────
-const $ = id => document.getElementById(id);
-const mes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-
-function toast(msg) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2400);
-}
-
-function closeModal(id) {
-  $(id).classList.remove('open');
-}
-
-function openModal(id) {
-  $(id).classList.add('open');
-}
-
-function parseDateBR(str) {
-  const [d,m,y] = str.split('/');
-  return new Date(+y, +m-1, +d);
-}
-
-function formatDateBlock(str) {
-  const dt = parseDateBR(str);
-  return { day: dt.getDate(), mon: mes[dt.getMonth()] };
-}
-
-function calcComprimidos(med) {
-  const tomados = med.historico.filter(h => h.status === 'tomado').length;
-  return Math.max(0, med.estoque - tomados);
-}
-
-function jaTomadiHoje(med) {
-  const hoje = new Date().toLocaleDateString('pt-BR');
-  return med.historico.some(h => h.data === hoje && h.status === 'tomado');
-}
-
-// ───── RENDERS ─────
-
-function renderHome() {
-  const tomados = db.medicacoes.filter(m => jaTomadiHoje(m)).length;
-  const totalMeds = db.medicacoes.length;
-
-  // Summary strip
-  if (dashCards.find(c=>c.id==='resumo')?.ativo) {
-    $('summaryStrip').style.display = '';
-    $('summaryStrip').innerHTML = `
-      <div class="sum-card">
-        <div class="sum-icon">💊</div>
-        <div class="sum-val">${tomados}/${totalMeds}</div>
-        <div class="sum-lbl">Remédios Hoje</div>
-      </div>
-      <div class="sum-card">
-        <div class="sum-icon">📅</div>
-        <div class="sum-val">${db.consultas.length}</div>
-        <div class="sum-lbl">Consultas</div>
-      </div>
-      <div class="sum-card">
-        <div class="sum-icon">❤️</div>
-        <div class="sum-val">Bom</div>
-        <div class="sum-lbl">Saúde Geral</div>
-      </div>`;
-  } else {
-    $('summaryStrip').style.display = 'none';
-  }
-
-  // Vitais
-  const homeVitaisSection = $('homeVitaisSection');
-  if (dashCards.find(c=>c.id==='vitais')?.ativo) {
-    homeVitaisSection.style.display = '';
-    $('homeVitals').innerHTML = db.vitais.slice(0,3).map(v=>vitalCard(v,false)).join('');
-  } else { homeVitaisSection.style.display = 'none'; }
-
-  // Meds
-  const homeMedsSection = $('homeMedsSection');
-  if (dashCards.find(c=>c.id==='meds')?.ativo) {
-    homeMedsSection.style.display = '';
-    $('homeMeds').innerHTML = db.medicacoes.slice(0,2).map(medCard).join('');
-  } else { homeMedsSection.style.display = 'none'; }
-
-  // Consulta
-  const homeConsultaSection = $('homeConsultaSection');
-  if (dashCards.find(c=>c.id==='consulta')?.ativo) {
-    homeConsultaSection.style.display = '';
-    $('homeConsulta').innerHTML = db.consultas.length
-      ? consultaCard(db.consultas[0])
-      : `<div class="empty"><div class="empty-icon">📅</div><div class="empty-title">Nenhuma consulta agendada</div></div>`;
-  } else { homeConsultaSection.style.display = 'none'; }
-
-  // Exames
-  const homeExamesSection = $('homeExamesSection');
-  if (dashCards.find(c=>c.id==='exames')?.ativo) {
-    homeExamesSection.style.display = '';
-    $('homeExames').innerHTML = db.examesAgendados.slice(0,2).map(e=>exameCard(e,false)).join('') ||
-      `<div class="empty"><div class="empty-icon">🔬</div><div class="empty-title">Nenhum exame agendado</div></div>`;
-  } else { homeExamesSection.style.display = 'none'; }
-}
-
-function renderSaude() {
-  $('saudeContent').innerHTML = db.vitais.map(v => vitalCard(v, true)).join('');
-}
-
-function renderMedicacoes() {
-  $('medicacoesContent').innerHTML = db.medicacoes.length
-    ? db.medicacoes.map(medCard).join('')
-    : `<div class="empty"><div class="empty-icon">💊</div><div class="empty-title">Nenhuma medicação</div><div class="empty-sub">Adicione sua primeira medicação</div></div>`;
-}
-
-function renderAgenda() {
-  let html = '';
-  if (db.consultas.length) {
-    html += `<div class="section-label">Consultas Agendadas</div>` + db.consultas.map(consultaCard).join('');
-  }
-  if (db.examesAgendados.length) {
-    html += `<div class="section-label">Exames Agendados</div>` + db.examesAgendados.map(e => exameCard(e, false)).join('');
-  }
-  if (db.examesRealizados.length) {
-    html += `<div class="section-label">Exames Realizados</div>` + db.examesRealizados.map(e => exameCard(e, true)).join('');
-  }
-  $('agendaContent').innerHTML = html || `<div class="empty"><div class="empty-icon">📅</div><div class="empty-title">Nenhum agendamento</div></div>`;
-}
-
-function renderPerfil() {
-  const u = db.usuario;
-  const hoje = new Date();
-  const nasc = new Date(u.nascimento);
-  let idade = hoje.getFullYear() - nasc.getFullYear();
-  if (hoje < new Date(hoje.getFullYear(), nasc.getMonth(), nasc.getDate())) idade--;
-
-  const compByTipo = (tipo) => db.compartilhamentos.filter(c => c.tipo === tipo);
-  const tipoInfo = { medico: {label:'Médico/Clínica', emoji:'👨‍⚕️'}, familiar:{label:'Familiar',emoji:'👨‍👩‍👧'}, cuidador:{label:'Cuidador',emoji:'🧑‍🦺'} };
-
-  let html = `
-    <div class="profile-hero">
-      <div class="profile-big-avatar">👤</div>
-      <div>
-        <div class="profile-name">${u.nome}</div>
-        <div class="profile-email">${u.email}</div>
-        <div class="profile-badge">🎂 ${idade} anos</div>
-      </div>
     </div>
 
-    <div class="section-label" style="margin-top:20px;">Informações</div>
-    <div class="card">
-      <div class="config-row"><div class="config-icon-wrap">📱</div><div class="config-text"><div class="config-title">Telefone</div><div class="config-sub">${u.telefone}</div></div></div>
-      <div class="config-row"><div class="config-icon-wrap">🪪</div><div class="config-text"><div class="config-title">CPF</div><div class="config-sub">${u.cpf}</div></div></div>
-    </div>
-
-    <div class="section-label">🎛️ Personalizar Dashboard</div>
-    <div class="card" style="padding:14px 16px;">
-      <div style="font-size:12px;color:var(--text-3);margin-bottom:12px;">Escolha quais cards aparecem na tela Início</div>
-      ${dashCards.map(c => `
-        <div class="dash-card-toggle ${c.ativo?'enabled':''}" id="dash-toggle-${c.id}" onclick="toggleDashCard('${c.id}')">
-          <div class="dash-icon-box">${c.icon}</div>
-          <div class="dash-info">
-            <div class="dash-name">${c.nome}</div>
-            <div class="dash-desc">${c.desc}</div>
-          </div>
-          <div class="toggle-wrap">
-            <button class="toggle ${c.ativo?'on':''}" tabindex="-1"></button>
-          </div>
+    <!-- Modal de Agenda do Dia -->
+    <div class="modal" id="dailyScheduleModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="dailyScheduleTitle">Agenda de Medicações - Hoje</span>
+                <button class="modal-ok" id="closeDailyScheduleModal">OK</button>
+            </div>
+            <div class="schedule-filters">
+                <button class="filter-btn active" onclick="filterScheduleByStatus('todos')">Todos</button>
+                <button class="filter-btn" onclick="filterScheduleByStatus('tomado')">✅ Tomadas</button>
+                <button class="filter-btn" onclick="filterScheduleByStatus('pendente')">⏳ Pendentes</button>
+                <button class="filter-btn" onclick="filterScheduleByStatus('atrasado')">🔴 Atrasadas</button>
+            </div>
+            <div id="dailyScheduleContent" style="max-height: 500px; overflow-y: auto;"></div>
         </div>
-      `).join('')}
     </div>
 
-    <div class="section-label">🔗 Compartilhamento de Dados</div>
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:12px;">Gerencie quem tem acesso às suas informações de saúde</div>
-
-    <div class="section-tabs" id="compTabs">
-      <button class="stab active" onclick="filterComp('todos',this)">Todos (${db.compartilhamentos.length})</button>
-      <button class="stab" onclick="filterComp('medico',this)">👨‍⚕️ Médicos (${compByTipo('medico').length})</button>
-      <button class="stab" onclick="filterComp('familiar',this)">👨‍👩‍👧 Familiares (${compByTipo('familiar').length})</button>
-      <button class="stab" onclick="filterComp('cuidador',this)">🧑‍🦺 Cuidadores (${compByTipo('cuidador').length})</button>
-    </div>
-
-    <div id="compList">
-      ${db.compartilhamentos.map(c => compCard(c)).join('')}
-    </div>
-
-    <button class="btn btn-primary" style="width:100%;margin-top:4px;margin-bottom:16px;" onclick="openModal('compModal')">+ Adicionar Compartilhamento</button>
-
-    <div class="section-label">Dispositivos</div>
-    <div class="card">
-      <div class="config-row">
-        <div class="config-icon-wrap">⌚</div>
-        <div class="config-text"><div class="config-title">Pulseira Inteligente</div><div class="config-sub" style="color:var(--green);">✅ Conectada</div></div>
-        <div class="toggle-wrap"><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-      </div>
-      <div class="config-row">
-        <div class="config-icon-wrap">🔗</div>
-        <div class="config-text"><div class="config-title">Google Fit</div><div class="config-sub" style="color:var(--green);">✅ Conectado</div></div>
-        <div class="toggle-wrap"><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-      </div>
-    </div>
-
-    <div class="section-label">Configurações</div>
-    <div class="card">
-      <div class="config-row"><div class="config-icon-wrap">🔔</div><div class="config-text"><div class="config-title">Notificações</div><div class="config-sub">Alertas de medicação ativos</div></div><span class="config-chevron">›</span></div>
-      <div class="config-row"><div class="config-icon-wrap">🎯</div><div class="config-text"><div class="config-title">Metas de Saúde</div><div class="config-sub">Configure suas metas</div></div><span class="config-chevron">›</span></div>
-    </div>
-
-    <div style="height:8px;"></div>
-  `;
-  $('perfilContent').innerHTML = html;
-}
-
-// ───── CARD BUILDERS ─────
-
-function vitalCard(v, showActions = true) {
-  return `
-    <div class="card vital-card" style="padding:14px 16px; display:block;">
-      <div style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;">
-        <div class="vital-icon-wrap">${v.icon}</div>
-        <div class="vital-info">
-          <div class="vital-name">${v.tipo}</div>
-          <div class="vital-val">${v.valor} <span class="vital-unit">${v.unidade}</span></div>
-          <div class="vital-meta">Ideal: ${v.ideal} · ${v.fonte}</div>
+    <!-- Modal de Calendário de Medicações -->
+    <div class="modal" id="medicationCalendarModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="medicationCalendarTitle">Calendário de Medicações</span>
+                <button class="modal-ok" id="closeMedicationCalendarModal">OK</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Selecionar dia</label>
+                <input type="date" class="form-input" id="medicationCalendarDateInput" onchange="renderMedicationCalendarDay()">
+            </div>
+            <div class="calendar-day-summary" id="medicationCalendarSummary"></div>
+            <div id="medicationCalendarContent" style="max-height: 430px; overflow-y: auto;"></div>
         </div>
-        <div class="vital-badge">Normal</div>
-      </div>
-      ${showActions ? `
-      <div class="vital-actions-row">
-        <button class="vital-action" onclick="openAddVital('${v.tipo}')">+ Adicionar</button>
-        <button class="vital-action" onclick="openVitalHist('${v.tipo}')">📈 Histórico</button>
-      </div>` : ''}
     </div>
-  `;
-}
 
-function medCard(med) {
-  const rest = calcComprimidos(med);
-  const tomado = jaTomadiHoje(med);
-  const baixo = rest <= med.estoqueMin;
-  const pct = med.aderencia;
-  const medIcons = { 'Dipirona':'💊','Losartana':'💊','Metformina':'💊','Atorvastatina':'💊','Omeprazol':'💊' };
-  return `
-    <div class="card med-card">
-      <div class="med-top">
-        <div class="med-thumb">${medIcons[med.nome]||'💊'}</div>
-        <div class="med-meta">
-          <div class="med-name">${med.nome}</div>
-          <div class="med-dose">${med.dosagem}</div>
+    <!-- Modal de Histórico de Sinal Vital com Filtros -->
+    <div class="modal" id="vitalDetailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="vitalDetailTitle">Histórico de Sinal Vital</span>
+                <button class="modal-ok" id="closeVitalDetailModal">OK</button>
+            </div>
+            <canvas id="sparklineChart" width="720" height="220" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 16px;"></canvas>
+            <div class="form-group">
+                <label class="form-label">Filtrar por Data</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="date" class="form-input" id="filterVitalDataInicio" style="flex: 1;" onchange="filterVitalDetail()">
+                    <input type="date" class="form-input" id="filterVitalDataFim" style="flex: 1;" onchange="filterVitalDetail()">
+                </div>
+            </div>
+            <div class="form-group">
+                <button class="button button-confirm" id="addVitalMedicaoBtn" style="width: 100%;">+ Adicionar Medição</button>
+            </div>
+            <div id="vitalDetailContent" style="max-height: 400px; overflow-y: auto;"></div>
         </div>
-        <div class="med-btns">
-          <button class="icon-btn ${tomado?'taken':''}" onclick="markTaken(${med.id})" title="Já Tomei">✅</button>
-          <button class="icon-btn" onclick="openEditMed(${med.id})" title="Editar">✏️</button>
-          <button class="icon-btn" onclick="deleteMed(${med.id})" title="Deletar">🗑️</button>
-        </div>
-      </div>
-      <div class="med-pills">
-        <span class="pill">🕐 ${med.horario}</span>
-        <span class="pill">📅 ${med.frequencia}</span>
-        <span class="pill ${baixo?'pill-warn':''}">📦 ${rest}/${med.estoque}</span>
-        ${baixo ? '<span class="pill pill-warn">⚠️ Estoque baixo</span>' : ''}
-      </div>
-      <div class="adh-bar"><div class="adh-fill" style="width:${pct}%"></div></div>
-      <div style="font-size:10px;color:var(--text-3);margin-top:4px;text-align:right;">Aderência ${pct}%</div>
     </div>
-  `;
-}
 
-function consultaCard(c) {
-  const db2 = formatDateBlock(c.data);
-  const isOnline = c.tipo === 'Online';
-  return `
-    <div class="card agenda-card">
-      <div class="agenda-row">
-        <div class="agenda-date-block">
-          <div class="agenda-day">${db2.day}</div>
-          <div class="agenda-mon">${db2.mon}</div>
+    <!-- Modal de Despertador -->
+    <div class="alarm-modal" id="alarmModal">
+        <div class="alarm-content">
+            <div class="alarm-icon">🔔</div>
+            <div class="alarm-title">Hora do Remédio!</div>
+            <div class="alarm-med" id="alarmMedName">Dipirona 500mg</div>
+            <div class="alarm-time" id="alarmTime">14:30</div>
+            <div class="alarm-buttons">
+                <button class="alarm-btn alarm-btn-dismiss" id="dismissAlarmBtn">Adiar</button>
+                <button class="alarm-btn alarm-btn-take" id="takeAlarmBtn">✅ Já Tomei</button>
+            </div>
         </div>
-        <div class="agenda-info">
-          <div class="agenda-title">${c.medico}</div>
-          <div class="agenda-sub">${c.especialidade} · ${c.hora}</div>
-          <div class="agenda-sub">${c.local}</div>
-          <div style="margin-top:4px;">
-            <span class="tag ${isOnline?'tag-blue':'tag-purple'}">${isOnline?'💻 Online':'🏥 Presencial'}</span>
-          </div>
-        </div>
-      </div>
-      ${c.motivo ? `<div style="margin-top:10px;font-size:12px;color:var(--text-3);">📝 ${c.motivo}</div>` : ''}
     </div>
-  `;
-}
 
-function exameCard(e, done) {
-  const db2 = formatDateBlock(e.data);
-  return `
-    <div class="card agenda-card ${done?'exame-done':'exame-card'}">
-      <div class="agenda-row">
-        <div class="agenda-date-block" style="background:${done?'var(--green-soft)':'var(--orange-soft)'}">
-          <div class="agenda-day" style="color:${done?'var(--green)':'var(--orange)'}">${db2.day}</div>
-          <div class="agenda-mon" style="color:${done?'var(--green)':'var(--orange)'}">${db2.mon}</div>
+    <!-- Modal de Alerta de Sinal Vital -->
+    <div class="alarm-modal" id="vitalAlarmModal">
+        <div class="alarm-content">
+            <div class="alarm-icon">⚠️</div>
+            <div class="alarm-title" id="vitalAlarmTitle">Alerta de Sinal Vital</div>
+            <div class="alarm-med" id="vitalAlarmValue">--</div>
+            <div class="alarm-time" id="vitalAlarmDescription" style="font-size: 13px;">Valor fora do limite configurado.</div>
+            <div class="alarm-buttons">
+                <button class="alarm-btn alarm-btn-dismiss" id="closeVitalAlarmBtn">Fechar</button>
+                <button class="alarm-btn alarm-btn-take" id="ackVitalAlarmBtn">Entendi</button>
+            </div>
         </div>
-        <div class="agenda-info">
-          <div class="agenda-title">${e.nome}</div>
-          <div class="agenda-sub">${e.local}</div>
-          <div style="margin-top:4px;">
-            <span class="tag ${done?'tag-green':'tag-orange'}">${done?'✅ Realizado':'⏳ Agendado'}</span>
-          </div>
-        </div>
-      </div>
-      ${done && e.resultado ? `<div class="resultado-box">📋 ${e.resultado}</div>` : ''}
-      ${!done && e.medico ? `<div style="margin-top:8px;font-size:12px;color:var(--text-3);">Solicitado por ${e.medico}</div>` : ''}
     </div>
-  `;
-}
 
-function compCard(c) {
-  const tipoMap = {
-    medico:   { emoji:'👨‍⚕️', cls:'medico',   badge:'tipo-medico',   label:'Médico'   },
-    familiar: { emoji:'👨‍👩‍👧', cls:'familiar', badge:'tipo-familiar', label:'Familiar' },
-    cuidador: { emoji:'🧑‍🦺', cls:'cuidador', badge:'tipo-cuidador', label:'Cuidador' },
-  };
-  const t = tipoMap[c.tipo] || tipoMap.medico;
-  const statusColor = c.ativo ? 'var(--green)' : 'var(--text-3)';
-  const statusText  = c.ativo ? '● Ativo' : '● Pausado';
-  return `
-    <div class="card comp-card" id="comp-card-${c.id}">
-      <div class="comp-header">
-        <div class="comp-avatar ${t.cls}">${t.emoji}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <div class="comp-name">${c.nome}</div>
-            <span class="tipo-badge ${t.badge}">${t.label}</span>
-          </div>
-          <div class="comp-spec">${c.subtitulo}</div>
-          <div style="font-size:11px;color:${statusColor};font-weight:600;margin-top:2px;">${statusText}</div>
+    <!-- Modal de Adicionar Medicação -->
+    <div class="modal" id="addMedicacaoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Adicionar Medicação</span>
+            </div>
+            <form id="addMedicacaoForm">
+                <div class="form-group">
+                    <label class="form-label">Buscar Medicamento</label>
+                    <input type="text" class="form-input" id="searchMedInput" placeholder="Ex: Dipirona, Losartana..." oninput="searchMedicamentos(this.value)">
+                    <div id="searchResults" style="display: none; max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; margin-top: 8px;"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Medicamento Selecionado</label>
+                    <input type="text" class="form-input" id="selectedMedName" readonly placeholder="Selecione um medicamento">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Dosagem</label>
+                    <select class="form-select" id="dosagemMedInput" required>
+                        <option value="">Selecione a dosagem</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Frequência</label>
+                    <select class="form-select" id="frequenciaMedInput" onchange="updateHorariosFields()" required>
+                        <option value="">Selecione</option>
+                        <option value="1x ao dia">1x ao dia</option>
+                        <option value="2x ao dia">2x ao dia</option>
+                        <option value="3x ao dia">3x ao dia</option>
+                        <option value="4x ao dia">4x ao dia</option>
+                        <option value="Conforme necessário">Conforme necessário</option>
+                    </select>
+                </div>
+                <div id="horariosContainer"></div>
+                <div class="form-group">
+                    <label class="form-label">Data Início</label>
+                    <input type="date" class="form-input" id="dataInicioMedInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data Fim</label>
+                    <input type="date" class="form-input" id="dataFimMedInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estoque Mínimo para Aviso</label>
+                    <input type="number" class="form-input" id="estoqueMinMedInput" placeholder="Ex: 7" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Exibir no Dashboard?</label>
+                    <div class="toggle-row">
+                        <span class="toggle-label">Mostrar card no Dashboard</span>
+                        <button type="button" class="toggle active" id="toggleDashboardMed" onclick="this.classList.toggle('active')"></button>
+                    </div>
+                </div>
+                <!-- Alertas de medicação -->
+                <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:8px;">🔔 Alertas</div>
+                <div class="toggle-row" style="margin-bottom:8px;">
+                    <span class="toggle-label">Lembrete antes do horário</span>
+                    <button type="button" class="toggle active" id="toggleLembreteMed" onclick="this.classList.toggle('active')"></button>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Avisar com antecedência</label>
+                    <select class="form-select" id="antecedenciaMedInput">
+                        <option value="5">5 minutos antes</option>
+                        <option value="10" selected>10 minutos antes</option>
+                        <option value="15">15 minutos antes</option>
+                        <option value="30">30 minutos antes</option>
+                    </select>
+                </div>
+                <div class="toggle-row" style="margin-bottom:8px;">
+                    <span class="toggle-label">Alertar dose atrasada</span>
+                    <button type="button" class="toggle active" id="toggleAtrasadaMed" onclick="this.classList.toggle('active')"></button>
+                </div>
+                <div class="toggle-row" style="margin-bottom:16px;">
+                    <span class="toggle-label">Alertar estoque baixo</span>
+                    <button type="button" class="toggle active" id="toggleEstoqueMed" onclick="this.classList.toggle('active')"></button>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelAddBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Adicionar</button>
+                </div>
+            </form>
         </div>
-      </div>
-      <div class="comp-chips">
-        ${c.dados.map(d=>`<span class="comp-chip">✓ ${d}</span>`).join('')}
-      </div>
-      <div class="comp-footer">
-        <span class="comp-since">Desde ${c.desde}</span>
-        <div class="comp-actions">
-          ${c.ativo
-            ? `<button class="comp-btn comp-btn-pause"  onclick="pauseComp(${c.id})">⏸ Pausar</button>`
-            : `<button class="comp-btn comp-btn-resume" onclick="resumeComp(${c.id})">▶ Reativar</button>`}
-          <button class="comp-btn comp-btn-remove" onclick="removeComp(${c.id})">🗑 Remover</button>
+    </div>
+
+    <!-- Modal de Editar Medicação -->
+    <div class="modal" id="editMedicacaoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Editar Medicação</span>
+            </div>
+            <form id="editMedicacaoForm">
+                <div class="form-group">
+                    <label class="form-label">Nome da Medicação</label>
+                    <input type="text" class="form-input" id="editNomeMedInput" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Dosagem</label>
+                    <input type="text" class="form-input" id="editDosagemMedInput" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Frequência</label>
+                    <select class="form-select" id="editFrequenciaMedInput" onchange="updateEditHorariosFields()" required>
+                        <option value="1x ao dia">1x ao dia</option>
+                        <option value="2x ao dia">2x ao dia</option>
+                        <option value="3x ao dia">3x ao dia</option>
+                        <option value="4x ao dia">4x ao dia</option>
+                        <option value="Conforme necessário">Conforme necessário</option>
+                    </select>
+                </div>
+                <div id="editHorariosContainer"></div>
+                <div class="form-group">
+                    <label class="form-label">Data Fim</label>
+                    <input type="date" class="form-input" id="editDataFimMedInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estoque Mínimo para Aviso</label>
+                    <input type="number" class="form-input" id="editEstoqueMinMedInput" min="1" required>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelEditBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Salvar</button>
+                </div>
+            </form>
         </div>
-      </div>
     </div>
-  `;
-}
 
-// ───── DASHBOARD TOGGLE ─────
-function toggleDashCard(id) {
-  const card = dashCards.find(c => c.id === id);
-  if (!card) return;
-  card.ativo = !card.ativo;
-  // update visual in perfil
-  const wrap = document.getElementById(`dash-toggle-${id}`);
-  if (wrap) {
-    wrap.classList.toggle('enabled', card.ativo);
-    const tog = wrap.querySelector('.toggle');
-    if (tog) tog.classList.toggle('on', card.ativo);
-  }
-  toast(card.ativo ? `✅ "${card.nome}" ativado no Início` : `🚫 "${card.nome}" removido do Início`);
-}
-
-// ───── COMP FILTER ─────
-function filterComp(tipo, btn) {
-  document.querySelectorAll('#compTabs .stab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const lista = tipo === 'todos'
-    ? db.compartilhamentos
-    : db.compartilhamentos.filter(c => c.tipo === tipo);
-  $('compList').innerHTML = lista.length
-    ? lista.map(compCard).join('')
-    : `<div class="empty"><div class="empty-icon">🔗</div><div class="empty-title">Nenhum compartilhamento nesta categoria</div></div>`;
-}
-
-// ───── COMP ACTIONS ─────
-function pauseComp(id) {
-  const c = db.compartilhamentos.find(x => x.id === id);
-  if (!c) return;
-  c.ativo = false;
-  toast(`⏸ Compartilhamento com ${c.nome} pausado`);
-  renderPerfil();
-}
-function resumeComp(id) {
-  const c = db.compartilhamentos.find(x => x.id === id);
-  if (!c) return;
-  c.ativo = true;
-  toast(`▶ Compartilhamento com ${c.nome} reativado`);
-  renderPerfil();
-}
-function removeComp(id) {
-  const c = db.compartilhamentos.find(x => x.id === id);
-  if (!c || !confirm(`Remover acesso de ${c.nome}?`)) return;
-  db.compartilhamentos = db.compartilhamentos.filter(x => x.id !== id);
-  toast(`🗑 Acesso de ${c.nome} removido`);
-  renderPerfil();
-}
-
-// ───── ACTIONS ─────
-let currentEditId = null;
-let currentVitalType = null;
-
-function markTaken(id) {
-  const med = db.medicacoes.find(m => m.id === id);
-  if (!med) return;
-  const hoje = new Date().toLocaleDateString('pt-BR');
-  const hora = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
-  if (jaTomadiHoje(med)) { toast('Você já marcou este remédio hoje!'); return; }
-  med.historico.push({ data: hoje, hora, status: 'tomado' });
-  toast(`✅ ${med.nome} marcado como tomado!`);
-  renderCurrentScreen();
-}
-
-function deleteMed(id) {
-  const med = db.medicacoes.find(m => m.id === id);
-  if (!med || !confirm(`Deletar ${med.nome}?`)) return;
-  db.medicacoes = db.medicacoes.filter(m => m.id !== id);
-  toast(`🗑️ ${med.nome} removido`);
-  renderCurrentScreen();
-}
-
-function openEditMed(id) {
-  const med = db.medicacoes.find(m => m.id === id);
-  if (!med) return;
-  currentEditId = id;
-  $('eNome').value = med.nome;
-  $('eDose').value = med.dosagem;
-  $('eFreq').value = med.frequencia;
-  $('eHorario').value = med.horario;
-  openModal('editMedModal');
-}
-
-function openAddVital(tipo) {
-  currentVitalType = tipo;
-  $('addVitalTitle').textContent = `+ ${tipo}`;
-  $('vValor').value = '';
-  openModal('addVitalModal');
-}
-
-function openVitalHist(tipo) {
-  const v = db.vitais.find(x => x.tipo === tipo);
-  if (!v) return;
-  $('histTitle').textContent = `📈 ${tipo}`;
-  const maxVal = Math.max(...v.historico.map(h => typeof h.val === 'number' ? h.val : parseFloat(h.val)||0));
-  const bars = v.historico.map((h, i) => {
-    const val = typeof h.val === 'number' ? h.val : parseFloat(h.val)||0;
-    const pct = maxVal > 0 ? Math.round((val/maxVal)*100) : 50;
-    const isLast = i === v.historico.length - 1;
-    return `<div class="bar ${isLast?'hi':''}" style="height:${pct}%" title="${val}"></div>`;
-  }).join('');
-  $('histContent').innerHTML = `
-    <div style="background:var(--surface2);border-radius:12px;padding:14px;">
-      <div style="font-size:13px;color:var(--text-3);margin-bottom:6px;">Últimas leituras</div>
-      <div class="mini-chart">${bars}</div>
-    </div>
-    <div style="margin-top:12px;">
-      ${v.historico.slice().reverse().slice(0,5).map((h,i) => `
-        <div class="hist-entry">
-          <div class="hist-status hist-taken">📊</div>
-          <div class="hist-info">
-            <div class="hist-date">${h.val} ${v.unidade}</div>
-            <div class="hist-hour">Fonte: ${v.fonte}</div>
-          </div>
+    <!-- Modal de Adicionar Agendamento -->
+    <div class="modal" id="addAgendaModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Adicionar Agendamento</span>
+            </div>
+            <form id="addAgendaForm">
+                <div class="form-group">
+                    <label class="form-label">Tipo</label>
+                    <select class="form-select" id="tipoAgendaInput" required>
+                        <option value="">Selecione</option>
+                        <option value="consulta">Consulta</option>
+                        <option value="exame">Exame</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nome/Descrição</label>
+                    <input type="text" class="form-input" id="nomeAgendaInput" placeholder="Ex: Consulta com Dr. Silva" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Médico/Especialista</label>
+                    <input type="text" class="form-input" id="medicoAgendaInput" placeholder="Ex: Dr. Carlos Silva" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Especialidade</label>
+                    <input type="text" class="form-input" id="especialidadeAgendaInput" placeholder="Ex: Cardiologia" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data</label>
+                    <input type="date" class="form-input" id="dataAgendaInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Horário</label>
+                    <input type="time" class="form-input" id="horarioAgendaInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Local</label>
+                    <input type="text" class="form-input" id="localAgendaInput" placeholder="Ex: Clínica Central" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tipo de Atendimento</label>
+                    <select class="form-select" id="tipoAtendimentoInput" required>
+                        <option value="">Selecione</option>
+                        <option value="Presencial">Presencial</option>
+                        <option value="Online">Online</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Motivo/Observações</label>
+                    <input type="text" class="form-input" id="motivoAgendaInput" placeholder="Ex: Acompanhamento cardíaco">
+                </div>
+                <!-- Lembrete -->
+                <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:8px;">🔔 Lembrete</div>
+                <div class="toggle-row" style="margin-bottom:8px;">
+                    <span class="toggle-label">Ativar lembrete</span>
+                    <button type="button" class="toggle active" id="toggleLembreteAgenda" onclick="this.classList.toggle('active')"></button>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Avisar com antecedência</label>
+                    <select class="form-select" id="antecedenciaAgendaInput">
+                        <option value="120">2 horas antes</option>
+                        <option value="1440" selected>1 dia antes</option>
+                        <option value="2880">2 dias antes</option>
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelAddAgendaBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Adicionar</button>
+                </div>
+            </form>
         </div>
-      `).join('')}
     </div>
-  `;
-  openModal('vitalHistModal');
-}
 
-function toggleAgendaFields() {
-  const tipo = $('agTipo').value;
-  $('agConsultaFields').style.display = tipo === 'consulta' ? '' : 'none';
-  $('agExameFields').style.display = tipo === 'exame' ? '' : 'none';
-}
+    <!-- Modal de Compartilhamento -->
+    <div class="modal" id="addCompartilhamentoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Compartilhar com Médico</span>
+            </div>
+            <form id="addCompartilhamentoForm">
+                <div class="form-group">
+                    <label class="form-label">Nome do Médico/Clínica</label>
+                    <input type="text" class="form-input" id="medicoCompartilhamentoInput" placeholder="Ex: Dr. Carlos Silva" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Especialidade</label>
+                    <input type="text" class="form-input" id="especialidadeCompartilhamentoInput" placeholder="Ex: Cardiologia" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Dados a Compartilhar</label>
+                    <div class="form-checkbox-group">
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="sinais_vitais" id="check_vitais">
+                            <label for="check_vitais">Sinais Vitais</label>
+                        </div>
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="medicacoes" id="check_meds">
+                            <label for="check_meds">Medicações</label>
+                        </div>
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="exames" id="check_exames">
+                            <label for="check_exames">Exames</label>
+                        </div>
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="agenda" id="check_agenda">
+                            <label for="check_agenda">Agenda</label>
+                        </div>
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="historico" id="check_historico">
+                            <label for="check_historico">Histórico Completo</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelCompartilhamentoBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Compartilhar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-// ───── NAVIGATION ─────
-let currentScreen = 'homeScreen';
+    <!-- Modal de Adicionar Sinal Vital -->
+    <div class="modal" id="addVitalModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="addVitalModalTitle">Adicionar Sinal Vital</span>
+            </div>
+            <form id="addVitalForm">
+                <input type="hidden" id="tipoVitalInput">
 
-function renderCurrentScreen() {
-  if (currentScreen === 'homeScreen') renderHome();
-  else if (currentScreen === 'saudeScreen') renderSaude();
-  else if (currentScreen === 'medicacoesScreen') renderMedicacoes();
-  else if (currentScreen === 'agendaScreen') renderAgenda();
-  else if (currentScreen === 'perfilScreen') renderPerfil();
-}
+                <!-- Pressão Arterial -->
+                <div id="pressureInputContainer" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label">Pressão Arterial (mmHg)</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <div style="flex: 1;">
+                                <input type="number" class="form-input" id="sistolicaInput" placeholder="120" min="0" max="300" style="text-align:center; font-size:18px; font-weight:600;">
+                                <div style="font-size: 11px; color: #999; margin-top: 4px; text-align:center;">Sistólica</div>
+                            </div>
+                            <div style="font-size: 24px; font-weight: 700; color: #ccc; padding-bottom: 18px;">/</div>
+                            <div style="flex: 1;">
+                                <input type="number" class="form-input" id="diastolicaInput" placeholder="80" min="0" max="200" style="text-align:center; font-size:18px; font-weight:600;">
+                                <div style="font-size: 11px; color: #999; margin-top: 4px; text-align:center;">Diastólica</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const screen = btn.dataset.screen;
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    $(screen).classList.add('active');
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentScreen = screen;
-    renderCurrentScreen();
-    // scroll top
-    document.querySelector('.app-body').scrollTop = 0;
-  });
-});
+                <!-- Outros sinais -->
+                <div id="standardInputContainer">
+                    <div class="form-group">
+                        <label class="form-label" id="valorVitalLabel">Valor</label>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="number" class="form-input" id="valorVitalInput" placeholder="0" step="any" style="font-size:22px; font-weight:700; text-align:center; flex:1;">
+                            <span id="unidadeVitalDisplay" style="font-size:14px; font-weight:600; color:#9058A7; white-space:nowrap;"></span>
+                        </div>
+                    </div>
+                </div>
 
-// Close modals on overlay click
-document.querySelectorAll('.modal-overlay').forEach(o => {
-  o.addEventListener('click', e => {
-    if (e.target === o) o.classList.remove('open');
-  });
-});
+                <div class="form-group">
+                    <label class="form-label">Fonte</label>
+                    <select class="form-select" id="fonteVitalInput" required>
+                        <option value="">Selecione</option>
+                        <option value="Manual">Manual</option>
+                        <option value="Pulseira">Pulseira</option>
+                        <option value="Google Fit">Google Fit</option>
+                        <option value="Apple Health">Apple Health</option>
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelAddVitalBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-// ───── FORMS ─────
+    <!-- Modal de Detalhe ECG -->
+    <div class="modal" id="ecgDetailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="ecgDetailTitle">Eletrocardiograma</span>
+                <button class="modal-ok" id="closeEcgDetailModal">OK</button>
+            </div>
+            <div id="ecgDetailContent" style="max-height: 500px; overflow-y: auto;"></div>
+        </div>
+    </div>
 
-// Add Med
-$('addMedBtn').addEventListener('click', () => openModal('addMedModal'));
-$('cancelAddMed').addEventListener('click', () => closeModal('addMedModal'));
-$('addMedForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const newId = Math.max(...db.medicacoes.map(m=>m.id), 0) + 1;
-  db.medicacoes.push({
-    id: newId,
-    nome: $('inNome').value,
-    dosagem: $('inDose').value,
-    horario: $('inHorario').value,
-    frequencia: $('inFreq').value,
-    estoque: parseInt($('inEstoque').value),
-    estoqueMin: 7,
-    aderencia: 100,
-    historico: []
-  });
-  closeModal('addMedModal');
-  $('addMedForm').reset();
-  toast('✅ Medicação adicionada!');
-  renderCurrentScreen();
-});
+    <!-- Modal de Composição Corporal -->
+    <div class="modal" id="composicaoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="composicaoModalTitle">Adicionar Dados</span>
+            </div>
+            <form id="composicaoForm">
+                <div class="form-group">
+                    <label class="form-label">Valor</label>
+                    <input type="number" class="form-input" id="composicaoValorInput" placeholder="Digite o valor" step="0.1" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fonte de Dados</label>
+                    <select class="form-select" id="composicaoFonteInput" required>
+                        <option value="">Selecione</option>
+                        <option value="Manual">Manual</option>
+                        <option value="Balança Inteligente">Balança Inteligente</option>
+                        <option value="Google Fit">Google Fit</option>
+                        <option value="Apple Health">Apple Health</option>
+                        <option value="Fitbit">Fitbit</option>
+                        <option value="Calculado">Calculado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data</label>
+                    <input type="date" class="form-input" id="composicaoDataInput" required>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelComposicaoBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Salvar</button>
+                </div>
+            </form>
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                <div class="section-title">Histórico</div>
+                <div id="composicaoHistoricoContent" style="max-height: 300px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
 
-// Edit Med
-$('cancelEditMed').addEventListener('click', () => closeModal('editMedModal'));
-$('editMedForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const med = db.medicacoes.find(m => m.id === currentEditId);
-  if (med) {
-    med.nome = $('eNome').value;
-    med.dosagem = $('eDose').value;
-    med.frequencia = $('eFreq').value;
-    med.horario = $('eHorario').value;
-  }
-  closeModal('editMedModal');
-  toast('✅ Medicação atualizada!');
-  renderCurrentScreen();
-});
+    <!-- Modal de Filtro de Período -->
+    <div class="modal" id="periodFilterModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Filtrar por Período</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Período</label>
+                <div class="period-buttons">
+                    <button class="period-btn active" onclick="setPeriodFilter('7d')">Últimos 7 dias</button>
+                    <button class="period-btn" onclick="setPeriodFilter('30d')">Últimos 30 dias</button>
+                    <button class="period-btn" onclick="setPeriodFilter('90d')">Últimos 90 dias</button>
+                    <button class="period-btn" onclick="setPeriodFilter('custom')">Personalizado</button>
+                </div>
+            </div>
+            <div id="customPeriodContainer" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Data Início</label>
+                    <input type="date" class="form-input" id="periodStartDate">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data Fim</label>
+                    <input type="date" class="form-input" id="periodEndDate">
+                </div>
+            </div>
+            <div class="button-group">
+                <button type="button" class="button-cancel" id="cancelPeriodFilterBtn">Cancelar</button>
+                <button type="button" class="button-submit" id="applyPeriodFilterBtn">Aplicar</button>
+            </div>
+        </div>
+    </div>
 
-// Add Agenda
-$('addAgendaBtn').addEventListener('click', () => openModal('addAgendaModal'));
-$('cancelAddAgenda').addEventListener('click', () => closeModal('addAgendaModal'));
-$('addAgendaForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const tipo = $('agTipo').value;
-  const data = $('agData').value;
-  const dataBR = data ? new Date(data+'T00:00').toLocaleDateString('pt-BR') : '';
-  if (tipo === 'consulta') {
-    db.consultas.push({
-      id: Date.now(),
-      medico: $('agMedico').value,
-      especialidade: $('agEspec').value,
-      data: dataBR,
-      hora: $('agHora').value,
-      tipo: $('agAtend').value,
-      local: $('agLocal').value,
-      motivo: $('agMotivo').value
-    });
-  } else {
-    db.examesAgendados.push({
-      id: Date.now(),
-      nome: $('agExameNome').value,
-      data: dataBR,
-      local: $('agLocal').value,
-      medico: $('agExameMedico').value
-    });
-  }
-  closeModal('addAgendaModal');
-  $('addAgendaForm').reset();
-  toggleAgendaFields();
-  toast('✅ Agendamento adicionado!');
-  renderCurrentScreen();
-});
+    <!-- Modal de Relatório de Aderência -->
+    <div class="modal" id="adherenceReportModal">
+        <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <span>Relatório de Aderência</span>
+                <button class="modal-ok" id="closeAdherenceReportModal">OK</button>
+            </div>
+            
+            <div class="adherence-header">
+                <div class="adherence-period" id="adherencePeriodText">Últimos 7 dias</div>
+                <button class="period-filter-btn" onclick="openPeriodFilterModal()">📅 Alterar Período</button>
+            </div>
+            
+            <div class="adherence-summary">
+                <div class="summary-stat">
+                    <div class="stat-value" id="adherencePercentage">85%</div>
+                    <div class="stat-label">Aderência Geral</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="stat-value" id="medicationsTaken">17</div>
+                    <div class="stat-label">Tomadas</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="stat-value" id="medicationsMissed">3</div>
+                    <div class="stat-label">Perdidas</div>
+                </div>
+            </div>
+            
+            <div class="section-title" style="margin-top: 20px;">Aderência por Medicação</div>
+            <div id="adherenceByMedicationContent"></div>
+            
+            <div class="section-title" style="margin-top: 20px;">Histórico Diário</div>
+            <div id="dailyAdherenceContent"></div>
+        </div>
+    </div>
 
-// Add Vital
-$('cancelAddVital').addEventListener('click', () => closeModal('addVitalModal'));
-$('addVitalForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const v = db.vitais.find(x => x.tipo === currentVitalType);
-  if (v) {
-    const novoVal = $('vValor').value;
-    v.valor = isNaN(novoVal) ? novoVal : parseFloat(novoVal);
-    v.fonte = $('vFonte').value;
-    v.dataHora = new Date().toLocaleString('pt-BR');
-    v.historico.push({ val: v.valor });
-  }
-  closeModal('addVitalModal');
-  $('addVitalForm').reset();
-  toast('✅ Leitura salva!');
-  renderCurrentScreen();
-});
+    <!-- Modal de Confirmação - Tomar Medicação -->
+    <div class="modal" id="takeMedicationModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Registrar Medicação</span>
+            </div>
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div id="takeMedName" style="font-size: 18px; font-weight: 700; color: #333333; margin-bottom: 8px;"></div>
+                <div style="font-size: 14px; color: #999999;">Horário agendado: <span id="takeMedScheduledTime" style="font-weight: 600;"></span></div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Tomou agora?</label>
+                <div style="display: flex; gap: 12px;">
+                    <button type="button" class="button-submit" style="flex: 1;" onclick="confirmTakeMedication(true)">
+                        ✅ Sim, agora
+                        <div style="font-size: 12px; margin-top: 4px;" id="takeMedCurrentTime"></div>
+                    </button>
+                    <button type="button" class="button-cancel" style="flex: 1;" onclick="document.getElementById('takeMedicationModal').classList.remove('active')">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin: 16px 0; color: #999999; font-size: 12px;">OU</div>
+            
+            <div class="form-group">
+                <label class="form-label">Outro horário</label>
+                <input type="time" class="form-input" id="takeMedTimeInput">
+                <button type="button" class="button-submit" style="width: 100%; margin-top: 8px;" onclick="confirmTakeMedication(false)">
+                    ✅ Registrar neste horário
+                </button>
+            </div>
+        </div>
+    </div>
 
-// Close Hist
-$('closeHistModal').addEventListener('click', () => closeModal('vitalHistModal'));
+    <!-- Modal de Pressão Arterial - Seguimento Batimento Cardíaco -->
+    <div class="modal" id="heartRateFollowupModal">
+        <div class="modal-content" style="max-width: 350px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🫀</div>
+            <div style="font-size: 18px; font-weight: 700; color: #333; margin-bottom: 8px;">Para um registro completo</div>
+            <div style="font-size: 14px; color: #666; margin-bottom: 20px;">Informe seu batimento cardíaco agora:</div>
+            <div class="form-group">
+                <input type="number" class="form-input" id="heartRateInput" placeholder="Ex: 72" min="30" max="200" style="text-align: center; font-size: 18px; font-weight: 600;">
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <button type="button" class="button-cancel" style="flex: 1;" onclick="skipHeartRateFollowup()">Pular</button>
+                <button type="button" class="button-submit" style="flex: 1;" onclick="confirmHeartRateFollowup()">✅ Confirmar</button>
+            </div>
+        </div>
+    </div>
 
-// Compartilhamento
-let selectedTipo = 'medico';
-function selectTipo(tipo, btn) {
-  selectedTipo = tipo;
-  document.querySelectorAll('#tipoSelector .tipo-opt').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const labels = { medico:'Especialidade', familiar:'Parentesco / Relação', cuidador:'Tipo de Cuidado' };
-  const placeholders = { medico:'Ex: Cardiologia', familiar:'Ex: Esposa, Filho...', cuidador:'Ex: Cuidador Profissional' };
-  $('compSubtituloLabel').textContent = labels[tipo];
-  $('compSubtitulo').placeholder = placeholders[tipo];
-}
+    <!-- Modal de Configuração de Sinais Vitais -->
+    <div class="modal" id="vitaisConfigModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>⚙️ Personalizar Sinais Vitais</span>
+                <button class="modal-ok" id="closeVitaisConfigModal">OK</button>
+            </div>
+            <p style="font-size: 13px; color: #999; margin-bottom: 16px;">Escolha o que aparece em cada tela.</p>
+            <div id="vitaisConfigContent"></div>
+        </div>
+    </div>
 
-$('cancelComp').addEventListener('click', () => closeModal('compModal'));
-$('compForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const checkboxes = document.querySelectorAll('#compForm input[name=compDados]:checked');
-  const dados = [...checkboxes].map(c => c.value);
-  if (!dados.length) { toast('Selecione ao menos um dado para compartilhar'); return; }
-  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  const agora = new Date();
-  db.compartilhamentos.push({
-    id: Date.now(),
-    tipo: selectedTipo,
-    nome: $('compNome').value,
-    subtitulo: $('compSubtitulo').value,
-    dados,
-    ativo: true,
-    desde: `${meses[agora.getMonth()]} ${agora.getFullYear()}`
-  });
-  closeModal('compModal');
-  $('compForm').reset();
-  selectedTipo = 'medico';
-  document.querySelectorAll('#tipoSelector .tipo-opt').forEach((b,i) => b.classList.toggle('active', i===0));
-  toast('✅ Compartilhamento criado com sucesso!');
-  renderCurrentScreen();
-});
+    <!-- Modal Configuração Composição Corporal -->
+    <div class="modal" id="composicaoConfigModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>⚙️ Personalizar Corpo</span>
+                <button class="modal-ok" id="closeComposicaoConfigModal">OK</button>
+            </div>
+            <p style="font-size:13px;color:#999;margin-bottom:16px;">Escolha o que aparece em cada tela.</p>
+            <div id="composicaoConfigContent"></div>
+        </div>
+    </div>
 
-// ───── ALARM ─────
-let currentAlarmMedId = null;
+    <!-- Modal Minha Composição Corporal -->
+    <div class="modal" id="minhaComposicaoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>📊 Minha Composição</span>
+                <button class="add-button" onclick="openNovoIndicadorCorpoModal()" style="width:32px;height:32px;font-size:18px;">+</button>
+                <button class="modal-ok" id="closeMinhaComposicaoModal">OK</button>
+            </div>
+            <div id="minhaComposicaoContent"></div>
+        </div>
+    </div>
 
-function showAlarm(medId) {
-  const med = db.medicacoes.find(m => m.id === medId);
-  if (!med) return;
-  currentAlarmMedId = medId;
-  $('alarmMedName').textContent = `${med.nome} ${med.dosagem}`;
-  $('alarmTime').textContent = med.horario;
-  $('alarmOverlay').classList.add('open');
-}
+    <!-- Modal Novo Indicador Corporal -->
+    <div class="modal" id="novoIndicadorCorpoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Novo Indicador</span>
+            </div>
+            <form id="novoIndicadorCorpoForm">
+                <div class="form-group">
+                    <label class="form-label">Nome</label>
+                    <input type="text" class="form-input" id="novoCorpoNome" placeholder="Ex: Circunferência Quadril" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unidade</label>
+                    <input type="text" class="form-input" id="novoCorpoUnidade" placeholder="Ex: cm" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Valor Ideal</label>
+                    <input type="text" class="form-input" id="novoCorpoIdeal" placeholder="Ex: &lt; 100">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ícone</label>
+                    <input type="text" class="form-input" id="novoCorpoIcon" placeholder="Ex: 📌" maxlength="4">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fonte Padrão</label>
+                    <select class="form-select" id="novoCorpoFonte">
+                        <option value="Manual">Manual</option>
+                        <option value="Balança Inteligente">Balança Inteligente</option>
+                        <option value="Calculado">Calculado</option>
+                        <option value="Google Fit">Google Fit</option>
+                        <option value="Apple Health">Apple Health</option>
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelNovoCorpoBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Adicionar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-$('alarmSnooze').addEventListener('click', () => {
-  $('alarmOverlay').classList.remove('open');
-  toast('⏰ Lembrete em 10 minutos');
-});
+    <!-- Modal Meus Sinais Vitais -->
+    <div class="modal" id="meusSinaisModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>🩺 Meus Sinais Vitais</span>
+                <button class="add-button" onclick="openNovoSinalModal()" style="width:32px;height:32px;font-size:18px;">+</button>
+                <button class="modal-ok" id="closeMeusSinaisModal">OK</button>
+            </div>
+            <div id="meusSinaisContent"></div>
+        </div>
+    </div>
 
-$('alarmTake').addEventListener('click', () => {
-  if (currentAlarmMedId) markTaken(currentAlarmMedId);
-  $('alarmOverlay').classList.remove('open');
-});
+    <!-- Modal Novo Sinal Vital -->
+    <div class="modal" id="novoSinalModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Novo Indicador</span>
+            </div>
+            <form id="novoSinalForm">
+                <div class="form-group">
+                    <label class="form-label">Nome</label>
+                    <input type="text" class="form-input" id="novoSinalNome" placeholder="Ex: Colesterol Total" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unidade</label>
+                    <input type="text" class="form-input" id="novoSinalUnidade" placeholder="Ex: mg/dL" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Valor Ideal</label>
+                    <input type="text" class="form-input" id="novoSinalIdeal" placeholder="Ex: 0-200">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ícone</label>
+                    <input type="text" class="form-input" id="novoSinalIcon" placeholder="Ex: 🧠" maxlength="4">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fonte Padrão</label>
+                    <select class="form-select" id="novoSinalFonte">
+                        <option value="Manual">Manual</option>
+                        <option value="Pulseira">Pulseira</option>
+                        <option value="Google Fit">Google Fit</option>
+                        <option value="Apple Health">Apple Health</option>
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelNovoSinalBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Adicionar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-function checkAlarms() {
-  const now = new Date();
-  const hm = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-  db.medicacoes.forEach(med => {
-    if (med.horario === hm && !jaTomadiHoje(med)) showAlarm(med.id);
-  });
-}
-setInterval(checkAlarms, 60000);
+    <!-- Modal Valores Ideais (Vitais + Corpo) -->
+    <div class="modal" id="valoresIdeaisModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>📈 Valores Ideais</span>
+                <button class="modal-ok" id="closeValoresIdeaisModal">OK</button>
+            </div>
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('valoresIdeais', 'vitais', this)">Vitais</button>
+                <button class="tab-btn" onclick="switchTab('valoresIdeais', 'corpo', this)">Corpo</button>
+            </div>
+            <div id="valoresIdeaisVitaisContent" class="tab-content active"></div>
+            <div id="valoresIdeaisCorpoContent" class="tab-content"></div>
+        </div>
+    </div>
 
-// ───── INIT ─────
-const today = new Date();
-$('dateLine').textContent = today.toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long' });
-renderHome();
-</script>
+    <!-- Modal Meus Indicadores (Vitais + Corpo) -->
+    <div class="modal" id="meusIndicadoresModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>📋 Meus Indicadores</span>
+                <button class="add-button" id="addIndicadorBtn" onclick="openNovoIndicadorModal()" style="width:32px;height:32px;font-size:18px;">+</button>
+                <button class="modal-ok" id="closeMeusIndicadoresModal">OK</button>
+            </div>
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('meusIndicadores', 'vitais', this)">Vitais</button>
+                <button class="tab-btn" onclick="switchTab('meusIndicadores', 'corpo', this)">Corpo</button>
+            </div>
+            <div id="meusIndicadoresVitaisContent" class="tab-content active"></div>
+            <div id="meusIndicadoresCorpoContent" class="tab-content"></div>
+        </div>
+    </div>
+
+    <!-- Modal Novo / Editar Indicador -->
+    <div class="modal" id="novoIndicadorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="novoIndicadorModalTitle">Novo Indicador</span>
+            </div>
+            <form id="novoIndicadorForm">
+                <input type="hidden" id="novoIndicadorCategoria" value="vitais">
+                <input type="hidden" id="editIndicadorId" value="">
+                <div class="form-group">
+                    <label class="form-label">Nome</label>
+                    <input type="text" class="form-input" id="novoIndicadorNome" placeholder="Ex: Colesterol Total" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unidade</label>
+                    <input type="text" class="form-input" id="novoIndicadorUnidade" placeholder="Ex: mg/dL" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Valor Ideal</label>
+                    <input type="text" class="form-input" id="novoIndicadorIdeal" placeholder="Ex: 0-200">
+                </div>
+                <div class="form-group" id="novoIndicadorIconGroup">
+                    <label class="form-label">Ícone</label>
+                    <input type="text" class="form-input" id="novoIndicadorIcon" placeholder="Ex: 🧠" maxlength="4">
+                </div>
+                <div class="form-group" id="novoIndicadorFonteGroup">
+                    <label class="form-label">Fonte Padrão</label>
+                    <select class="form-select" id="novoIndicadorFonte">
+                        <option value="Manual">Manual</option>
+                        <option value="Pulseira">Pulseira</option>
+                        <option value="Balança Inteligente">Balança Inteligente</option>
+                        <option value="Google Fit">Google Fit</option>
+                        <option value="Apple Health">Apple Health</option>
+                        <option value="Calculado">Calculado</option>
+                    </select>
+                </div>
+                <!-- Alertas de sinal vital (só aparece ao editar) -->
+                <div id="alertaVitalContainer" style="display:none;">
+                    <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:8px;margin-top:4px;">🔔 Alertas</div>
+                    <div class="toggle-row" style="margin-bottom:8px;">
+                        <span class="toggle-label">Ativar alertas para este sinal</span>
+                        <button type="button" class="toggle" id="toggleAlertaVital" onclick="this.classList.toggle('active');toggleAlertaVitalFields()"></button>
+                    </div>
+                    <div id="alertaVitalFields" style="display:none;">
+                        <div class="form-group">
+                            <label class="form-label">Alertar se acima de</label>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input type="number" class="form-input" id="alertaAcimaInput" placeholder="Ex: 140" step="any" style="flex:1;">
+                                <span id="alertaUnidadeLabel" style="font-size:13px;color:#9058A7;font-weight:600;"></span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Alertar se abaixo de</label>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input type="number" class="form-input" id="alertaAbaixoInput" placeholder="Ex: 60" step="any" style="flex:1;">
+                                <span style="font-size:13px;color:#9058A7;font-weight:600;" id="alertaUnidadeLabel2"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelNovoIndicadorBtn">Cancelar</button>
+                    <button type="submit" class="button-submit" id="salvarIndicadorBtn">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Cadastro de Dispositivo -->
+    <div class="modal" id="addDispositivoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Cadastrar Dispositivo</span>
+            </div>
+            <form id="addDispositivoForm">
+                <div class="form-group">
+                    <label class="form-label">Nome / Modelo</label>
+                    <input type="text" class="form-input" id="dispositivoNomeInput" placeholder="Ex: Apple Watch Series 9" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tipo de Dispositivo</label>
+                    <select class="form-select" id="dispositivoTipoSelect" onchange="onTipoDispositivoChange()" required>
+                        <option value="">Selecione o tipo</option>
+                        <option value="Relógio / Pulseira">⌚ Relógio / Pulseira</option>
+                        <option value="Balança Inteligente">⚖️ Balança Inteligente</option>
+                        <option value="Glicosímetro">🩺 Glicosímetro</option>
+                        <option value="Termômetro">🌡️ Termômetro</option>
+                        <option value="Esfigmomanômetro">🩺 Esfigmomanômetro</option>
+                        <option value="App / Plataforma">📱 App / Plataforma</option>
+                    </select>
+                </div>
+                <div id="dispositivoSinaisContainer"></div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelDispositivoBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Central de Alertas -->
+    <div class="modal" id="alertasModal">
+        <div class="modal-content" style="max-height:85vh;overflow-y:auto;">
+            <div class="modal-header">
+                <span>🔔 Alertas</span>
+                <button class="modal-ok" id="closeAlertasModal">OK</button>
+            </div>
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('alertas', 'vitais', this)">Vitais</button>
+                <button class="tab-btn" onclick="switchTab('alertas', 'meds', this)">Medicações</button>
+                <button class="tab-btn" onclick="switchTab('alertas', 'agenda', this)">Agenda</button>
+            </div>
+            <div id="alertasVitaisContent" class="tab-content active"></div>
+            <div id="alertasMedsContent" class="tab-content"></div>
+            <div id="alertasAgendaContent" class="tab-content"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="data.js"></script>
+    <script src="components.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
