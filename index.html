@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teep Saúde - App de Saúde</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="root">
+        <div class="mobile-container">
+            <!-- Header -->
+            <div class="header" id="header">
+                <div>
+                    <div class="greeting" id="greeting">Olá!</div>
+                    <div class="date" id="date"></div>
+                </div>
+            </div>
+
+            <!-- Screens -->
+            <div class="app-content">
+                <!-- Home Screen -->
+                <div class="screen active" id="homeScreen">
+                    <div class="page-title-wrap">
+                        <div class="section-title page-title">🏠 Home</div>
+                        <div class="page-subtitle">Resumo do seu dia de saúde</div>
+                    </div>
+                    <div class="section-title">Agora - Medicações</div>
+                    <div id="homeNow"></div>
+
+                    <div class="section-title">Hoje - Medicações</div>
+                    <div id="homeToday"></div>
+
+                    <div class="section-title">Saúde em destaque</div>
+                    <div id="homeVitals"></div>
+
+                    <div class="section-title">Próxima Consulta</div>
+                    <div id="homeConsulta"></div>
+                </div>
+
+                <!-- Saúde Screen -->
+                <div class="screen" id="saudeScreen">
+                    <div class="page-title-row">
+                        <div class="page-title-wrap">
+                            <div class="section-title page-title">❤️ Saúde</div>
+                            <div class="page-subtitle">Acompanhe sinais vitais e alertas</div>
+                        </div>
+                        <button class="config-gear-btn" onclick="openVitaisConfigModal()">⚙️</button>
+                    </div>
+                    <div id="saudeContent"></div>
+                </div>
+
+                <!-- Composição Corporal Screen -->
+                <div class="screen" id="composicaoScreen">
+                    <div class="page-title-row">
+                        <div class="page-title-wrap">
+                            <div class="section-title page-title">📊 Corpo</div>
+                            <div class="page-subtitle">Indicadores de composição corporal</div>
+                        </div>
+                        <button class="config-gear-btn" onclick="openComposicaoConfigModal()">⚙️</button>
+                    </div>
+                    <div id="composicaoContent"></div>
+                </div>
+
+                <!-- Medicações Screen -->
+                <div class="screen" id="medicacoesScreen">
+                    <div class="med-page-title-wrap">
+                        <div class="section-title med-page-title">💊 Medicações</div>
+                        <div class="med-page-subtitle">Controle de horários e tomadas</div>
+                    </div>
+                    <div class="med-calendar-bar" onclick="openMedicationCalendarModal()">
+                        <div class="med-calendar-left">
+                            <span class="med-calendar-icon">🗓️</span>
+                            <div class="med-calendar-texts">
+                                <div class="med-calendar-title">Calendário</div>
+                                <div class="med-calendar-subtitle" id="medCalendarTodayLabel">Hoje</div>
+                            </div>
+                        </div>
+                        <div class="med-calendar-actions">
+                            <button class="med-chip-btn med-chip-btn-secondary" id="reportBtn" title="Ver relatório de aderência" onclick="event.stopPropagation()">Relatório</button>
+                        </div>
+                    </div>
+
+                    <div class="med-header-widget">
+                        <div class="clock-widget" id="clockWidget" onclick="openDailyScheduleModal()">
+                            <div class="clock-time" id="clockTime">14:30</div>
+                            <div class="clock-label">Agenda do Dia</div>
+                            <span class="clock-widget-plus" aria-hidden="true">+</span>
+                        </div>
+                        <div class="med-summary">
+                            <div class="summary-item">
+                                <span class="summary-label">Tomadas</span>
+                                <span class="summary-value" id="medTomadas">3</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Pendentes</span>
+                                <span class="summary-value" id="medPendentes">2</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="med-page-divider"></div>
+
+                    <div class="med-actions-row">
+                        <div class="section-title med-section-title">Doses de hoje</div>
+                        <div class="med-actions-group">
+                            <button class="med-chip-btn med-chip-btn-primary" id="addMedBtn" title="Adicionar medicação">+ Adicionar</button>
+                        </div>
+                    </div>
+                    <div class="med-helper-text" id="medTodayHelper"></div>
+                    <div id="medicationsOverdueNow"></div>
+                    <div id="medicacoesHoje"></div>
+
+                    <div class="med-page-divider"></div>
+                    <div class="section-title med-section-title">Meus remédios</div>
+                    <div id="medicacoesCadastros"></div>
+                </div>
+
+                <!-- Agenda Screen -->
+                <div class="screen" id="agendaScreen">
+                    <div class="page-title-row">
+                        <div class="page-title-wrap">
+                            <div class="section-title page-title">📅 Agenda</div>
+                            <div class="page-subtitle">Consultas, exames e compromissos</div>
+                        </div>
+                        <button class="add-button" id="addAgendaBtn" style="width: 40px; height: 40px; font-size: 20px;">+</button>
+                    </div>
+                    <div id="agendaContent"></div>
+                </div>
+
+                <!-- Perfil Screen -->
+                <div class="screen" id="perfilScreen">
+                    <div class="page-title-wrap">
+                        <div class="section-title page-title">👤 Perfil</div>
+                        <div class="page-subtitle">Dados pessoais e configurações</div>
+                    </div>
+                    <div id="perfilContent"></div>
+                </div>
+            </div>
+
+            <!-- Bottom Navigation -->
+            <div class="bottom-nav">
+                <button class="nav-item active" data-screen="homeScreen">
+                    <div class="nav-icon">🏠</div>
+                    <div>Home</div>
+                </button>
+                <button class="nav-item" data-screen="saudeScreen">
+                    <div class="nav-icon">❤️</div>
+                    <div>Saúde</div>
+                </button>
+                <button class="nav-item" data-screen="composicaoScreen">
+                    <div class="nav-icon">📊</div>
+                    <div>Corpo</div>
+                </button>
+                <button class="nav-item" data-screen="medicacoesScreen">
+                    <div class="nav-icon">💊</div>
+                    <div>Medicações</div>
+                </button>
+                <button class="nav-item" data-screen="agendaScreen">
+                    <div class="nav-icon">📅</div>
+                    <div>Agenda</div>
+                </button>
+                <button class="nav-item" data-screen="perfilScreen">
+                    <div class="nav-icon">👤</div>
+                    <div>Perfil</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Agenda do Dia -->
+    <div class="modal" id="dailyScheduleModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="dailyScheduleTitle">Agenda de Medicações - Hoje</span>
+                <button class="modal-ok" id="closeDailyScheduleModal">OK</button>
+            </div>
+            <div class="schedule-filters">
+                <button class="filter-btn active" onclick="filterScheduleByStatus('todos')">Todos</button>
+                <button class="filter-btn" onclick="filterScheduleByStatus('tomado')">✅ Tomadas</button>
+                <button class="filter-btn" onclick="filterScheduleByStatus('pendente')">⏳ Pendentes</button>
+                <button class="filter-btn" onclick="filterScheduleByStatus('atrasado')">🔴 Atrasadas</button>
+            </div>
+            <div id="dailyScheduleContent" style="max-height: 500px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Calendário de Medicações -->
+    <div class="modal" id="medicationCalendarModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="medicationCalendarTitle">Calendário de Medicações</span>
+                <button class="modal-ok" id="closeMedicationCalendarModal">OK</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Selecionar dia</label>
+                <input type="date" class="form-input" id="medicationCalendarDateInput" onchange="renderMedicationCalendarDay()">
+            </div>
+            <div class="calendar-day-summary" id="medicationCalendarSummary"></div>
+            <div id="medicationCalendarContent" style="max-height: 430px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Histórico de Sinal Vital com Filtros -->
+    <div class="modal" id="vitalDetailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="vitalDetailTitle">Histórico de Sinal Vital</span>
+                <button class="modal-ok" id="closeVitalDetailModal">OK</button>
+            </div>
+            <canvas id="sparklineChart" width="720" height="220" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 16px;"></canvas>
+            <div class="form-group">
+                <label class="form-label">Filtrar por Data</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="date" class="form-input" id="filterVitalDataInicio" style="flex: 1;" onchange="filterVitalDetail()">
+                    <input type="date" class="form-input" id="filterVitalDataFim" style="flex: 1;" onchange="filterVitalDetail()">
+                </div>
+            </div>
+            <div class="form-group">
+                <button class="button button-confirm" id="addVitalMedicaoBtn" style="width: 100%;">+ Adicionar Medição</button>
+            </div>
+            <div id="vitalDetailContent" style="max-height: 400px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Despertador -->
+    <div class="alarm-modal" id="alarmModal">
+        <div class="alarm-content">
+            <div class="alarm-icon">🔔</div>
+            <div class="alarm-title">Hora do Remédio!</div>
+            <div class="alarm-med" id="alarmMedName">Dipirona 500mg</div>
+            <div class="alarm-time" id="alarmTime">14:30</div>
+            <div class="alarm-buttons">
+                <button class="alarm-btn alarm-btn-dismiss" id="dismissAlarmBtn">Adiar</button>
+                <button class="alarm-btn alarm-btn-take" id="takeAlarmBtn">✅ Já Tomei</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Alerta de Sinal Vital -->
+    <div class="alarm-modal" id="vitalAlarmModal">
+        <div class="alarm-content">
+            <div class="alarm-icon">⚠️</div>
+            <div class="alarm-title" id="vitalAlarmTitle">Alerta de Sinal Vital</div>
+            <div class="alarm-med" id="vitalAlarmValue">--</div>
+            <div class="alarm-time" id="vitalAlarmDescription" style="font-size: 13px;">Valor fora do limite configurado.</div>
+            <div class="alarm-buttons">
+                <button class="alarm-btn alarm-btn-dismiss" id="closeVitalAlarmBtn">Fechar</button>
+                <button class="alarm-btn alarm-btn-take" id="ackVitalAlarmBtn">Entendi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Adicionar Medicação -->
+    <div class="modal" id="addMedicacaoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Adicionar Medicação</span>
+            </div>
+            <form id="addMedicacaoForm">
+                <div class="form-group med-pick-group">
+                    <label class="form-label">Medicamento</label>
+                    <p class="med-pick-hint">Adicione um remédio por vez: busque na lista e toque no nome para confirmar.</p>
+                    <input type="hidden" id="selectedMedName" value="">
+                    <div id="medSearchRow" class="med-search-row">
+                        <input type="text" class="form-input" id="searchMedInput" placeholder="Digite para buscar (ex.: Dipirona, Losartana)…" oninput="searchMedicamentos(this.value)" autocomplete="off" aria-label="Buscar medicamento no catálogo">
+                        <div id="searchResults" class="med-search-results" style="display: none;"></div>
+                    </div>
+                    <div id="medSelectedRow" class="med-selected-row" style="display: none;">
+                        <div class="med-selected-chip" role="status">
+                            <span class="med-selected-emoji" aria-hidden="true">💊</span>
+                            <span class="med-selected-name" id="medSelectedDisplayName"></span>
+                        </div>
+                        <button type="button" class="med-change-btn" onclick="trocarMedicamentoSelecionado()">Trocar</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Dosagem</label>
+                    <select class="form-select" id="dosagemMedInput" required>
+                        <option value="">Selecione a dosagem</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Frequência</label>
+                    <select class="form-select" id="frequenciaMedInput" onchange="updateHorariosFields()" required>
+                        <option value="">Selecione</option>
+                        <option value="1x ao dia">1x ao dia</option>
+                        <option value="2x ao dia">2x ao dia</option>
+                        <option value="3x ao dia">3x ao dia</option>
+                        <option value="4x ao dia">4x ao dia</option>
+                        <option value="Conforme necessário">Conforme necessário</option>
+                    </select>
+                </div>
+                <div id="horariosContainer"></div>
+                <div class="form-group">
+                    <label class="form-label">Foto do medicamento (opcional)</label>
+                    <input type="file" class="form-input" id="fotoMedInput" accept="image/*" style="display:none;">
+                    <div class="photo-upload-area" id="photoUploadArea" onclick="document.getElementById('fotoMedInput').click()">
+                        <div class="photo-upload-placeholder">📷 Toque para adicionar foto do remédio</div>
+                        <div class="photo-preview" id="photoPreview" style="display:none;">
+                            <img id="photoPreviewImg" alt="Pré-visualização do medicamento">
+                            <button type="button" class="photo-remove-btn" onclick="event.stopPropagation(); removerFoto()">×</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data Início</label>
+                    <input type="date" class="form-input" id="dataInicioMedInput" required>
+                </div>
+                <div class="toggle-row" style="margin-bottom:8px;">
+                    <span class="toggle-label">Uso contínuo (sem data fim)</span>
+                    <button type="button" class="toggle" id="toggleSemDataFimMed" onclick="toggleSemDataFimMedicacao('add')"></button>
+                </div>
+                <div class="form-group" id="dataFimMedGroup">
+                    <label class="form-label">Data fim <span class="form-hint">(opcional)</span></label>
+                    <input type="date" class="form-input" id="dataFimMedInput">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estoque Atual</label>
+                    <input type="number" class="form-input" id="estoqueAtualMedInput" placeholder="Ex: 30" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estoque Mínimo para Aviso</label>
+                    <input type="number" class="form-input" id="estoqueMinMedInput" placeholder="Ex: 7" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Exibir no Dashboard?</label>
+                    <div class="toggle-row">
+                        <span class="toggle-label">Mostrar card no Dashboard</span>
+                        <button type="button" class="toggle active" id="toggleDashboardMed" onclick="this.classList.toggle('active')"></button>
+                    </div>
+                </div>
+                <!-- Alertas de medicação -->
+                <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:8px;">🔔 Alertas</div>
+                <div class="toggle-row" style="margin-bottom:8px;">
+                    <span class="toggle-label">Lembrete antes do horário</span>
+                    <button type="button" class="toggle active" id="toggleLembreteMed" onclick="this.classList.toggle('active')"></button>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Avisar com antecedência</label>
+                    <select class="form-select" id="antecedenciaMedInput">
+                        <option value="5">5 minutos antes</option>
+                        <option value="10" selected>10 minutos antes</option>
+                        <option value="15">15 minutos antes</option>
+                        <option value="30">30 minutos antes</option>
+                    </select>
+                </div>
+                <div class="toggle-row" style="margin-bottom:8px;">
+                    <span class="toggle-label">Alertar dose atrasada</span>
+                    <button type="button" class="toggle active" id="toggleAtrasadaMed" onclick="this.classList.toggle('active')"></button>
+                </div>
+                <div class="toggle-row" style="margin-bottom:16px;">
+                    <span class="toggle-label">Alertar estoque baixo</span>
+                    <button type="button" class="toggle active" id="toggleEstoqueMed" onclick="this.classList.toggle('active')"></button>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelAddBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Adicionar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Editar Medicação -->
+    <div class="modal" id="editMedicacaoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Editar Medicação</span>
+            </div>
+            <form id="editMedicacaoForm">
+                <div class="form-group">
+                    <label class="form-label">Nome da Medicação</label>
+                    <input type="text" class="form-input" id="editNomeMedInput" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Dosagem</label>
+                    <input type="text" class="form-input" id="editDosagemMedInput" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Frequência</label>
+                    <select class="form-select" id="editFrequenciaMedInput" onchange="updateEditHorariosFields()" required>
+                        <option value="1x ao dia">1x ao dia</option>
+                        <option value="2x ao dia">2x ao dia</option>
+                        <option value="3x ao dia">3x ao dia</option>
+                        <option value="4x ao dia">4x ao dia</option>
+                        <option value="Conforme necessário">Conforme necessário</option>
+                    </select>
+                </div>
+                <div id="editHorariosContainer"></div>
+                <div class="form-group">
+                    <label class="form-label">Foto do medicamento (opcional)</label>
+                    <input type="file" class="form-input" id="editFotoMedInput" accept="image/*" style="display:none;">
+                    <div class="photo-upload-area" id="editPhotoUploadArea" onclick="document.getElementById('editFotoMedInput').click()">
+                        <div class="photo-upload-placeholder">📷 Toque para alterar foto do remédio</div>
+                        <div class="photo-preview" id="editPhotoPreview" style="display:none;">
+                            <img id="editPhotoPreviewImg" alt="Pré-visualização do medicamento">
+                            <button type="button" class="photo-remove-btn" onclick="event.stopPropagation(); removerFotoEdit()">×</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="toggle-row" style="margin-bottom:8px;">
+                    <span class="toggle-label">Uso contínuo (sem data fim)</span>
+                    <button type="button" class="toggle" id="toggleSemDataFimMedEdit" onclick="toggleSemDataFimMedicacao('edit')"></button>
+                </div>
+                <div class="form-group" id="editDataFimMedGroup">
+                    <label class="form-label">Data fim <span class="form-hint">(opcional)</span></label>
+                    <input type="date" class="form-input" id="editDataFimMedInput">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estoque Atual</label>
+                    <input type="number" class="form-input" id="editEstoqueAtualMedInput" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estoque Mínimo para Aviso</label>
+                    <input type="number" class="form-input" id="editEstoqueMinMedInput" min="1" required>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelEditBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Adicionar Agendamento -->
+    <div class="modal" id="addAgendaModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Adicionar Agendamento</span>
+            </div>
+            <form id="addAgendaForm">
+                <div class="form-group">
+                    <label class="form-label">Tipo</label>
+                    <select class="form-select" id="tipoAgendaInput" required>
+                        <option value="">Selecione</option>
+                        <option value="consulta">Consulta</option>
+                        <option value="exame">Exame</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nome/Descrição</label>
+                    <input type="text" class="form-input" id="nomeAgendaInput" placeholder="Ex: Consulta com Dr. Silva" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Médico/Especialista</label>
+                    <input type="text" class="form-input" id="medicoAgendaInput" placeholder="Ex: Dr. Carlos Silva" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Especialidade</label>
+                    <input type="text" class="form-input" id="especialidadeAgendaInput" placeholder="Ex: Cardiologia" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data</label>
+                    <input type="date" class="form-input" id="dataAgendaInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Horário</label>
+                    <input type="time" class="form-input" id="horarioAgendaInput" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Local</label>
+                    <input type="text" class="form-input" id="localAgendaInput" placeholder="Ex: Clínica Central" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tipo de Atendimento</label>
+                    <select class="form-select" id="tipoAtendimentoInput" required>
+                        <option value="">Selecione</option>
+                        <option value="Presencial">Presencial</option>
+                        <option value="Online">Online</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Motivo/Observações</label>
+                    <input type="text" class="form-input" id="motivoAgendaInput" placeholder="Ex: Acompanhamento cardíaco">
+                </div>
+                <!-- Lembrete -->
+                <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:8px;">🔔 Lembrete</div>
+                <div class="toggle-row" style="margin-bottom:8px;">
+                    <span class="toggle-label">Ativar lembrete</span>
+                    <button type="button" class="toggle active" id="toggleLembreteAgenda" onclick="this.classList.toggle('active')"></button>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Avisar com antecedência</label>
+                    <select class="form-select" id="antecedenciaAgendaInput">
+                        <option value="120">2 horas antes</option>
+                        <option value="1440" selected>1 dia antes</option>
+                        <option value="2880">2 dias antes</option>
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelAddAgendaBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Adicionar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Compartilhamento -->
+    <div class="modal" id="addCompartilhamentoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Compartilhar com Médico</span>
+            </div>
+            <form id="addCompartilhamentoForm">
+                <div class="form-group">
+                    <label class="form-label">Nome do Médico/Clínica</label>
+                    <input type="text" class="form-input" id="medicoCompartilhamentoInput" placeholder="Ex: Dr. Carlos Silva" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Especialidade</label>
+                    <input type="text" class="form-input" id="especialidadeCompartilhamentoInput" placeholder="Ex: Cardiologia" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Dados a Compartilhar</label>
+                    <div class="form-checkbox-group">
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="sinais_vitais" id="check_vitais">
+                            <label for="check_vitais">Sinais Vitais</label>
+                        </div>
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="medicacoes" id="check_meds">
+                            <label for="check_meds">Medicações</label>
+                        </div>
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="exames" id="check_exames">
+                            <label for="check_exames">Exames</label>
+                        </div>
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="agenda" id="check_agenda">
+                            <label for="check_agenda">Agenda</label>
+                        </div>
+                        <div class="form-checkbox-item">
+                            <input type="checkbox" class="form-checkbox" name="dados" value="historico" id="check_historico">
+                            <label for="check_historico">Histórico Completo</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelCompartilhamentoBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Compartilhar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Adicionar Sinal Vital -->
+    <div class="modal" id="addVitalModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="addVitalModalTitle">Adicionar Sinal Vital</span>
+            </div>
+            <form id="addVitalForm">
+                <input type="hidden" id="tipoVitalInput">
+
+                <div class="form-group">
+                    <label class="form-label">Tipo de medição</label>
+                    <input type="hidden" id="fonteVitalInput" value="">
+                    <div class="vital-fonte-buttons" id="vitalFonteButtons">
+                        <button type="button" class="vital-fonte-btn" data-value="Manual" onclick="setVitalFonte('Manual', this)">Manual</button>
+                        <button type="button" class="vital-fonte-btn" data-value="Pulseira" onclick="setVitalFonte('Pulseira', this)">Pulseira</button>
+                        <button type="button" class="vital-fonte-btn" data-value="Google Fit" onclick="setVitalFonte('Google Fit', this)">Google Fit</button>
+                        <button type="button" class="vital-fonte-btn" data-value="Apple Health" onclick="setVitalFonte('Apple Health', this)">Apple Health</button>
+                    </div>
+                </div>
+                <div class="pulseira-checklist" id="pulseiraChecklist" style="display:none;" role="group" aria-label="Preparo para medição por pulseira">
+                    <div class="pulseira-checklist-title">Preparo antes da leitura</div>
+                    <p class="pulseira-checklist-hint">Toque em cada passo quando tiver cumprido.</p>
+                    <button type="button" class="pulseira-guide-btn" onclick="completePulseiraGuide()">Medição guiada — marcar tudo</button>
+                    <div class="pulseira-steps">
+                        <button type="button" class="pulseira-step-btn" data-step="rest" onclick="togglePulseiraStep(this)" aria-pressed="false">Descansei uns 5 minutos antes da medição</button>
+                        <button type="button" class="pulseira-step-btn" data-step="pose" onclick="togglePulseiraStep(this)" aria-pressed="false">Pulso na altura do coração, corpo em repouso</button>
+                        <button type="button" class="pulseira-step-btn" data-step="stimuli" onclick="togglePulseiraStep(this)" aria-pressed="false">Sem café, exercício ou cigarro nos últimos minutos</button>
+                    </div>
+                </div>
+
+                <!-- Pressão Arterial manual -->
+                <div id="pressureInputContainer" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label">Pressão Arterial (mmHg)</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <div style="flex: 1;">
+                                <input type="number" class="form-input" id="sistolicaInput" placeholder="120" min="0" max="300" style="text-align:center; font-size:18px; font-weight:600;">
+                                <div style="font-size: 11px; color: #999; margin-top: 4px; text-align:center;">Sistólica</div>
+                            </div>
+                            <div style="font-size: 24px; font-weight: 700; color: #ccc; padding-bottom: 18px;">/</div>
+                            <div style="flex: 1;">
+                                <input type="number" class="form-input" id="diastolicaInput" placeholder="80" min="0" max="200" style="text-align:center; font-size:18px; font-weight:600;">
+                                <div style="font-size: 11px; color: #999; margin-top: 4px; text-align:center;">Diastólica</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pressão Arterial por fonte automática -->
+                <div id="pressureCaptureContainer" style="display:none;">
+                    <div class="vital-auto-capture">
+                        <div class="vital-auto-capture-title">Coleta automática</div>
+                        <p class="vital-auto-capture-hint" id="captureHintText"></p>
+                        <button type="button" class="pulseira-guide-btn vital-capture-btn" onclick="collectPressureFromSource()">Capturar / Coletar dados</button>
+                        <div id="pressureCaptureResult" class="vital-capture-result" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <!-- Outros sinais -->
+                <div id="standardInputContainer">
+                    <div class="form-group">
+                        <label class="form-label" id="valorVitalLabel">Valor</label>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="number" class="form-input" id="valorVitalInput" placeholder="0" step="any" style="font-size:22px; font-weight:700; text-align:center; flex:1;">
+                            <span id="unidadeVitalDisplay" style="font-size:14px; font-weight:600; color:#9058A7; white-space:nowrap;"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelAddVitalBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Detalhe ECG -->
+    <div class="modal" id="ecgDetailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="ecgDetailTitle">Eletrocardiograma</span>
+                <button class="modal-ok" id="closeEcgDetailModal">OK</button>
+            </div>
+            <div id="ecgDetailContent" style="max-height: 500px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Composição Corporal -->
+    <div class="modal" id="composicaoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="composicaoModalTitle">Adicionar Dados</span>
+            </div>
+            <form id="composicaoForm">
+                <div class="form-group">
+                    <label class="form-label">Valor</label>
+                    <input type="number" class="form-input" id="composicaoValorInput" placeholder="Digite o valor" step="0.1" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fonte de Dados</label>
+                    <select class="form-select" id="composicaoFonteInput" required>
+                        <option value="">Selecione</option>
+                        <option value="Manual">Manual</option>
+                        <option value="Balança Inteligente">Balança Inteligente</option>
+                        <option value="Google Fit">Google Fit</option>
+                        <option value="Apple Health">Apple Health</option>
+                        <option value="Fitbit">Fitbit</option>
+                        <option value="Calculado">Calculado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data</label>
+                    <input type="date" class="form-input" id="composicaoDataInput" required>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelComposicaoBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Salvar</button>
+                </div>
+            </form>
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                <div class="section-title">Histórico</div>
+                <div id="composicaoHistoricoContent" style="max-height: 300px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Filtro de Período -->
+    <div class="modal" id="periodFilterModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Filtrar por Período</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Período</label>
+                <div class="period-buttons">
+                    <button class="period-btn active" onclick="setPeriodFilter('7d')">Últimos 7 dias</button>
+                    <button class="period-btn" onclick="setPeriodFilter('30d')">Últimos 30 dias</button>
+                    <button class="period-btn" onclick="setPeriodFilter('90d')">Últimos 90 dias</button>
+                    <button class="period-btn" onclick="setPeriodFilter('custom')">Personalizado</button>
+                </div>
+            </div>
+            <div id="customPeriodContainer" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Data Início</label>
+                    <input type="date" class="form-input" id="periodStartDate">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data Fim</label>
+                    <input type="date" class="form-input" id="periodEndDate">
+                </div>
+            </div>
+            <div class="button-group">
+                <button type="button" class="button-cancel" id="cancelPeriodFilterBtn">Cancelar</button>
+                <button type="button" class="button-submit" id="applyPeriodFilterBtn">Aplicar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Relatório de Aderência -->
+    <div class="modal" id="adherenceReportModal">
+        <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <span>Relatório de Aderência</span>
+                <button class="modal-ok" id="closeAdherenceReportModal">OK</button>
+            </div>
+            
+            <div class="adherence-header">
+                <div class="adherence-period" id="adherencePeriodText">Últimos 7 dias</div>
+                <button class="period-filter-btn" onclick="openPeriodFilterModal()">📅 Alterar Período</button>
+            </div>
+            
+            <div class="adherence-summary">
+                <div class="summary-stat">
+                    <div class="stat-value" id="adherencePercentage">85%</div>
+                    <div class="stat-label">Aderência Geral</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="stat-value" id="medicationsTaken">17</div>
+                    <div class="stat-label">Tomadas</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="stat-value" id="medicationsMissed">3</div>
+                    <div class="stat-label">Perdidas</div>
+                </div>
+            </div>
+            
+            <div class="section-title" style="margin-top: 20px;">Aderência por Medicação</div>
+            <div id="adherenceByMedicationContent"></div>
+            
+            <div class="section-title" style="margin-top: 20px;">Histórico Diário</div>
+            <div id="dailyAdherenceContent"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação - Tomar Medicação -->
+    <div class="modal" id="takeMedicationModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Registrar Medicação</span>
+            </div>
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div id="takeMedName" style="font-size: 18px; font-weight: 700; color: #333333; margin-bottom: 8px;"></div>
+                <div style="font-size: 14px; color: #999999;">Horário agendado: <span id="takeMedScheduledTime" style="font-weight: 600;"></span></div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Tomou agora?</label>
+                <div style="display: flex; gap: 12px;">
+                    <button type="button" class="button-submit" style="flex: 1;" onclick="confirmTakeMedication(true)">
+                        ✅ Sim, agora
+                        <div style="font-size: 12px; margin-top: 4px;" id="takeMedCurrentTime"></div>
+                    </button>
+                    <button type="button" class="button-cancel" style="flex: 1;" onclick="document.getElementById('takeMedicationModal').classList.remove('active')">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin: 16px 0; color: #999999; font-size: 12px;">OU</div>
+            
+            <div class="form-group">
+                <label class="form-label">Outro horário</label>
+                <input type="time" class="form-input" id="takeMedTimeInput">
+                <button type="button" class="button-submit" style="width: 100%; margin-top: 8px;" onclick="confirmTakeMedication(false)">
+                    ✅ Registrar neste horário
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Pressão Arterial - Seguimento Batimento Cardíaco -->
+    <div class="modal" id="heartRateFollowupModal">
+        <div class="modal-content" style="max-width: 350px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🫀</div>
+            <div style="font-size: 18px; font-weight: 700; color: #333; margin-bottom: 8px;">Para um registro completo</div>
+            <div style="font-size: 14px; color: #666; margin-bottom: 20px;">Informe seu batimento cardíaco agora:</div>
+            <div class="form-group">
+                <input type="number" class="form-input" id="heartRateInput" placeholder="Ex: 72" min="30" max="200" style="text-align: center; font-size: 18px; font-weight: 600;">
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <button type="button" class="button-cancel" style="flex: 1;" onclick="skipHeartRateFollowup()">Pular</button>
+                <button type="button" class="button-submit" style="flex: 1;" onclick="confirmHeartRateFollowup()">✅ Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Check-in (Humor/Sintomas) após medição manual -->
+    <div class="modal" id="moodCheckinModal">
+        <div class="modal-content mood-modal-content">
+            <div class="mood-modal-header">
+                <button type="button" class="mood-close" onclick="closeMoodCheckinModal()">×</button>
+                <div class="mood-header-text">
+                    <div class="mood-title">Controle de sintomas</div>
+                    <div class="mood-subtitle">Como você está se sentindo?</div>
+                </div>
+            </div>
+
+            <div class="mood-section">
+                <div class="mood-section-title">Humor</div>
+                <div class="mood-faces" id="moodFaces">
+                    <button type="button" class="mood-face" data-value="1" onclick="selectMoodFace(1)" aria-label="Muito mal">😞</button>
+                    <button type="button" class="mood-face" data-value="2" onclick="selectMoodFace(2)" aria-label="Mal">🙁</button>
+                    <button type="button" class="mood-face" data-value="3" onclick="selectMoodFace(3)" aria-label="Neutro">😐</button>
+                    <button type="button" class="mood-face" data-value="4" onclick="selectMoodFace(4)" aria-label="Bem">🙂</button>
+                    <button type="button" class="mood-face" data-value="5" onclick="selectMoodFace(5)" aria-label="Muito bem">😄</button>
+                </div>
+            </div>
+
+            <div class="mood-actions">
+                <button type="button" class="mood-outline-btn" onclick="toggleSymptomsPanel()">+ Sintomas</button>
+                <button type="button" class="mood-outline-btn" onclick="toggleNotePanel()">+ Nota</button>
+            </div>
+
+            <div class="mood-panel" id="symptomsPanel" style="display:none;">
+                <div class="mood-panel-title">Selecione sintomas (se houver)</div>
+                <div class="mood-symptoms">
+                    <button type="button" class="mood-symptom-btn" data-value="Dor de cabeça" onclick="toggleSymptomButton(this)">Dor de cabeça</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Tontura" onclick="toggleSymptomButton(this)">Tontura</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Falta de ar" onclick="toggleSymptomButton(this)">Falta de ar</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Dor no peito" onclick="toggleSymptomButton(this)">Dor no peito</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Náusea" onclick="toggleSymptomButton(this)">Náusea</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Ansiedade" onclick="toggleSymptomButton(this)">Ansiedade</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Cansaço" onclick="toggleSymptomButton(this)">Cansaço</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Palpitação" onclick="toggleSymptomButton(this)">Palpitação</button>
+                </div>
+            </div>
+
+            <div class="mood-panel" id="notePanel" style="display:none;">
+                <div class="mood-panel-title">Escreva uma nota (opcional)</div>
+                <textarea class="mood-note" id="moodNoteInput" rows="3" placeholder="Ex: Dor de cabeça desde cedo, dormi mal..."></textarea>
+            </div>
+
+            <div class="mood-time-row">
+                <div class="mood-time-label">Hora</div>
+                <input type="time" class="mood-time-input" id="moodTimeInput">
+            </div>
+
+            <div class="mood-buttons">
+                <button type="button" class="mood-btn ghost" onclick="ignoreMoodCheckin()">Ignorar</button>
+                <button type="button" class="mood-btn soft" id="moodRescheduleBtn" onclick="rescheduleMoodCheckin()">Reagendar</button>
+                <button type="button" class="mood-btn primary" id="moodConfirmBtn" onclick="confirmMoodCheckin()" disabled>Confirmar</button>
+            </div>
+
+            <div class="mood-history">
+                <div class="mood-history-title">Últimas medições</div>
+                <div id="moodHistoryList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Reagendamento da próxima medição -->
+    <div class="modal" id="rescheduleMeasurementModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Reagendar medição</span>
+                <button class="modal-ok" id="closeRescheduleMeasurementModal">OK</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Quando será a próxima medição?</label>
+                <input type="datetime-local" class="form-input" id="nextMeasurementDateTimeInput">
+            </div>
+            <div class="toggle-row" style="margin-bottom: 14px;">
+                <span class="toggle-label">Deseja receber aviso por notificação?</span>
+                <button type="button" class="toggle active" id="notifyNextMeasurementToggle" onclick="this.classList.toggle('active')"></button>
+            </div>
+            <div class="button-group">
+                <button type="button" class="button-cancel" id="cancelRescheduleMeasurementBtn">Cancelar</button>
+                <button type="button" class="button-submit" id="confirmRescheduleMeasurementBtn" onclick="confirmRescheduleMeasurement()">Salvar reagendamento</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Visualização da Foto do Medicamento -->
+    <div class="modal" id="medicationPhotoModal">
+        <div class="modal-content medication-photo-modal-content">
+            <div class="modal-header">
+                <span id="medicationPhotoModalTitle">Foto do medicamento</span>
+                <button class="modal-ok" id="closeMedicationPhotoModal">OK</button>
+            </div>
+            <div class="medication-photo-modal-body">
+                <img id="medicationPhotoModalImg" alt="Foto do medicamento">
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Configuração de Sinais Vitais -->
+    <div class="modal" id="vitaisConfigModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>⚙️ Personalizar Sinais Vitais</span>
+                <button class="modal-ok" id="closeVitaisConfigModal">OK</button>
+            </div>
+            <p style="font-size: 13px; color: #999; margin-bottom: 16px;">Escolha o que aparece em cada tela.</p>
+            <div id="vitaisConfigContent"></div>
+        </div>
+    </div>
+
+    <!-- Modal Configuração Composição Corporal -->
+    <div class="modal" id="composicaoConfigModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>⚙️ Personalizar Corpo</span>
+                <button class="modal-ok" id="closeComposicaoConfigModal">OK</button>
+            </div>
+            <p style="font-size:13px;color:#999;margin-bottom:16px;">Escolha o que aparece em cada tela.</p>
+            <div id="composicaoConfigContent"></div>
+        </div>
+    </div>
+
+    <!-- Modal Minha Composição Corporal -->
+    <div class="modal" id="minhaComposicaoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>📊 Minha Composição</span>
+                <button class="add-button" onclick="openNovoIndicadorCorpoModal()" style="width:32px;height:32px;font-size:18px;">+</button>
+                <button class="modal-ok" id="closeMinhaComposicaoModal">OK</button>
+            </div>
+            <div id="minhaComposicaoContent"></div>
+        </div>
+    </div>
+
+    <!-- Modal Novo Indicador Corporal -->
+    <div class="modal" id="novoIndicadorCorpoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Novo Indicador</span>
+            </div>
+            <form id="novoIndicadorCorpoForm">
+                <div class="form-group">
+                    <label class="form-label">Nome</label>
+                    <input type="text" class="form-input" id="novoCorpoNome" placeholder="Ex: Circunferência Quadril" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unidade</label>
+                    <input type="text" class="form-input" id="novoCorpoUnidade" placeholder="Ex: cm" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Valor Ideal</label>
+                    <input type="text" class="form-input" id="novoCorpoIdeal" placeholder="Ex: &lt; 100">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ícone</label>
+                    <input type="text" class="form-input" id="novoCorpoIcon" placeholder="Ex: 📌" maxlength="4">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fonte Padrão</label>
+                    <select class="form-select" id="novoCorpoFonte">
+                        <option value="Manual">Manual</option>
+                        <option value="Balança Inteligente">Balança Inteligente</option>
+                        <option value="Calculado">Calculado</option>
+                        <option value="Google Fit">Google Fit</option>
+                        <option value="Apple Health">Apple Health</option>
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelNovoCorpoBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Adicionar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Meus Sinais Vitais -->
+    <div class="modal" id="meusSinaisModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>🩺 Meus Sinais Vitais</span>
+                <button class="add-button" onclick="openNovoSinalModal()" style="width:32px;height:32px;font-size:18px;">+</button>
+                <button class="modal-ok" id="closeMeusSinaisModal">OK</button>
+            </div>
+            <div id="meusSinaisContent"></div>
+        </div>
+    </div>
+
+    <!-- Modal Novo Sinal Vital -->
+    <div class="modal" id="novoSinalModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Novo Indicador</span>
+            </div>
+            <form id="novoSinalForm">
+                <div class="form-group">
+                    <label class="form-label">Nome</label>
+                    <input type="text" class="form-input" id="novoSinalNome" placeholder="Ex: Colesterol Total" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unidade</label>
+                    <input type="text" class="form-input" id="novoSinalUnidade" placeholder="Ex: mg/dL" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Valor Ideal</label>
+                    <input type="text" class="form-input" id="novoSinalIdeal" placeholder="Ex: 0-200">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ícone</label>
+                    <input type="text" class="form-input" id="novoSinalIcon" placeholder="Ex: 🧠" maxlength="4">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fonte Padrão</label>
+                    <select class="form-select" id="novoSinalFonte">
+                        <option value="Manual">Manual</option>
+                        <option value="Pulseira">Pulseira</option>
+                        <option value="Google Fit">Google Fit</option>
+                        <option value="Apple Health">Apple Health</option>
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelNovoSinalBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Adicionar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Valores Ideais (Vitais + Corpo) -->
+    <div class="modal" id="valoresIdeaisModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>📈 Valores Ideais</span>
+                <button class="modal-ok" id="closeValoresIdeaisModal">OK</button>
+            </div>
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('valoresIdeais', 'vitais', this)">Vitais</button>
+                <button class="tab-btn" onclick="switchTab('valoresIdeais', 'corpo', this)">Corpo</button>
+            </div>
+            <div id="valoresIdeaisVitaisContent" class="tab-content active"></div>
+            <div id="valoresIdeaisCorpoContent" class="tab-content"></div>
+        </div>
+    </div>
+
+    <!-- Modal Meus Indicadores (Vitais + Corpo) -->
+    <div class="modal" id="meusIndicadoresModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>📋 Meus Indicadores</span>
+                <button class="add-button" id="addIndicadorBtn" onclick="openNovoIndicadorModal()" style="width:32px;height:32px;font-size:18px;">+</button>
+                <button class="modal-ok" id="closeMeusIndicadoresModal">OK</button>
+            </div>
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('meusIndicadores', 'vitais', this)">Vitais</button>
+                <button class="tab-btn" onclick="switchTab('meusIndicadores', 'corpo', this)">Corpo</button>
+            </div>
+            <div id="meusIndicadoresVitaisContent" class="tab-content active"></div>
+            <div id="meusIndicadoresCorpoContent" class="tab-content"></div>
+        </div>
+    </div>
+
+    <!-- Modal Novo / Editar Indicador -->
+    <div class="modal" id="novoIndicadorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="novoIndicadorModalTitle">Novo Indicador</span>
+            </div>
+            <form id="novoIndicadorForm">
+                <input type="hidden" id="novoIndicadorCategoria" value="vitais">
+                <input type="hidden" id="editIndicadorId" value="">
+                <div class="form-group">
+                    <label class="form-label">Nome</label>
+                    <input type="text" class="form-input" id="novoIndicadorNome" placeholder="Ex: Colesterol Total" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unidade</label>
+                    <input type="text" class="form-input" id="novoIndicadorUnidade" placeholder="Ex: mg/dL" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Valor Ideal</label>
+                    <input type="text" class="form-input" id="novoIndicadorIdeal" placeholder="Ex: 0-200">
+                </div>
+                <div class="form-group" id="novoIndicadorIconGroup">
+                    <label class="form-label">Ícone</label>
+                    <input type="text" class="form-input" id="novoIndicadorIcon" placeholder="Ex: 🧠" maxlength="4">
+                </div>
+                <div class="form-group" id="novoIndicadorFonteGroup">
+                    <label class="form-label">Fonte Padrão</label>
+                    <select class="form-select" id="novoIndicadorFonte">
+                        <option value="Manual">Manual</option>
+                        <option value="Pulseira">Pulseira</option>
+                        <option value="Balança Inteligente">Balança Inteligente</option>
+                        <option value="Google Fit">Google Fit</option>
+                        <option value="Apple Health">Apple Health</option>
+                        <option value="Calculado">Calculado</option>
+                    </select>
+                </div>
+                <!-- Alertas de sinal vital (só aparece ao editar) -->
+                <div id="alertaVitalContainer" style="display:none;">
+                    <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:8px;margin-top:4px;">🔔 Alertas</div>
+                    <div class="toggle-row" style="margin-bottom:8px;">
+                        <span class="toggle-label">Ativar alertas para este sinal</span>
+                        <button type="button" class="toggle" id="toggleAlertaVital" onclick="this.classList.toggle('active');toggleAlertaVitalFields()"></button>
+                    </div>
+                    <div id="alertaVitalFields" style="display:none;">
+                        <div class="form-group">
+                            <label class="form-label">Alertar se acima de</label>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input type="number" class="form-input" id="alertaAcimaInput" placeholder="Ex: 140" step="any" style="flex:1;">
+                                <span id="alertaUnidadeLabel" style="font-size:13px;color:#9058A7;font-weight:600;"></span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Alertar se abaixo de</label>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input type="number" class="form-input" id="alertaAbaixoInput" placeholder="Ex: 60" step="any" style="flex:1;">
+                                <span style="font-size:13px;color:#9058A7;font-weight:600;" id="alertaUnidadeLabel2"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelNovoIndicadorBtn">Cancelar</button>
+                    <button type="submit" class="button-submit" id="salvarIndicadorBtn">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Cadastro de Dispositivo -->
+    <div class="modal" id="addDispositivoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Cadastrar Dispositivo</span>
+            </div>
+            <form id="addDispositivoForm">
+                <div class="form-group">
+                    <label class="form-label">Nome / Modelo</label>
+                    <input type="text" class="form-input" id="dispositivoNomeInput" placeholder="Ex: Apple Watch Series 9" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tipo de Dispositivo</label>
+                    <select class="form-select" id="dispositivoTipoSelect" onchange="onTipoDispositivoChange()" required>
+                        <option value="">Selecione o tipo</option>
+                        <option value="Relógio / Pulseira">⌚ Relógio / Pulseira</option>
+                        <option value="Balança Inteligente">⚖️ Balança Inteligente</option>
+                        <option value="Glicosímetro">🩺 Glicosímetro</option>
+                        <option value="Termômetro">🌡️ Termômetro</option>
+                        <option value="Esfigmomanômetro">🩺 Esfigmomanômetro</option>
+                        <option value="App / Plataforma">📱 App / Plataforma</option>
+                    </select>
+                </div>
+                <div id="dispositivoSinaisContainer"></div>
+                <div class="button-group">
+                    <button type="button" class="button-cancel" id="cancelDispositivoBtn">Cancelar</button>
+                    <button type="submit" class="button-submit">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Central de Alertas -->
+    <div class="modal" id="alertasModal">
+        <div class="modal-content" style="max-height:85vh;overflow-y:auto;">
+            <div class="modal-header">
+                <span>🔔 Alertas</span>
+                <button class="modal-ok" id="closeAlertasModal">OK</button>
+            </div>
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('alertas', 'vitais', this)">Vitais</button>
+                <button class="tab-btn" onclick="switchTab('alertas', 'meds', this)">Medicações</button>
+                <button class="tab-btn" onclick="switchTab('alertas', 'agenda', this)">Agenda</button>
+            </div>
+            <div id="alertasVitaisContent" class="tab-content active"></div>
+            <div id="alertasMedsContent" class="tab-content"></div>
+            <div id="alertasAgendaContent" class="tab-content"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Feedback do Sistema -->
+    <div class="modal" id="feedbackModal">
+        <div class="modal-content feedback-modal-content">
+            <div class="feedback-modal-icon" id="feedbackModalIcon">✅</div>
+            <div class="feedback-modal-title" id="feedbackModalTitle">Concluído</div>
+            <div class="feedback-modal-message" id="feedbackModalMessage">Operação realizada com sucesso.</div>
+            <div class="button-group">
+                <button type="button" class="button-submit" id="feedbackModalOkBtn">Entendi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="data.js"></script>
+    <script src="components.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
