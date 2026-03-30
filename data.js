@@ -57,6 +57,11 @@ const mockData = {
     { id: 30, nome: 'Soro Fisiologico', formas: ['solucao', 'gotas', 'unidade'], dosagens: ['5ml', '10ml', '20 gotas', '1 unidade'], foto: '💧' }
   ],
 
+  /** Onde registrar pressão: Manual, Pulseira, Google Fit, Apple Health (definido em Perfil) */
+  configColetaPressao: {
+    fonte: 'Manual'
+  },
+
   // Configuração de sinais vitais (ativo/inativo e valores ideais)
   configSinaisVitais: {
     'Batimento Cardíaco':      { exibirSaude: true,  exibirDashboard: true  },

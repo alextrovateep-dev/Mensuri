@@ -544,7 +544,7 @@
     </div>
 
     <!-- Modal de Adicionar Sinal Vital -->
-    <div class="modal" id="addVitalModal">
+    <div class="modal add-vital-modal" id="addVitalModal">
         <div class="modal-content">
             <div class="modal-header">
                 <span id="addVitalModalTitle">Adicionar Sinal Vital</span>
@@ -552,16 +552,7 @@
             <form id="addVitalForm">
                 <input type="hidden" id="tipoVitalInput">
 
-                <div class="form-group">
-                    <label class="form-label">Tipo de medição</label>
-                    <input type="hidden" id="fonteVitalInput" value="">
-                    <div class="vital-fonte-buttons" id="vitalFonteButtons">
-                        <button type="button" class="vital-fonte-btn" data-value="Manual" onclick="setVitalFonte('Manual', this)">Manual</button>
-                        <button type="button" class="vital-fonte-btn" data-value="Pulseira" onclick="setVitalFonte('Pulseira', this)">Pulseira</button>
-                        <button type="button" class="vital-fonte-btn" data-value="Google Fit" onclick="setVitalFonte('Google Fit', this)">Google Fit</button>
-                        <button type="button" class="vital-fonte-btn" data-value="Apple Health" onclick="setVitalFonte('Apple Health', this)">Apple Health</button>
-                    </div>
-                </div>
+                <input type="hidden" id="fonteVitalInput" value="">
                 <div class="pulseira-checklist" id="pulseiraChecklist" style="display:none;" role="group" aria-label="Preparo para medição por pulseira">
                     <div class="pulseira-checklist-title">Preparo antes da leitura</div>
                     <p class="pulseira-checklist-hint">Toque em cada passo quando tiver cumprido.</p>
@@ -577,15 +568,15 @@
                 <div id="pressureInputContainer" style="display: none;">
                     <div class="form-group">
                         <label class="form-label">Pressão Arterial (mmHg)</label>
-                        <div style="display: flex; gap: 8px; align-items: center;">
-                            <div style="flex: 1;">
-                                <input type="number" class="form-input" id="sistolicaInput" placeholder="120" min="0" max="300" style="text-align:center; font-size:18px; font-weight:600;">
-                                <div style="font-size: 11px; color: #999; margin-top: 4px; text-align:center;">Sistólica</div>
+                        <div class="pressure-input-row">
+                            <div class="pressure-input-cell">
+                                <input type="number" class="form-input pressure-input-field" id="sistolicaInput" placeholder="120" min="0" max="300">
+                                <div class="pressure-input-hint">Sistólica</div>
                             </div>
-                            <div style="font-size: 24px; font-weight: 700; color: #ccc; padding-bottom: 18px;">/</div>
-                            <div style="flex: 1;">
-                                <input type="number" class="form-input" id="diastolicaInput" placeholder="80" min="0" max="200" style="text-align:center; font-size:18px; font-weight:600;">
-                                <div style="font-size: 11px; color: #999; margin-top: 4px; text-align:center;">Diastólica</div>
+                            <div class="pressure-input-slash">/</div>
+                            <div class="pressure-input-cell">
+                                <input type="number" class="form-input pressure-input-field" id="diastolicaInput" placeholder="80" min="0" max="200">
+                                <div class="pressure-input-hint">Diastólica</div>
                             </div>
                         </div>
                     </div>
@@ -605,9 +596,9 @@
                 <div id="standardInputContainer">
                     <div class="form-group">
                         <label class="form-label" id="valorVitalLabel">Valor</label>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <input type="number" class="form-input" id="valorVitalInput" placeholder="0" step="any" style="font-size:22px; font-weight:700; text-align:center; flex:1;">
-                            <span id="unidadeVitalDisplay" style="font-size:14px; font-weight:600; color:#9058A7; white-space:nowrap;"></span>
+                        <div class="vital-standard-input-row">
+                            <input type="number" class="form-input vital-input-valor" id="valorVitalInput" placeholder="0" step="any">
+                            <span id="unidadeVitalDisplay" class="vital-unidade-badge"></span>
                         </div>
                     </div>
                 </div>
@@ -616,6 +607,21 @@
                     <button type="submit" class="button-submit">Salvar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Confirmação antes de salvar medição (números grandes) -->
+    <div class="modal" id="vitalSaveConfirmModal">
+        <div class="modal-content vital-save-confirm-content">
+            <div class="modal-header">
+                <span id="vitalConfirmTitle">Confirmar medição</span>
+            </div>
+            <p class="vital-save-confirm-lead" id="vitalConfirmLead">Confira os valores. Estão corretos?</p>
+            <div id="vitalConfirmBody" class="vital-save-confirm-body"></div>
+            <div class="button-group">
+                <button type="button" class="button-cancel" id="vitalConfirmBackBtn">Corrigir</button>
+                <button type="button" class="button-submit" id="vitalConfirmSaveBtn">Salvar</button>
+            </div>
         </div>
     </div>
 

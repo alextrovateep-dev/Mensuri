@@ -28,6 +28,23 @@ function getMedicationPhotoHtml(med, catalog) {
   };
 }
 
+/** Miniatura + legenda: “Visualizar” (foto) ou “Detalhe” (placeholder → edição). */
+function getMedicationPhotoColumnHtml(med, catalog, variant) {
+  const { isPhotoImage, html: photoHtml } = getMedicationPhotoHtml(med, catalog);
+  const btnClass = variant === 'manage' ? 'med-manage-photo' : 'med-photo';
+  const hint = isPhotoImage
+    ? `<button type="button" class="med-photo-hint-btn" onclick="openMedicationPhotoModalById(${med.id}); event.stopPropagation();">Visualizar</button>`
+    : `<button type="button" class="med-photo-hint-btn med-photo-hint-btn--muted" onclick="openEditMedicacaoModal(${med.id}); event.stopPropagation();">Detalhe</button>`;
+  return `
+    <div class="med-photo-column">
+      <button class="${btnClass} ${isPhotoImage ? 'is-clickable' : ''}" type="button" ${isPhotoImage ? `onclick="openMedicationPhotoModalById(${med.id}); event.stopPropagation();"` : ''} title="${isPhotoImage ? 'Ver foto em tamanho maior' : 'Sem foto cadastrada'}">
+        ${photoHtml}
+      </button>
+      ${hint}
+    </div>
+  `;
+}
+
 // Card de Sinal Vital Melhorado - Condensado com Tendência
 function createVitalCard(vital) {
   const colors = categoryColors.saude;
@@ -145,7 +162,7 @@ function createMedicacaoCard(med) {
   const catalog = (typeof mockData !== 'undefined' && mockData.catalogoMedicamentos)
     ? mockData.catalogoMedicamentos.find(m => m.nome === med.nome)
     : null;
-  const { isPhotoImage, html: photoHtml } = getMedicationPhotoHtml(med, catalog);
+  const photoColumnHtml = getMedicationPhotoColumnHtml(med, catalog, 'card');
   const estoqueAtual = med.estoqueAtual || 0;
   const estoqueMinimo = med.estoqueMinimo || 7;
   const temAviso = estoqueAtual <= estoqueMinimo;
@@ -205,9 +222,7 @@ function createMedicacaoCard(med) {
     <div class="card card-medicacao-enhanced" style="border-left-color: ${colors.border}">
       <div class="med-header-enhanced">
         <div class="med-title-enhanced">
-          <button class="med-photo ${isPhotoImage ? 'is-clickable' : ''}" type="button" ${isPhotoImage ? `onclick="openMedicationPhotoModalById(${med.id}); event.stopPropagation();"` : ''} title="${isPhotoImage ? 'Ver foto do medicamento' : 'Sem foto cadastrada'}">
-            ${photoHtml}
-          </button>
+          ${photoColumnHtml}
           <div class="med-title-text">
             <div class="med-name">${med.nome} <span class="med-title-feature">${med.dosagem}</span></div>
           </div>

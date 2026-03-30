@@ -5,6 +5,10 @@ let currentVitalType = '';
 let currentVitalDetail = null;
 let lastMedicationAlertKey = null;
 let lastVitalAlertKey = null;
+/** Dados validados antes de salvar (modal de confirmação) */
+let pendingVitalSavePayload = null;
+/** BPM pendente após informar batimento (mesmo modal de confirmação) */
+let pendingHeartRateBpm = null;
 let lastRescheduleAlertKey = null;
 
 function getTodayISODate() {
@@ -121,6 +125,60 @@ function getMedicationDayEntries(dateISO) {
   return entries;
 }
 
+function ensureConfigColetaPressao() {
+  if (!mockData.configColetaPressao || typeof mockData.configColetaPressao.fonte !== 'string') {
+    mockData.configColetaPressao = { fonte: 'Manual' };
+  }
+  const ok = ['Manual', 'Pulseira', 'Google Fit', 'Apple Health'];
+  if (!ok.includes(mockData.configColetaPressao.fonte)) {
+    mockData.configColetaPressao.fonte = 'Manual';
+  }
+}
+
+function getFontePressaoConfig() {
+  ensureConfigColetaPressao();
+  return mockData.configColetaPressao.fonte;
+}
+
+function setFontePressaoPerfil(fonte, btnEl) {
+  ensureConfigColetaPressao();
+  mockData.configColetaPressao.fonte = fonte;
+  document.querySelectorAll('.config-pressao-fonte-btn').forEach((b) => {
+    b.classList.toggle('selected', b.getAttribute('data-value') === fonte);
+  });
+  if (typeof showFeedbackModal === 'function') {
+    showFeedbackModal(`Medição de pressão por: ${fonte}.`, 'success');
+  }
+}
+
+function applyVitalFonteValue(value) {
+  const input = document.getElementById('fonteVitalInput');
+  if (input) input.value = value;
+  document.querySelectorAll('.vital-fonte-btn').forEach((btn) => {
+    btn.classList.toggle('selected', btn.getAttribute('data-value') === value);
+  });
+  const checklist = document.getElementById('pulseiraChecklist');
+  if (checklist) checklist.style.display = value === 'Pulseira' ? 'block' : 'none';
+  if (value !== 'Pulseira') resetPulseiraStepButtons();
+  const isPressure = currentVitalType === 'Pressão Arterial';
+  const pressureContainer = document.getElementById('pressureInputContainer');
+  const pressureCaptureContainer = document.getElementById('pressureCaptureContainer');
+  if (isPressure) {
+    if (value === 'Manual') {
+      if (pressureContainer) pressureContainer.style.display = 'block';
+      if (pressureCaptureContainer) pressureCaptureContainer.style.display = 'none';
+      clearVitalCaptureState();
+      setTimeout(() => document.getElementById('sistolicaInput')?.focus(), 100);
+    } else {
+      if (pressureContainer) pressureContainer.style.display = 'none';
+      if (pressureCaptureContainer) pressureCaptureContainer.style.display = 'block';
+      setAutoCaptureHint(value);
+      clearVitalCaptureState();
+      if (value === 'Pulseira') resetPulseiraStepButtons();
+    }
+  }
+}
+
 function ensureBottomNavConfig() {
   if (!mockData.configBottomNav) {
     mockData.configBottomNav = {};
@@ -175,6 +233,7 @@ function toggleBottomNavItem(screenId, toggleEl) {
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
   ensureBottomNavConfig();
+  ensureConfigColetaPressao();
   updateDate();
   renderHome();
   setupNavigation();
@@ -344,14 +403,12 @@ function createMedicacaoManageRow(med) {
   const catalog = (typeof mockData !== 'undefined' && mockData.catalogoMedicamentos)
     ? mockData.catalogoMedicamentos.find(m => m.nome === med.nome)
     : null;
-  const { isPhotoImage, html: photoHtml } = getMedicationPhotoHtml(med, catalog);
+  const photoColumnHtml = getMedicationPhotoColumnHtml(med, catalog, 'manage');
 
   return `
     <div class="med-manage-row">
       <div class="med-manage-left">
-        <button class="med-manage-photo ${isPhotoImage ? 'is-clickable' : ''}" type="button" ${isPhotoImage ? `onclick="openMedicationPhotoModalById(${med.id}); event.stopPropagation();"` : ''} title="${isPhotoImage ? 'Ver foto do medicamento' : 'Sem foto cadastrada'}">
-          ${photoHtml}
-        </button>
+        ${photoColumnHtml}
         <div class="med-manage-text">
           <div class="med-manage-name">${med.nome}</div>
           <div class="med-manage-sub">${med.dosagem}</div>
@@ -453,6 +510,21 @@ function renderPerfil() {
     { screenId: 'medicacoesScreen', icon: '💊', title: 'Medicações', subtitle: 'Mostrar no menu inferior' },
     { screenId: 'agendaScreen', icon: '📅', title: 'Agenda', subtitle: 'Mostrar no menu inferior' }
   ];
+  ensureConfigColetaPressao();
+  const fontePressao = getFontePressaoConfig();
+  const fontesPressao = ['Manual', 'Pulseira', 'Google Fit', 'Apple Health'];
+  const pressaoConfigHtml = `
+    <div class="section-title">🩸 Pressão arterial</div>
+    <div class="config-block-pressao">
+      <p class="config-block-desc">Forma de registrar novas medições (usada ao adicionar pressão).</p>
+      <div class="vital-fonte-buttons vital-fonte-buttons--config">
+        ${fontesPressao.map((f) => `
+          <button type="button" class="vital-fonte-btn config-pressao-fonte-btn ${fontePressao === f ? 'selected' : ''}" data-value="${f}" onclick="setFontePressaoPerfil(this.getAttribute('data-value'), this)">${f}</button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
   const navControlsHtml = navControlItems.map(item => `
     <div class="config-item">
       <div class="config-item-content">
@@ -482,6 +554,7 @@ function renderPerfil() {
     </div>
 
     <div class="section-title">⚙️ Configurações</div>
+    ${pressaoConfigHtml}
     <div class="config-item" onclick="openMeusIndicadoresModal()" style="cursor:pointer;">
       <div class="config-item-content">
         <div class="config-icon">📋</div>
@@ -2989,45 +3062,241 @@ function openAddVitalModal(tipoVital) {
   }
 
   document.getElementById('fonteVitalInput').value = '';
-  document.querySelectorAll('.vital-fonte-btn').forEach(btn => btn.classList.remove('selected'));
   const checklist = document.getElementById('pulseiraChecklist');
   if (checklist) checklist.style.display = 'none';
   resetPulseiraStepButtons();
   clearVitalCaptureState();
+
+  if (tipoVital === 'Pressão Arterial') {
+    ensureConfigColetaPressao();
+    const fonte = getFontePressaoConfig();
+    applyVitalFonteValue(fonte);
+  } else {
+    applyVitalFonteValue('Manual');
+  }
+
   document.getElementById('addVitalModal').classList.add('active');
 }
 
-function setVitalFonte(value, btnEl) {
-  const input = document.getElementById('fonteVitalInput');
-  if (input) input.value = value;
-  document.querySelectorAll('.vital-fonte-btn').forEach(btn => btn.classList.remove('selected'));
-  if (btnEl) btnEl.classList.add('selected');
-  const isPressure = currentVitalType === 'Pressão Arterial';
-  const pressureContainer = document.getElementById('pressureInputContainer');
-  const pressureCaptureContainer = document.getElementById('pressureCaptureContainer');
-  const checklist = document.getElementById('pulseiraChecklist');
-  if (checklist) checklist.style.display = value === 'Pulseira' ? 'block' : 'none';
-  if (value !== 'Pulseira') resetPulseiraStepButtons();
-  if (isPressure) {
-    if (value === 'Manual') {
-      if (pressureContainer) pressureContainer.style.display = 'block';
-      if (pressureCaptureContainer) pressureCaptureContainer.style.display = 'none';
-      clearVitalCaptureState();
-      setTimeout(() => document.getElementById('sistolicaInput')?.focus(), 100);
+function renderHeartRateConfirmBody(bpm) {
+  return `
+    <div class="vital-confirm-block">
+      <div class="vital-confirm-type">Batimento cardíaco</div>
+      <div class="vital-confirm-single"><span class="vital-confirm-num">${bpm}</span><span class="vital-confirm-unit-inline"> bpm</span></div>
+    </div>`;
+}
+
+function renderVitalConfirmBodyFromPayload(p) {
+  if (p.tipoVital === 'Pressão Arterial') {
+    const s = p.sistolica;
+    const d = p.diastolica;
+    return `
+      <div class="vital-confirm-block">
+        <div class="vital-confirm-type">${p.tipoVital}</div>
+        <div class="vital-confirm-nums" aria-hidden="true">
+          <span class="vital-confirm-num">${s}</span><span class="vital-confirm-slash">/</span><span class="vital-confirm-num">${d}</span>
+        </div>
+        <div class="vital-confirm-unit">mmHg</div>
+        <div class="vital-confirm-meta">Fonte: ${p.fonte}</div>
+      </div>`;
+  }
+  const u = p.unidade ? ` ${p.unidade}` : '';
+  return `
+    <div class="vital-confirm-block">
+      <div class="vital-confirm-type">${p.tipoVital}</div>
+      <div class="vital-confirm-single"><span class="vital-confirm-num">${p.valor}</span><span class="vital-confirm-unit-inline">${u}</span></div>
+      <div class="vital-confirm-meta">Fonte: ${p.fonte}</div>
+    </div>`;
+}
+
+function openVitalConfirmModal(html, options = {}) {
+  const title = options.title ?? 'Confirmar medição';
+  const lead = options.lead ?? 'Confira os valores. Estão corretos?';
+  const body = document.getElementById('vitalConfirmBody');
+  if (body) body.innerHTML = html;
+  const titleEl = document.getElementById('vitalConfirmTitle');
+  if (titleEl) titleEl.textContent = title;
+  const leadEl = document.getElementById('vitalConfirmLead');
+  if (leadEl) leadEl.textContent = lead;
+  document.getElementById('vitalSaveConfirmModal')?.classList.add('active');
+}
+
+function closeVitalConfirmModal() {
+  document.getElementById('vitalSaveConfirmModal')?.classList.remove('active');
+  pendingVitalSavePayload = null;
+  pendingHeartRateBpm = null;
+}
+
+function buildAddVitalPendingPayload() {
+  const tipoVital = document.getElementById('tipoVitalInput').value;
+  const fonte = document.getElementById('fonteVitalInput').value;
+
+  if (!fonte) {
+    return { ok: false, message: 'Selecione a fonte da medicao.' };
+  }
+
+  if (fonte === 'Pulseira' && !isPulseiraChecklistComplete()) {
+    return { ok: false, message: 'Para medicao por pulseira, conclua o checklist de preparo.' };
+  }
+
+  if (tipoVital === 'Pressão Arterial') {
+    let sistolica;
+    let diastolica;
+    if (fonte === 'Manual') {
+      sistolica = document.getElementById('sistolicaInput').value;
+      diastolica = document.getElementById('diastolicaInput').value;
+      if (!sistolica || !diastolica) {
+        return { ok: false, message: 'Preencha sistolica e diastolica.' };
+      }
     } else {
-      if (pressureContainer) pressureContainer.style.display = 'none';
-      if (pressureCaptureContainer) pressureCaptureContainer.style.display = 'block';
-      setAutoCaptureHint(value);
-      clearVitalCaptureState();
-      if (value === 'Pulseira') resetPulseiraStepButtons();
+      if (!capturedPressureFromSource) {
+        return { ok: false, message: 'Toque em "Capturar / Coletar dados" para continuar.' };
+      }
+      sistolica = capturedPressureFromSource.sistolica;
+      diastolica = capturedPressureFromSource.diastolica;
     }
+    return {
+      ok: true,
+      payload: {
+        tipoVital,
+        fonte,
+        sistolica: parseInt(String(sistolica), 10),
+        diastolica: parseInt(String(diastolica), 10)
+      }
+    };
+  }
+
+  const valorRaw = document.getElementById('valorVitalInput').value;
+  if (!valorRaw) {
+    return { ok: false, message: 'Informe o valor.' };
+  }
+  const vital = mockData.sinaisVitais.find(v => v.tipo === tipoVital);
+  const unidade = vital ? vital.unidade : '';
+  return {
+    ok: true,
+    payload: {
+      tipoVital,
+      fonte,
+      valor: parseFloat(valorRaw),
+      unidade
+    }
+  };
+}
+
+function executePendingVitalSave() {
+  const p = pendingVitalSavePayload;
+  if (!p) return;
+
+  const agora = new Date();
+  const dataHora = `${agora.toISOString().slice(0, 10)}T${agora.toTimeString().slice(0, 5)}:00`;
+
+  if (p.tipoVital === 'Pressão Arterial') {
+    const { sistolica, diastolica } = p;
+    lastPressureValue = `${sistolica}/${diastolica}`;
+    lastManualMeasurementMeta = {
+      isSporadic: true,
+      dateISO: agora.toISOString().slice(0, 10),
+      timeHHMM: agora.toTimeString().slice(0, 5)
+    };
+
+    const vital = mockData.sinaisVitais.find(v => v.tipo === p.tipoVital);
+    if (vital) {
+      vital.valor = { sistolica, diastolica };
+      vital.fonte = p.fonte;
+      vital.tempo = 'Agora';
+      vital.dataHora = dataHora;
+      vital.historico.unshift({
+        data: agora.toISOString().slice(0, 10),
+        hora: agora.toTimeString().slice(0, 5),
+        valor: { sistolica, diastolica },
+        status: 'normal'
+      });
+      checkVitalAlert(vital);
+    }
+
+    closeVitalConfirmModal();
+    const addVitalModal = document.getElementById('addVitalModal');
+    const addVitalForm = document.getElementById('addVitalForm');
+    if (addVitalModal) addVitalModal.classList.remove('active');
+    if (addVitalForm) addVitalForm.reset();
+    document.getElementById('unidadeVitalDisplay').textContent = '';
+    resetPulseiraStepButtons();
+    clearVitalCaptureState();
+
+    document.getElementById('heartRateFollowupModal').classList.add('active');
+    setTimeout(() => document.getElementById('heartRateInput').focus(), 100);
+    return;
+  }
+
+  const vital = mockData.sinaisVitais.find(v => v.tipo === p.tipoVital);
+  if (vital) {
+    vital.valor = p.valor;
+    vital.fonte = p.fonte;
+    vital.tempo = 'Agora';
+    vital.dataHora = dataHora;
+    vital.historico.unshift({
+      data: agora.toISOString().slice(0, 10),
+      hora: agora.toTimeString().slice(0, 5),
+      valor: p.valor,
+      status: 'normal'
+    });
+    checkVitalAlert(vital);
+  }
+
+  closeVitalConfirmModal();
+  const addVitalModal = document.getElementById('addVitalModal');
+  const addVitalForm = document.getElementById('addVitalForm');
+  if (addVitalModal) addVitalModal.classList.remove('active');
+  if (addVitalForm) addVitalForm.reset();
+  document.getElementById('unidadeVitalDisplay').textContent = '';
+  resetPulseiraStepButtons();
+  clearVitalCaptureState();
+
+  renderSaude();
+  if (currentVitalDetail && currentVitalDetail.tipo === p.tipoVital && vital) {
+    renderVitalDetailContent(vital.historico);
+    renderSparklineChart(vital.historico);
+  }
+}
+
+function executePendingHeartRateSave() {
+  const bpm = pendingHeartRateBpm;
+  if (bpm === null || bpm === undefined) return;
+
+  const vital = mockData.sinaisVitais.find(v => v.tipo === 'Batimento Cardíaco');
+  if (vital) {
+    vital.valor = bpm;
+    vital.tempo = 'Agora';
+    const now = new Date();
+    vital.dataHora = `${now.toISOString().slice(0, 10)}T${now.toTimeString().slice(0, 5)}:00`;
+    vital.historico.unshift({
+      data: now.toISOString().slice(0, 10),
+      hora: now.toTimeString().slice(0, 5),
+      valor: bpm,
+      status: 'normal'
+    });
+    checkVitalAlert(vital);
+  }
+
+  closeVitalConfirmModal();
+  document.getElementById('heartRateFollowupModal').classList.remove('active');
+  document.getElementById('heartRateInput').value = '';
+  renderSaude();
+  openMoodCheckinModal();
+}
+
+function executePendingConfirmSave() {
+  if (pendingVitalSavePayload) {
+    executePendingVitalSave();
+  } else if (pendingHeartRateBpm !== null && pendingHeartRateBpm !== undefined) {
+    executePendingHeartRateSave();
   }
 }
 
 function collectPressureFromSource() {
   const fonte = document.getElementById('fonteVitalInput')?.value;
   if (!fonte || fonte === 'Manual') {
-    showFeedbackModal('Selecione Pulseira, Google Fit ou Apple Health.', 'warning');
+    showFeedbackModal('Em Perfil, escolha Pulseira, Google Fit ou Apple Health como fonte da pressão.', 'warning');
     return;
   }
   const mock = simulatePressureCaptureForFonte(fonte);
@@ -3047,6 +3316,9 @@ function setupVitalModals() {
   const addVitalModal = document.getElementById('addVitalModal');
   const cancelAddVitalBtn = document.getElementById('cancelAddVitalBtn');
   const addVitalForm = document.getElementById('addVitalForm');
+  const vitalSaveConfirmModal = document.getElementById('vitalSaveConfirmModal');
+  const vitalConfirmBackBtn = document.getElementById('vitalConfirmBackBtn');
+  const vitalConfirmSaveBtn = document.getElementById('vitalConfirmSaveBtn');
 
   const closeModal = () => {
     addVitalModal.classList.remove('active');
@@ -3062,119 +3334,50 @@ function setupVitalModals() {
     if (e.target === addVitalModal) closeModal();
   });
 
+  if (vitalConfirmBackBtn) {
+    vitalConfirmBackBtn.addEventListener('click', () => closeVitalConfirmModal());
+  }
+  if (vitalConfirmSaveBtn) {
+    vitalConfirmSaveBtn.addEventListener('click', () => executePendingConfirmSave());
+  }
+  if (vitalSaveConfirmModal) {
+    vitalSaveConfirmModal.addEventListener('click', (e) => {
+      if (e.target === vitalSaveConfirmModal) closeVitalConfirmModal();
+    });
+  }
+
   addVitalForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const tipoVital = document.getElementById('tipoVitalInput').value;
-    const fonte = document.getElementById('fonteVitalInput').value;
-    const agora = new Date();
-    const dataHora = `${agora.toISOString().slice(0, 10)}T${agora.toTimeString().slice(0, 5)}:00`;
-
-    if (!fonte) {
-      showFeedbackModal('Selecione a fonte da medicao.', 'warning');
+    const built = buildAddVitalPendingPayload();
+    if (!built.ok) {
+      showFeedbackModal(built.message, 'warning');
       return;
     }
-
-    if (fonte === 'Pulseira' && !isPulseiraChecklistComplete()) {
-      showFeedbackModal('Para medicao por pulseira, conclua o checklist de preparo.', 'warning');
-      return;
-    }
-
-    if (tipoVital === 'Pressão Arterial') {
-      let sistolica;
-      let diastolica;
-      if (fonte === 'Manual') {
-        sistolica = document.getElementById('sistolicaInput').value;
-        diastolica = document.getElementById('diastolicaInput').value;
-        if (!sistolica || !diastolica) { showFeedbackModal('Preencha sistolica e diastolica.', 'warning'); return; }
-      } else {
-        if (!capturedPressureFromSource) {
-          showFeedbackModal('Toque em "Capturar / Coletar dados" para continuar.', 'warning');
-          return;
-        }
-        sistolica = capturedPressureFromSource.sistolica;
-        diastolica = capturedPressureFromSource.diastolica;
-      }
-      lastPressureValue = `${sistolica}/${diastolica}`;
-      lastManualMeasurementMeta = {
-        isSporadic: true,
-        dateISO: agora.toISOString().slice(0, 10),
-        timeHHMM: agora.toTimeString().slice(0, 5)
-      };
-
-      const vital = mockData.sinaisVitais.find(v => v.tipo === tipoVital);
-      if (vital) {
-        vital.valor = { sistolica: parseInt(sistolica, 10), diastolica: parseInt(diastolica, 10) };
-        vital.fonte = fonte;
-        vital.tempo = 'Agora';
-        vital.dataHora = dataHora;
-        vital.historico.unshift({
-          data: agora.toISOString().slice(0, 10),
-          hora: agora.toTimeString().slice(0, 5),
-          valor: { sistolica: parseInt(sistolica, 10), diastolica: parseInt(diastolica, 10) },
-          status: 'normal'
-        });
-        checkVitalAlert(vital);
-      }
-
-      closeModal();
-      document.getElementById('heartRateFollowupModal').classList.add('active');
-      setTimeout(() => document.getElementById('heartRateInput').focus(), 100);
-    } else {
-      const valor = document.getElementById('valorVitalInput').value;
-      if (!valor) { showFeedbackModal('Informe o valor.', 'warning'); return; }
-
-      const vital = mockData.sinaisVitais.find(v => v.tipo === tipoVital);
-      if (vital) {
-        vital.valor = parseFloat(valor);
-        vital.fonte = fonte;
-        vital.tempo = 'Agora';
-        vital.dataHora = dataHora;
-        vital.historico.unshift({
-          data: agora.toISOString().slice(0, 10),
-          hora: agora.toTimeString().slice(0, 5),
-          valor: parseFloat(valor),
-          status: 'normal'
-        });
-        checkVitalAlert(vital);
-      }
-
-      closeModal();
-      renderSaude();
-      if (currentVitalDetail && currentVitalDetail.tipo === tipoVital) {
-        renderVitalDetailContent(vital.historico);
-        renderSparklineChart(vital.historico);
-      }
-    }
+    pendingHeartRateBpm = null;
+    pendingVitalSavePayload = built.payload;
+    openVitalConfirmModal(renderVitalConfirmBodyFromPayload(built.payload));
   });
 }
 
 function confirmHeartRateFollowup() {
   const heartRate = document.getElementById('heartRateInput').value;
-  
+
   if (!heartRate) {
     showFeedbackModal('Digite o batimento cardiaco.', 'warning');
     return;
   }
-  
-  const vital = mockData.sinaisVitais.find(v => v.tipo === 'Batimento Cardíaco');
-  if (vital) {
-    vital.valor = parseInt(heartRate);
-    vital.tempo = 'Agora';
-    const now = new Date();
-    vital.dataHora = `${now.toISOString().slice(0, 10)}T${now.toTimeString().slice(0, 5)}:00`;
-    vital.historico.unshift({
-      data: now.toISOString().slice(0, 10),
-      hora: now.toTimeString().slice(0, 5),
-      valor: parseInt(heartRate, 10),
-      status: 'normal'
-    });
-    checkVitalAlert(vital);
+  const bpm = parseInt(heartRate, 10);
+  if (Number.isNaN(bpm) || bpm < 30 || bpm > 200) {
+    showFeedbackModal('Informe um batimento entre 30 e 200.', 'warning');
+    return;
   }
-  
-  document.getElementById('heartRateFollowupModal').classList.remove('active');
-  document.getElementById('heartRateInput').value = '';
-  renderSaude();
-  openMoodCheckinModal();
+
+  pendingVitalSavePayload = null;
+  pendingHeartRateBpm = bpm;
+  openVitalConfirmModal(renderHeartRateConfirmBody(bpm), {
+    title: 'Confirmar batimento',
+    lead: 'Confira o valor. Está correto?'
+  });
 }
 
 function skipHeartRateFollowup() {
