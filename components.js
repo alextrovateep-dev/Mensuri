@@ -8,6 +8,7 @@ function createVitalCard(vital) {
   const vitalValue = typeof formatVitalValue === 'function' ? formatVitalValue(vital) : vital.valor;
   
   const tendenciaArrow = vital.tendencia === 'up' ? '↑' : '↓';
+  const tendenciaClass = vital.tendencia === 'up' ? 'up' : 'down';
   
   // Formatar data/hora
   let dataHoraFormatada = '';
@@ -41,7 +42,10 @@ function createVitalCard(vital) {
       <div class="vital-tendencia-line">
         <span class="vital-historico">${ultimas3}</span>
         <span class="vital-separator">|</span>
-        <span class="vital-tendencia-text">Tendência ${tendenciaArrow}</span>
+        <span class="vital-tendencia-text">
+          Tendência
+          <span class="vital-tendencia-arrow ${tendenciaClass}" aria-hidden="true">${tendenciaArrow}</span>
+        </span>
       </div>
       <span class="card-action-plus" aria-hidden="true">+</span>
     </div>
@@ -110,6 +114,14 @@ function createEcgCard(ecg) {
 function createMedicacaoCard(med) {
   const colors = categoryColors.medicacao;
   const ultimasDoses = getUltimasDoses(med, 3);
+  const catalog = (typeof mockData !== 'undefined' && mockData.catalogoMedicamentos)
+    ? mockData.catalogoMedicamentos.find(m => m.nome === med.nome)
+    : null;
+  const photoValue = med.foto || (catalog && catalog.foto) || '💊';
+  const isPhotoImage = typeof photoValue === 'string' && photoValue.startsWith('data:');
+  const photoHtml = typeof photoValue === 'string' && photoValue.startsWith('data:')
+    ? `<img src="${photoValue}" alt="Foto do medicamento ${med.nome}">`
+    : `<span class="med-photo-emoji" aria-hidden="true">${photoValue}</span>`;
   const estoqueAtual = med.estoqueAtual || 0;
   const estoqueMinimo = med.estoqueMinimo || 7;
   const temAviso = estoqueAtual <= estoqueMinimo;
@@ -140,7 +152,7 @@ function createMedicacaoCard(med) {
     const statusLabel = status === 'tomado'
       ? 'Tomado'
       : status === 'atrasado'
-      ? 'Pendente'
+      ? 'Atrasado'
       : 'A tomar';
 
     return `
@@ -169,7 +181,12 @@ function createMedicacaoCard(med) {
     <div class="card card-medicacao-enhanced" style="border-left-color: ${colors.border}">
       <div class="med-header-enhanced">
         <div class="med-title-enhanced">
-          <div class="med-name">${med.nome} <span class="med-title-feature">${med.dosagem}</span></div>
+          <button class="med-photo ${isPhotoImage ? 'is-clickable' : ''}" type="button" ${isPhotoImage ? `onclick="openMedicationPhotoModalById(${med.id}); event.stopPropagation();"` : ''} title="${isPhotoImage ? 'Ver foto do medicamento' : 'Sem foto cadastrada'}">
+            ${photoHtml}
+          </button>
+          <div class="med-title-text">
+            <div class="med-name">${med.nome} <span class="med-title-feature">${med.dosagem}</span></div>
+          </div>
         </div>
         <div class="med-actions-enhanced">
           <button class="med-action-btn-enhanced" onclick="openEditMedicacaoModal(${med.id})" title="Editar">✏️</button>
@@ -178,7 +195,7 @@ function createMedicacaoCard(med) {
       </div>
 
       <div class="med-horarios-interactive">
-        <div class="horarios-label">Horários:</div>
+        <div class="horarios-label">Toque no horário para marcar:</div>
         <div class="horarios-list-interactive">
           ${horariosHtml}
         </div>
@@ -280,6 +297,7 @@ function createCompartilhamentoCard(compartilhamento) {
 
 // Funções auxiliares
 function calcularDiasRestantes(medicacao) {
+  if (!medicacao.dataFim || String(medicacao.dataFim).trim() === '') return null;
   const dataFim = new Date(medicacao.dataFim);
   const hoje = new Date();
   const diferenca = dataFim - hoje;
@@ -315,6 +333,10 @@ function deleteMedicacao(medicacaoId) {
   if (medicacao && confirm(`Tem certeza que deseja deletar ${medicacao.nome}?`)) {
     mockData.medicacoes = mockData.medicacoes.filter(m => m.id !== medicacaoId);
     renderMedicacoes();
-    alert(`✅ ${medicacao.nome} deletado com sucesso!`);
+    if (typeof showFeedbackModal === 'function') {
+      showFeedbackModal(`${medicacao.nome} deletado com sucesso.`, 'success');
+    } else {
+      alert(`${medicacao.nome} deletado com sucesso.`);
+    }
   }
 }

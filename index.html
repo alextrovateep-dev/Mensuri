@@ -21,20 +21,30 @@
             <div class="app-content">
                 <!-- Home Screen -->
                 <div class="screen active" id="homeScreen">
-                    <div class="section-title">Sinais Vitais</div>
+                    <div class="page-title-wrap">
+                        <div class="section-title page-title">🏠 Home</div>
+                        <div class="page-subtitle">Resumo do seu dia de saúde</div>
+                    </div>
+                    <div class="section-title">Agora - Medicações</div>
+                    <div id="homeNow"></div>
+
+                    <div class="section-title">Hoje - Medicações</div>
+                    <div id="homeToday"></div>
+
+                    <div class="section-title">Saúde em destaque</div>
                     <div id="homeVitals"></div>
-                    
-                    <div class="section-title">Medicações</div>
-                    <div id="homeMeds"></div>
-                    
+
                     <div class="section-title">Próxima Consulta</div>
                     <div id="homeConsulta"></div>
                 </div>
 
                 <!-- Saúde Screen -->
                 <div class="screen" id="saudeScreen">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                        <div class="section-title" style="margin: 0;">Sinais Vitais</div>
+                    <div class="page-title-row">
+                        <div class="page-title-wrap">
+                            <div class="section-title page-title">❤️ Saúde</div>
+                            <div class="page-subtitle">Acompanhe sinais vitais e alertas</div>
+                        </div>
                         <button class="config-gear-btn" onclick="openVitaisConfigModal()">⚙️</button>
                     </div>
                     <div id="saudeContent"></div>
@@ -42,8 +52,11 @@
 
                 <!-- Composição Corporal Screen -->
                 <div class="screen" id="composicaoScreen">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                        <div class="section-title" style="margin: 0;">Composição Corporal</div>
+                    <div class="page-title-row">
+                        <div class="page-title-wrap">
+                            <div class="section-title page-title">📊 Corpo</div>
+                            <div class="page-subtitle">Indicadores de composição corporal</div>
+                        </div>
                         <button class="config-gear-btn" onclick="openComposicaoConfigModal()">⚙️</button>
                     </div>
                     <div id="composicaoContent"></div>
@@ -51,15 +64,21 @@
 
                 <!-- Medicações Screen -->
                 <div class="screen" id="medicacoesScreen">
+                    <div class="med-page-title-wrap">
+                        <div class="section-title med-page-title">💊 Medicações</div>
+                        <div class="med-page-subtitle">Controle de horários e tomadas</div>
+                    </div>
                     <div class="med-calendar-bar" onclick="openMedicationCalendarModal()">
                         <div class="med-calendar-left">
                             <span class="med-calendar-icon">🗓️</span>
                             <div class="med-calendar-texts">
-                                <div class="med-calendar-title">Calendário de Medicações</div>
+                                <div class="med-calendar-title">Calendário</div>
                                 <div class="med-calendar-subtitle" id="medCalendarTodayLabel">Hoje</div>
                             </div>
                         </div>
-                        <span class="med-calendar-open">Ver por dia</span>
+                        <div class="med-calendar-actions">
+                            <button class="med-chip-btn med-chip-btn-secondary" id="reportBtn" title="Ver relatório de aderência" onclick="event.stopPropagation()">Relatório</button>
+                        </div>
                     </div>
 
                     <div class="med-header-widget">
@@ -83,21 +102,27 @@
                     <div class="med-page-divider"></div>
 
                     <div class="med-actions-row">
-                        <div class="section-title med-section-title">Minhas Medicações</div>
+                        <div class="section-title med-section-title">Doses de hoje</div>
                         <div class="med-actions-group">
-                            <button class="med-chip-btn med-chip-btn-success" id="takeAllPendingBtn" title="Tomar todas as pendentes de hoje">✅ Pendentes</button>
-                            <button class="med-icon-btn med-icon-btn-warning" id="reportBtn" title="Relatório de Aderência">📊</button>
-                            <button class="med-icon-btn med-icon-btn-primary" id="addMedBtn" title="Adicionar medicação">+</button>
+                            <button class="med-chip-btn med-chip-btn-primary" id="addMedBtn" title="Adicionar medicação">+ Adicionar</button>
                         </div>
                     </div>
+                    <div class="med-helper-text" id="medTodayHelper"></div>
                     <div id="medicationsOverdueNow"></div>
-                    <div id="medicacoesContent"></div>
+                    <div id="medicacoesHoje"></div>
+
+                    <div class="med-page-divider"></div>
+                    <div class="section-title med-section-title">Meus remédios</div>
+                    <div id="medicacoesCadastros"></div>
                 </div>
 
                 <!-- Agenda Screen -->
                 <div class="screen" id="agendaScreen">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                        <div class="section-title" style="margin: 0;">Minha Agenda</div>
+                    <div class="page-title-row">
+                        <div class="page-title-wrap">
+                            <div class="section-title page-title">📅 Agenda</div>
+                            <div class="page-subtitle">Consultas, exames e compromissos</div>
+                        </div>
                         <button class="add-button" id="addAgendaBtn" style="width: 40px; height: 40px; font-size: 20px;">+</button>
                     </div>
                     <div id="agendaContent"></div>
@@ -105,6 +130,10 @@
 
                 <!-- Perfil Screen -->
                 <div class="screen" id="perfilScreen">
+                    <div class="page-title-wrap">
+                        <div class="section-title page-title">👤 Perfil</div>
+                        <div class="page-subtitle">Dados pessoais e configurações</div>
+                    </div>
                     <div id="perfilContent"></div>
                 </div>
             </div>
@@ -229,14 +258,21 @@
                 <span>Adicionar Medicação</span>
             </div>
             <form id="addMedicacaoForm">
-                <div class="form-group">
-                    <label class="form-label">Buscar Medicamento</label>
-                    <input type="text" class="form-input" id="searchMedInput" placeholder="Ex: Dipirona, Losartana..." oninput="searchMedicamentos(this.value)">
-                    <div id="searchResults" style="display: none; max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; margin-top: 8px;"></div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Medicamento Selecionado</label>
-                    <input type="text" class="form-input" id="selectedMedName" readonly placeholder="Selecione um medicamento">
+                <div class="form-group med-pick-group">
+                    <label class="form-label">Medicamento</label>
+                    <p class="med-pick-hint">Adicione um remédio por vez: busque na lista e toque no nome para confirmar.</p>
+                    <input type="hidden" id="selectedMedName" value="">
+                    <div id="medSearchRow" class="med-search-row">
+                        <input type="text" class="form-input" id="searchMedInput" placeholder="Digite para buscar (ex.: Dipirona, Losartana)…" oninput="searchMedicamentos(this.value)" autocomplete="off" aria-label="Buscar medicamento no catálogo">
+                        <div id="searchResults" class="med-search-results" style="display: none;"></div>
+                    </div>
+                    <div id="medSelectedRow" class="med-selected-row" style="display: none;">
+                        <div class="med-selected-chip" role="status">
+                            <span class="med-selected-emoji" aria-hidden="true">💊</span>
+                            <span class="med-selected-name" id="medSelectedDisplayName"></span>
+                        </div>
+                        <button type="button" class="med-change-btn" onclick="trocarMedicamentoSelecionado()">Trocar</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Dosagem</label>
@@ -257,12 +293,31 @@
                 </div>
                 <div id="horariosContainer"></div>
                 <div class="form-group">
+                    <label class="form-label">Foto do medicamento (opcional)</label>
+                    <input type="file" class="form-input" id="fotoMedInput" accept="image/*" style="display:none;">
+                    <div class="photo-upload-area" id="photoUploadArea" onclick="document.getElementById('fotoMedInput').click()">
+                        <div class="photo-upload-placeholder">📷 Toque para adicionar foto do remédio</div>
+                        <div class="photo-preview" id="photoPreview" style="display:none;">
+                            <img id="photoPreviewImg" alt="Pré-visualização do medicamento">
+                            <button type="button" class="photo-remove-btn" onclick="event.stopPropagation(); removerFoto()">×</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
                     <label class="form-label">Data Início</label>
                     <input type="date" class="form-input" id="dataInicioMedInput" required>
                 </div>
+                <div class="toggle-row" style="margin-bottom:8px;">
+                    <span class="toggle-label">Uso contínuo (sem data fim)</span>
+                    <button type="button" class="toggle" id="toggleSemDataFimMed" onclick="toggleSemDataFimMedicacao('add')"></button>
+                </div>
+                <div class="form-group" id="dataFimMedGroup">
+                    <label class="form-label">Data fim <span class="form-hint">(opcional)</span></label>
+                    <input type="date" class="form-input" id="dataFimMedInput">
+                </div>
                 <div class="form-group">
-                    <label class="form-label">Data Fim</label>
-                    <input type="date" class="form-input" id="dataFimMedInput" required>
+                    <label class="form-label">Estoque Atual</label>
+                    <input type="number" class="form-input" id="estoqueAtualMedInput" placeholder="Ex: 30" min="1" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Estoque Mínimo para Aviso</label>
@@ -333,8 +388,27 @@
                 </div>
                 <div id="editHorariosContainer"></div>
                 <div class="form-group">
-                    <label class="form-label">Data Fim</label>
-                    <input type="date" class="form-input" id="editDataFimMedInput" required>
+                    <label class="form-label">Foto do medicamento (opcional)</label>
+                    <input type="file" class="form-input" id="editFotoMedInput" accept="image/*" style="display:none;">
+                    <div class="photo-upload-area" id="editPhotoUploadArea" onclick="document.getElementById('editFotoMedInput').click()">
+                        <div class="photo-upload-placeholder">📷 Toque para alterar foto do remédio</div>
+                        <div class="photo-preview" id="editPhotoPreview" style="display:none;">
+                            <img id="editPhotoPreviewImg" alt="Pré-visualização do medicamento">
+                            <button type="button" class="photo-remove-btn" onclick="event.stopPropagation(); removerFotoEdit()">×</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="toggle-row" style="margin-bottom:8px;">
+                    <span class="toggle-label">Uso contínuo (sem data fim)</span>
+                    <button type="button" class="toggle" id="toggleSemDataFimMedEdit" onclick="toggleSemDataFimMedicacao('edit')"></button>
+                </div>
+                <div class="form-group" id="editDataFimMedGroup">
+                    <label class="form-label">Data fim <span class="form-hint">(opcional)</span></label>
+                    <input type="date" class="form-input" id="editDataFimMedInput">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estoque Atual</label>
+                    <input type="number" class="form-input" id="editEstoqueAtualMedInput" min="1" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Estoque Mínimo para Aviso</label>
@@ -478,7 +552,28 @@
             <form id="addVitalForm">
                 <input type="hidden" id="tipoVitalInput">
 
-                <!-- Pressão Arterial -->
+                <div class="form-group">
+                    <label class="form-label">Tipo de medição</label>
+                    <input type="hidden" id="fonteVitalInput" value="">
+                    <div class="vital-fonte-buttons" id="vitalFonteButtons">
+                        <button type="button" class="vital-fonte-btn" data-value="Manual" onclick="setVitalFonte('Manual', this)">Manual</button>
+                        <button type="button" class="vital-fonte-btn" data-value="Pulseira" onclick="setVitalFonte('Pulseira', this)">Pulseira</button>
+                        <button type="button" class="vital-fonte-btn" data-value="Google Fit" onclick="setVitalFonte('Google Fit', this)">Google Fit</button>
+                        <button type="button" class="vital-fonte-btn" data-value="Apple Health" onclick="setVitalFonte('Apple Health', this)">Apple Health</button>
+                    </div>
+                </div>
+                <div class="pulseira-checklist" id="pulseiraChecklist" style="display:none;" role="group" aria-label="Preparo para medição por pulseira">
+                    <div class="pulseira-checklist-title">Preparo antes da leitura</div>
+                    <p class="pulseira-checklist-hint">Toque em cada passo quando tiver cumprido.</p>
+                    <button type="button" class="pulseira-guide-btn" onclick="completePulseiraGuide()">Medição guiada — marcar tudo</button>
+                    <div class="pulseira-steps">
+                        <button type="button" class="pulseira-step-btn" data-step="rest" onclick="togglePulseiraStep(this)" aria-pressed="false">Descansei uns 5 minutos antes da medição</button>
+                        <button type="button" class="pulseira-step-btn" data-step="pose" onclick="togglePulseiraStep(this)" aria-pressed="false">Pulso na altura do coração, corpo em repouso</button>
+                        <button type="button" class="pulseira-step-btn" data-step="stimuli" onclick="togglePulseiraStep(this)" aria-pressed="false">Sem café, exercício ou cigarro nos últimos minutos</button>
+                    </div>
+                </div>
+
+                <!-- Pressão Arterial manual -->
                 <div id="pressureInputContainer" style="display: none;">
                     <div class="form-group">
                         <label class="form-label">Pressão Arterial (mmHg)</label>
@@ -496,6 +591,16 @@
                     </div>
                 </div>
 
+                <!-- Pressão Arterial por fonte automática -->
+                <div id="pressureCaptureContainer" style="display:none;">
+                    <div class="vital-auto-capture">
+                        <div class="vital-auto-capture-title">Coleta automática</div>
+                        <p class="vital-auto-capture-hint" id="captureHintText"></p>
+                        <button type="button" class="pulseira-guide-btn vital-capture-btn" onclick="collectPressureFromSource()">Capturar / Coletar dados</button>
+                        <div id="pressureCaptureResult" class="vital-capture-result" style="display:none;"></div>
+                    </div>
+                </div>
+
                 <!-- Outros sinais -->
                 <div id="standardInputContainer">
                     <div class="form-group">
@@ -505,17 +610,6 @@
                             <span id="unidadeVitalDisplay" style="font-size:14px; font-weight:600; color:#9058A7; white-space:nowrap;"></span>
                         </div>
                     </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Fonte</label>
-                    <select class="form-select" id="fonteVitalInput" required>
-                        <option value="">Selecione</option>
-                        <option value="Manual">Manual</option>
-                        <option value="Pulseira">Pulseira</option>
-                        <option value="Google Fit">Google Fit</option>
-                        <option value="Apple Health">Apple Health</option>
-                    </select>
                 </div>
                 <div class="button-group">
                     <button type="button" class="button-cancel" id="cancelAddVitalBtn">Cancelar</button>
@@ -691,6 +785,105 @@
             <div style="display: flex; gap: 12px;">
                 <button type="button" class="button-cancel" style="flex: 1;" onclick="skipHeartRateFollowup()">Pular</button>
                 <button type="button" class="button-submit" style="flex: 1;" onclick="confirmHeartRateFollowup()">✅ Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Check-in (Humor/Sintomas) após medição manual -->
+    <div class="modal" id="moodCheckinModal">
+        <div class="modal-content mood-modal-content">
+            <div class="mood-modal-header">
+                <button type="button" class="mood-close" onclick="closeMoodCheckinModal()">×</button>
+                <div class="mood-header-text">
+                    <div class="mood-title">Controle de sintomas</div>
+                    <div class="mood-subtitle">Como você está se sentindo?</div>
+                </div>
+            </div>
+
+            <div class="mood-section">
+                <div class="mood-section-title">Humor</div>
+                <div class="mood-faces" id="moodFaces">
+                    <button type="button" class="mood-face" data-value="1" onclick="selectMoodFace(1)" aria-label="Muito mal">😞</button>
+                    <button type="button" class="mood-face" data-value="2" onclick="selectMoodFace(2)" aria-label="Mal">🙁</button>
+                    <button type="button" class="mood-face" data-value="3" onclick="selectMoodFace(3)" aria-label="Neutro">😐</button>
+                    <button type="button" class="mood-face" data-value="4" onclick="selectMoodFace(4)" aria-label="Bem">🙂</button>
+                    <button type="button" class="mood-face" data-value="5" onclick="selectMoodFace(5)" aria-label="Muito bem">😄</button>
+                </div>
+            </div>
+
+            <div class="mood-actions">
+                <button type="button" class="mood-outline-btn" onclick="toggleSymptomsPanel()">+ Sintomas</button>
+                <button type="button" class="mood-outline-btn" onclick="toggleNotePanel()">+ Nota</button>
+            </div>
+
+            <div class="mood-panel" id="symptomsPanel" style="display:none;">
+                <div class="mood-panel-title">Selecione sintomas (se houver)</div>
+                <div class="mood-symptoms">
+                    <button type="button" class="mood-symptom-btn" data-value="Dor de cabeça" onclick="toggleSymptomButton(this)">Dor de cabeça</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Tontura" onclick="toggleSymptomButton(this)">Tontura</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Falta de ar" onclick="toggleSymptomButton(this)">Falta de ar</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Dor no peito" onclick="toggleSymptomButton(this)">Dor no peito</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Náusea" onclick="toggleSymptomButton(this)">Náusea</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Ansiedade" onclick="toggleSymptomButton(this)">Ansiedade</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Cansaço" onclick="toggleSymptomButton(this)">Cansaço</button>
+                    <button type="button" class="mood-symptom-btn" data-value="Palpitação" onclick="toggleSymptomButton(this)">Palpitação</button>
+                </div>
+            </div>
+
+            <div class="mood-panel" id="notePanel" style="display:none;">
+                <div class="mood-panel-title">Escreva uma nota (opcional)</div>
+                <textarea class="mood-note" id="moodNoteInput" rows="3" placeholder="Ex: Dor de cabeça desde cedo, dormi mal..."></textarea>
+            </div>
+
+            <div class="mood-time-row">
+                <div class="mood-time-label">Hora</div>
+                <input type="time" class="mood-time-input" id="moodTimeInput">
+            </div>
+
+            <div class="mood-buttons">
+                <button type="button" class="mood-btn ghost" onclick="ignoreMoodCheckin()">Ignorar</button>
+                <button type="button" class="mood-btn soft" id="moodRescheduleBtn" onclick="rescheduleMoodCheckin()">Reagendar</button>
+                <button type="button" class="mood-btn primary" id="moodConfirmBtn" onclick="confirmMoodCheckin()" disabled>Confirmar</button>
+            </div>
+
+            <div class="mood-history">
+                <div class="mood-history-title">Últimas medições</div>
+                <div id="moodHistoryList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Reagendamento da próxima medição -->
+    <div class="modal" id="rescheduleMeasurementModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Reagendar medição</span>
+                <button class="modal-ok" id="closeRescheduleMeasurementModal">OK</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Quando será a próxima medição?</label>
+                <input type="datetime-local" class="form-input" id="nextMeasurementDateTimeInput">
+            </div>
+            <div class="toggle-row" style="margin-bottom: 14px;">
+                <span class="toggle-label">Deseja receber aviso por notificação?</span>
+                <button type="button" class="toggle active" id="notifyNextMeasurementToggle" onclick="this.classList.toggle('active')"></button>
+            </div>
+            <div class="button-group">
+                <button type="button" class="button-cancel" id="cancelRescheduleMeasurementBtn">Cancelar</button>
+                <button type="button" class="button-submit" id="confirmRescheduleMeasurementBtn" onclick="confirmRescheduleMeasurement()">Salvar reagendamento</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Visualização da Foto do Medicamento -->
+    <div class="modal" id="medicationPhotoModal">
+        <div class="modal-content medication-photo-modal-content">
+            <div class="modal-header">
+                <span id="medicationPhotoModalTitle">Foto do medicamento</span>
+                <button class="modal-ok" id="closeMedicationPhotoModal">OK</button>
+            </div>
+            <div class="medication-photo-modal-body">
+                <img id="medicationPhotoModalImg" alt="Foto do medicamento">
             </div>
         </div>
     </div>
@@ -972,6 +1165,18 @@
             <div id="alertasVitaisContent" class="tab-content active"></div>
             <div id="alertasMedsContent" class="tab-content"></div>
             <div id="alertasAgendaContent" class="tab-content"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Feedback do Sistema -->
+    <div class="modal" id="feedbackModal">
+        <div class="modal-content feedback-modal-content">
+            <div class="feedback-modal-icon" id="feedbackModalIcon">✅</div>
+            <div class="feedback-modal-title" id="feedbackModalTitle">Concluído</div>
+            <div class="feedback-modal-message" id="feedbackModalMessage">Operação realizada com sucesso.</div>
+            <div class="button-group">
+                <button type="button" class="button-submit" id="feedbackModalOkBtn">Entendi</button>
+            </div>
         </div>
     </div>
 
