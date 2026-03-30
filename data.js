@@ -499,7 +499,6 @@ const mockData = {
       exibirDashboard: true,
       alertas: { lembrete: true, antecedencia: 10, atrasada: true, estoqueBaixo: true },
       categoria: 'medicacao',
-      foto: 'Mensuri.png',
       historico: [
         { data: '25/01/2024', hora: '08:00', status: 'tomado' },
         { data: '25/01/2024', hora: '14:30', status: 'tomado' },
@@ -525,7 +524,6 @@ const mockData = {
       exibirDashboard: true,
       alertas: { lembrete: true, antecedencia: 10, atrasada: true, estoqueBaixo: true },
       categoria: 'medicacao',
-      foto: 'Mensuri.png',
       historico: [
         { data: '25/01/2024', hora: '08:00', status: 'tomado' },
         { data: '24/01/2024', hora: '08:00', status: 'tomado' },
@@ -547,7 +545,6 @@ const mockData = {
       exibirDashboard: false,
       alertas: { lembrete: true, antecedencia: 15, atrasada: false, estoqueBaixo: true },
       categoria: 'medicacao',
-      foto: 'Mensuri.png',
       historico: [
         { data: '25/01/2024', hora: '08:00', status: 'tomado' },
         { data: '25/01/2024', hora: '20:00', status: 'pendente' },
@@ -570,7 +567,6 @@ const mockData = {
       exibirDashboard: false,
       alertas: { lembrete: true, antecedencia: 10, atrasada: true, estoqueBaixo: true },
       categoria: 'medicacao',
-      foto: 'Mensuri.png',
       historico: [
         { data: '25/01/2024', hora: '20:00', status: 'pendente' },
         { data: '24/01/2024', hora: '20:00', status: 'tomado' },
@@ -592,7 +588,6 @@ const mockData = {
       exibirDashboard: true,
       alertas: { lembrete: true, antecedencia: 10, atrasada: true, estoqueBaixo: true },
       categoria: 'medicacao',
-      foto: 'Mensuri.png',
       historico: [
         { data: '25/01/2024', hora: '07:00', status: 'tomado' },
         { data: '24/01/2024', hora: '07:00', status: 'tomado' },

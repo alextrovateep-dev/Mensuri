@@ -344,11 +344,7 @@ function createMedicacaoManageRow(med) {
   const catalog = (typeof mockData !== 'undefined' && mockData.catalogoMedicamentos)
     ? mockData.catalogoMedicamentos.find(m => m.nome === med.nome)
     : null;
-  const photoValue = med.foto || (catalog && catalog.foto) || '💊';
-  const isPhotoImage = typeof photoValue === 'string' && photoValue.startsWith('data:');
-  const photoHtml = typeof photoValue === 'string' && photoValue.startsWith('data:')
-    ? `<img src="${photoValue}" alt="Foto do medicamento ${med.nome}">`
-    : `<span class="med-photo-emoji" aria-hidden="true">${photoValue}</span>`;
+  const { isPhotoImage, html: photoHtml } = getMedicationPhotoHtml(med, catalog);
 
   return `
     <div class="med-manage-row">

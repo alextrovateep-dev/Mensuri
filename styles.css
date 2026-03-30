@@ -2512,6 +2512,34 @@ body {
   font-size: 20px;
 }
 
+.med-photo-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 100%;
+  height: 100%;
+  padding: 2px;
+  box-sizing: border-box;
+}
+
+.med-photo-placeholder-icon {
+  width: 16px;
+  height: 16px;
+  color: #b89bc9;
+  flex-shrink: 0;
+}
+
+.med-photo-placeholder-label {
+  font-size: 8px;
+  font-weight: 800;
+  color: #9058a7;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .medication-photo-modal-content {
   max-width: 420px;
 }

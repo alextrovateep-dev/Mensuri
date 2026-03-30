@@ -1,5 +1,33 @@
 // Componentes Reutilizáveis
 
+/**
+ * Miniatura do medicamento: só aceita foto real em base64 (data:image/...).
+ * Outros valores (emoji, nome de arquivo, vazio) usam placeholder com rótulo "Imagem".
+ */
+function getMedicationPhotoHtml(med, catalog) {
+  const raw =
+    med.foto != null && String(med.foto).trim() !== ''
+      ? med.foto
+      : catalog && catalog.foto != null
+        ? catalog.foto
+        : null;
+  if (typeof raw === 'string' && raw.startsWith('data:image')) {
+    return {
+      isPhotoImage: true,
+      html: `<img src="${raw}" alt="Foto do medicamento ${med.nome}">`
+    };
+  }
+  return {
+    isPhotoImage: false,
+    html: `<span class="med-photo-placeholder">
+      <svg class="med-photo-placeholder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+      </svg>
+      <span class="med-photo-placeholder-label">Imagem</span>
+    </span>`
+  };
+}
+
 // Card de Sinal Vital Melhorado - Condensado com Tendência
 function createVitalCard(vital) {
   const colors = categoryColors.saude;
@@ -117,11 +145,7 @@ function createMedicacaoCard(med) {
   const catalog = (typeof mockData !== 'undefined' && mockData.catalogoMedicamentos)
     ? mockData.catalogoMedicamentos.find(m => m.nome === med.nome)
     : null;
-  const photoValue = med.foto || (catalog && catalog.foto) || '💊';
-  const isPhotoImage = typeof photoValue === 'string' && photoValue.startsWith('data:');
-  const photoHtml = typeof photoValue === 'string' && photoValue.startsWith('data:')
-    ? `<img src="${photoValue}" alt="Foto do medicamento ${med.nome}">`
-    : `<span class="med-photo-emoji" aria-hidden="true">${photoValue}</span>`;
+  const { isPhotoImage, html: photoHtml } = getMedicationPhotoHtml(med, catalog);
   const estoqueAtual = med.estoqueAtual || 0;
   const estoqueMinimo = med.estoqueMinimo || 7;
   const temAviso = estoqueAtual <= estoqueMinimo;
