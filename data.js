@@ -801,6 +801,32 @@ function toISODateTime(dateStr, timeStr) {
   return `${isoDate}T${timeStr}:00`;
 }
 
+/** Último dia do tratamento: início + (duracaoDias - 1) dias corridos (calendário local). */
+function computeDataFimFromInicioDuracao(dataInicioISO, duracaoDias) {
+  if (!dataInicioISO || duracaoDias == null || duracaoDias < 1) return '';
+  const parts = dataInicioISO.split('-').map(Number);
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return '';
+  const [y, m, d] = parts;
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + duracaoDias - 1);
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function inferDuracaoDiasFromInicioFim(dataInicio, dataFim) {
+  if (!dataInicio || !dataFim) return null;
+  const pa = dataInicio.split('-').map(Number);
+  const pb = dataFim.split('-').map(Number);
+  if (pa.length !== 3 || pb.length !== 3) return null;
+  const a = new Date(pa[0], pa[1] - 1, pa[2]);
+  const b = new Date(pb[0], pb[1] - 1, pb[2]);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null;
+  const diff = Math.round((b - a) / 86400000) + 1;
+  return diff > 0 ? diff : null;
+}
+
 function parseIdealObject(ideal) {
   if (ideal == null) return null;
   if (typeof ideal === 'object' && ideal.label) return ideal;
@@ -880,6 +906,206 @@ function formatHistoricValue(vitalTipo, historicoItem) {
     return `${historicoItem.valor.sistolica}/${historicoItem.valor.diastolica}`;
   }
   return String(historicoItem?.valor ?? '-');
+}
+
+function historicoEntryToMs(entry) {
+  if (!entry || !entry.data) return null;
+  const timePart = entry.hora && String(entry.hora).length >= 4 ? String(entry.hora).slice(0, 5) : '12:00';
+  const d = new Date(`${entry.data}T${timePart}:00`);
+  const t = d.getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+function getHistoricoUltimas24Horas(historico) {
+  const now = Date.now();
+  const limite = now - 24 * 60 * 60 * 1000;
+  return (historico || []).filter((h) => {
+    const t = historicoEntryToMs(h);
+    return t != null && t >= limite && t <= now + 5 * 60 * 1000;
+  });
+}
+
+function parseHistoricoPressurePair(h) {
+  const v = h && h.valor;
+  if (v && typeof v === 'object' && v.sistolica != null && v.diastolica != null) {
+    return { s: Number(v.sistolica), d: Number(v.diastolica) };
+  }
+  if (typeof v === 'string' && typeof parsePressureValue === 'function') {
+    const parsed = parsePressureValue(v);
+    if (!parsed) return null;
+    return { s: Number(parsed.sistolica), d: Number(parsed.diastolica) };
+  }
+  return null;
+}
+
+function getVital24hMinMaxStrings(vital) {
+  const historico = getHistoricoUltimas24Horas(vital?.historico);
+  if (historico.length === 0) return null;
+  const tipo = vital && vital.tipo;
+  if (tipo === 'Pressão Arterial') {
+    const pairs = historico.map(parseHistoricoPressurePair).filter(Boolean);
+    if (pairs.length === 0) return null;
+    const maxP = pairs.reduce((a, b) => (b.s > a.s || (b.s === a.s && b.d > a.d) ? b : a));
+    const minP = pairs.reduce((a, b) => (b.s < a.s || (b.s === a.s && b.d < a.d) ? b : a));
+    return { maxStr: `${maxP.s}/${maxP.d}`, minStr: `${minP.s}/${minP.d}` };
+  }
+  const nums = historico
+    .map((h) => {
+      const v = h.valor;
+      if (v != null && typeof v === 'object') return null;
+      const n = parseFloat(v);
+      return Number.isNaN(n) ? null : n;
+    })
+    .filter((n) => n != null);
+  if (nums.length === 0) return null;
+  return { maxStr: String(Math.max(...nums)), minStr: String(Math.min(...nums)) };
+}
+
+function formatVital24hRangeLine(vital) {
+  const mm = getVital24hMinMaxStrings(vital);
+  const u = vital && vital.unidade ? ` ${vital.unidade}` : '';
+  if (!mm) {
+    return `<div class="vital-24h-line"><span class="vital-24h-label">24 h</span><span class="vital-24h-empty">sem medições</span></div>`;
+  }
+  return `<div class="vital-24h-line"><span class="vital-24h-label">24 h</span><span class="vital-24h-mm">Máx. ${mm.maxStr}${u}</span><span class="vital-24h-sep">·</span><span class="vital-24h-mm">Mín. ${mm.minStr}${u}</span></div>`;
+}
+
+function getNumericTrendValue(vitalTipo, historicoItem) {
+  if (!historicoItem) return null;
+  const v = historicoItem.valor;
+  if (vitalTipo === 'Pressão Arterial') {
+    const p = parseHistoricoPressurePair(historicoItem);
+    if (p) return p.s;
+  }
+  const n = parseFloat(v);
+  return Number.isNaN(n) ? null : n;
+}
+
+function computeTrendDirFromHistoricoSlice(vitalTipo, historicoNewestFirst) {
+  if (!historicoNewestFirst || historicoNewestFirst.length < 2) return 'up';
+  const chrono = historicoNewestFirst.slice(0, 3).reverse();
+  const a = getNumericTrendValue(vitalTipo, chrono[0]);
+  const b = getNumericTrendValue(vitalTipo, chrono[chrono.length - 1]);
+  if (a == null || b == null) return 'up';
+  if (b > a) return 'up';
+  if (b < a) return 'down';
+  return 'up';
+}
+
+/** Medições fictícias nas últimas 24 h para demonstrar Máx./Mín. nos cards (dados sempre atuais). */
+function injectDemoMedicoesUltimas24h(data) {
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const now = new Date();
+  const at = (hoursAgo, minutesAgo = 0) => {
+    const t = new Date(now.getTime() - hoursAgo * 3600000 - minutesAgo * 60000);
+    return {
+      data: `${t.getFullYear()}-${pad2(t.getMonth() + 1)}-${pad2(t.getDate())}`,
+      hora: `${pad2(t.getHours())}:${pad2(t.getMinutes())}`
+    };
+  };
+
+  const demoRows = {
+    'Batimento Cardíaco': [
+      { ...at(0, 40), valor: 85, status: 'normal' },
+      { ...at(3, 10), valor: 72, status: 'normal' },
+      { ...at(9, 0), valor: 94, status: 'normal' },
+      { ...at(19, 30), valor: 64, status: 'normal' }
+    ],
+    'Pressão Arterial': [
+      { ...at(0, 55), valor: { sistolica: 122, diastolica: 81 }, status: 'normal' },
+      { ...at(4, 0), valor: { sistolica: 118, diastolica: 76 }, status: 'normal' },
+      { ...at(11, 20), valor: { sistolica: 132, diastolica: 86 }, status: 'ligeiramente_alta' },
+      { ...at(21, 0), valor: { sistolica: 112, diastolica: 72 }, status: 'normal' }
+    ],
+    Temperatura: [
+      { ...at(1, 0), valor: 36.9, status: 'normal' },
+      { ...at(7, 0), valor: 36.4, status: 'normal' },
+      { ...at(14, 0), valor: 37.2, status: 'normal' },
+      { ...at(20, 0), valor: 36.6, status: 'normal' }
+    ],
+    Passos: [
+      { ...at(1, 0), valor: 8840, status: 'normal' },
+      { ...at(8, 0), valor: 4120, status: 'normal' },
+      { ...at(16, 0), valor: 7260, status: 'normal' },
+      { ...at(22, 0), valor: 3180, status: 'normal' }
+    ],
+    Oxigenação: [
+      { ...at(0, 20), valor: 98, status: 'normal' },
+      { ...at(5, 0), valor: 96, status: 'normal' },
+      { ...at(12, 0), valor: 99, status: 'normal' },
+      { ...at(18, 0), valor: 97, status: 'normal' }
+    ],
+    Calorias: [
+      { ...at(2, 0), valor: 2180, status: 'normal' },
+      { ...at(9, 0), valor: 1640, status: 'normal' },
+      { ...at(15, 0), valor: 2050, status: 'normal' },
+      { ...at(23, 0), valor: 1420, status: 'normal' }
+    ],
+    Glicemia: [
+      { ...at(0, 30), valor: 92, status: 'normal' },
+      { ...at(6, 0), valor: 104, status: 'atencao' },
+      { ...at(13, 0), valor: 88, status: 'normal' },
+      { ...at(20, 0), valor: 97, status: 'normal' }
+    ],
+    HRV: [
+      { ...at(1, 0), valor: 54, status: 'normal' },
+      { ...at(8, 0), valor: 42, status: 'normal' },
+      { ...at(14, 0), valor: 58, status: 'normal' },
+      { ...at(21, 0), valor: 47, status: 'normal' }
+    ],
+    'Nível de Estresse': [
+      { ...at(0, 50), valor: 34, status: 'normal' },
+      { ...at(5, 0), valor: 46, status: 'atencao' },
+      { ...at(12, 0), valor: 28, status: 'normal' },
+      { ...at(19, 0), valor: 41, status: 'normal' }
+    ],
+    Sono: [
+      { ...at(4, 0), valor: 7.4, status: 'normal' },
+      { ...at(14, 0), valor: 6.2, status: 'atencao' },
+      { ...at(22, 0), valor: 8.1, status: 'normal' }
+    ],
+    Hidratação: [
+      { ...at(0, 15), valor: 1950, status: 'normal' },
+      { ...at(6, 0), valor: 1200, status: 'atencao' },
+      { ...at(13, 0), valor: 2400, status: 'normal' },
+      { ...at(20, 0), valor: 1550, status: 'normal' }
+    ],
+    'Freq. Respiratória': [
+      { ...at(0, 25), valor: 16, status: 'normal' },
+      { ...at(5, 0), valor: 19, status: 'normal' },
+      { ...at(11, 0), valor: 14, status: 'normal' },
+      { ...at(17, 0), valor: 17, status: 'normal' }
+    ]
+  };
+
+  data.sinaisVitais.forEach((vital) => {
+    const rows = demoRows[vital.tipo];
+    if (!rows || !Array.isArray(vital.historico)) return;
+
+    const sortedDesc = [...rows].sort((a, b) => historicoEntryToMs(b) - historicoEntryToMs(a));
+    for (let i = sortedDesc.length - 1; i >= 0; i -= 1) {
+      const h = { ...sortedDesc[i] };
+      if (h.data) {
+        const isoDate = toISODate(h.data);
+        if (isoDate) h.data = isoDate;
+      }
+      h.dataISO = h.data;
+      h.dataHoraISO = toISODateTime(h.data, h.hora || '00:00');
+      vital.historico.unshift(h);
+    }
+
+    const newest = vital.historico[0];
+    if (!newest) return;
+    if (vital.tipo === 'Pressão Arterial' && newest.valor && typeof newest.valor === 'object') {
+      vital.valor = { sistolica: newest.valor.sistolica, diastolica: newest.valor.diastolica };
+    } else {
+      vital.valor = newest.valor;
+    }
+    const hm = newest.hora ? newest.hora.slice(0, 5) : '00:00';
+    vital.dataHora = `${newest.data}T${hm}:00`;
+    vital.dataHoraISO = vital.dataHora;
+    vital.tempo = 'Agora';
+  });
 }
 
 function formatISODateBR(isoDate) {
@@ -969,6 +1195,10 @@ function normalizeMockDataForAnalysis(data) {
     med.dataFim = toISODate(med.dataFim) || med.dataFim;
     med.dataInicioISO = med.dataInicio;
     med.dataFimISO = med.dataFim;
+    if (med.dataInicio && med.dataFim && (med.duracaoDias == null || med.duracaoDias === undefined)) {
+      const inferred = inferDuracaoDiasFromInicioFim(med.dataInicio, med.dataFim);
+      if (inferred) med.duracaoDias = inferred;
+    }
     if (Array.isArray(med.historico)) {
       med.historico.forEach(h => {
         if (h.data) {
@@ -1014,3 +1244,4 @@ function normalizeMockDataForAnalysis(data) {
 }
 
 normalizeMockDataForAnalysis(mockData);
+injectDemoMedicoesUltimas24h(mockData);

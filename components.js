@@ -45,29 +45,23 @@ function getMedicationPhotoColumnHtml(med, catalog, variant) {
   `;
 }
 
-// Card de Sinal Vital Melhorado - Condensado com Tendência
+// Card de Sinal Vital: lista mostra só valor + faixa 24 h (tendência e 3 últimas ficam no modal com gráfico)
 function createVitalCard(vital) {
   const colors = categoryColors.saude;
   const variacaoIcon = vital.variacao === 'normal' ? '🟢' : '🔴';
   const idealLabel = typeof formatIdealLabel === 'function' ? formatIdealLabel(vital.ideal) : vital.ideal;
   const vitalValue = typeof formatVitalValue === 'function' ? formatVitalValue(vital) : vital.valor;
-  
-  const tendenciaArrow = vital.tendencia === 'up' ? '↑' : '↓';
-  const tendenciaClass = vital.tendencia === 'up' ? 'up' : 'down';
-  
-  // Formatar data/hora
+
   let dataHoraFormatada = '';
   if (vital.dataHora) {
     dataHoraFormatada = typeof formatISODateTimeBR === 'function' ? formatISODateTimeBR(vital.dataHora) : vital.dataHora;
   }
-  
-  // Últimas 3 medições
-  const ultimas3 = vital.historico
-    .slice(0, 3)
-    .reverse()
-    .map(h => (typeof formatHistoricValue === 'function' ? formatHistoricValue(vital.tipo, h) : h.valor))
-    .join('→');
-  
+
+  const rangeLine =
+    typeof formatVital24hRangeLine === 'function'
+      ? formatVital24hRangeLine(vital)
+      : '<div class="vital-24h-line"><span class="vital-24h-label">24 h</span><span class="vital-24h-empty">—</span></div>';
+
   return `
     <div class="card card-saude vital-card card-has-action" style="border-left-color: ${colors.border}; cursor: pointer;" onclick="openVitalDetailModal('${vital.tipo}', ${vital.id})">
       <div class="vital-header-compact">
@@ -77,21 +71,14 @@ function createVitalCard(vital) {
         </div>
         <div class="vital-status-icon">${variacaoIcon}</div>
       </div>
-      
+
       <div class="vital-main-line">
         <span class="vital-value-main">${vitalValue} ${vital.unidade}</span>
         <span class="vital-separator">•</span>
         <span class="vital-datetime">${dataHoraFormatada}</span>
       </div>
 
-      <div class="vital-tendencia-line">
-        <span class="vital-historico">${ultimas3}</span>
-        <span class="vital-separator">|</span>
-        <span class="vital-tendencia-text">
-          Tendência
-          <span class="vital-tendencia-arrow ${tendenciaClass}" aria-hidden="true">${tendenciaArrow}</span>
-        </span>
-      </div>
+      ${rangeLine}
       <span class="card-action-plus" aria-hidden="true">+</span>
     </div>
   `;
@@ -194,10 +181,14 @@ function createMedicacaoCard(med) {
       ? 'Tomado'
       : status === 'atrasado'
       ? 'Atrasado'
-      : 'A tomar';
+      : 'A\u00A0tomar';
+
+    const clickHandler = status === 'tomado'
+      ? `handleMedicationScheduleClick(${med.id}, '${horario}', 'tomado', '${med.nome}', '${med.dosagem}', '${hoje}')`
+      : `handleMedicationScheduleClick(${med.id}, '${horario}', '${status}', '${med.nome}', '${med.dosagem}', '${hoje}')`;
 
     return `
-      <div class="horario-item ${statusClass}" onclick="openTakeModal('${med.nome}', '${med.dosagem}', '${horario}', ${med.id})">
+      <div class="horario-item ${statusClass}" onclick="${clickHandler}">
         <span class="horario-time">${horario}</span>
         <span class="horario-status">${statusLabel}</span>
       </div>
@@ -221,10 +212,19 @@ function createMedicacaoCard(med) {
   return `
     <div class="card card-medicacao-enhanced" style="border-left-color: ${colors.border}">
       <div class="med-header-enhanced">
-        <div class="med-title-enhanced">
-          ${photoColumnHtml}
-          <div class="med-title-text">
-            <div class="med-name">${med.nome} <span class="med-title-feature">${med.dosagem}</span></div>
+        <div class="med-header-inner">
+          <div class="med-card-name-block">
+            <div class="med-col-label">Nome do remédio</div>
+            <div class="med-title-enhanced">
+              ${photoColumnHtml}
+              <div class="med-title-text">
+                <div class="med-name">${med.nome} <span class="med-title-feature">${med.dosagem}</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="med-card-tomados-block">
+            <div class="med-col-label">Tomados</div>
+            <div class="med-tomados-value" title="Total de doses registradas como tomadas (histórico)">${totalTomados}</div>
           </div>
         </div>
         <div class="med-actions-enhanced">
@@ -243,9 +243,8 @@ function createMedicacaoCard(med) {
       ${historicoHtml}
 
       <div class="med-estoque compact">
-        <div class="estoque-label">Tomados: ${totalTomados}</div>
-        <div class="estoque-text">Estoque: ${estoqueAtual}</div>
-        <div class="estoque-text">Faltam: ${faltaParaAcabar}</div>
+        <div class="estoque-text estoque-line-main">Estoque: ${estoqueAtual}</div>
+        <div class="estoque-text estoque-line-main">Faltam: ${faltaParaAcabar}</div>
       </div>
 
       ${temAviso ? `<div class="med-warning">⚠️ Estoque baixo: faltam ${faltaParaAcabar} comprimidos (aprox. ${diasRestantes} dia${diasRestantes === 1 ? '' : 's'})</div>` : ''}

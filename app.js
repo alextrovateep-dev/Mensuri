@@ -10,6 +10,7 @@ let pendingVitalSavePayload = null;
 /** BPM pendente após informar batimento (mesmo modal de confirmação) */
 let pendingHeartRateBpm = null;
 let lastRescheduleAlertKey = null;
+let pendingConfirmAction = null;
 
 function getTodayISODate() {
   return new Date().toISOString().slice(0, 10);
@@ -86,6 +87,27 @@ function showFeedbackModal(message, type = 'info', title = '') {
   modal.classList.add('active');
 }
 
+function openConfirmModal(message, onConfirm, title = 'Confirmar ação') {
+  const modal = document.getElementById('confirmModal');
+  const titleEl = document.getElementById('confirmModalTitle');
+  const messageEl = document.getElementById('confirmModalMessage');
+  if (!modal || !titleEl || !messageEl) {
+    const fallbackOk = window.confirm(message);
+    if (fallbackOk && typeof onConfirm === 'function') onConfirm();
+    return;
+  }
+  titleEl.textContent = title;
+  messageEl.textContent = message;
+  pendingConfirmAction = typeof onConfirm === 'function' ? onConfirm : null;
+  modal.classList.add('active');
+}
+
+function closeConfirmModal() {
+  const modal = document.getElementById('confirmModal');
+  if (modal) modal.classList.remove('active');
+  pendingConfirmAction = null;
+}
+
 // Fallback global: qualquer alert nativo vira modal padrão.
 if (typeof window !== 'undefined') {
   window.alert = function(message) {
@@ -138,17 +160,6 @@ function ensureConfigColetaPressao() {
 function getFontePressaoConfig() {
   ensureConfigColetaPressao();
   return mockData.configColetaPressao.fonte;
-}
-
-function setFontePressaoPerfil(fonte, btnEl) {
-  ensureConfigColetaPressao();
-  mockData.configColetaPressao.fonte = fonte;
-  document.querySelectorAll('.config-pressao-fonte-btn').forEach((b) => {
-    b.classList.toggle('selected', b.getAttribute('data-value') === fonte);
-  });
-  if (typeof showFeedbackModal === 'function') {
-    showFeedbackModal(`Medição de pressão por: ${fonte}.`, 'success');
-  }
 }
 
 function applyVitalFonteValue(value) {
@@ -274,7 +285,7 @@ function renderHome() {
         <div class="home-priority-value">${atrasadas.length}</div>
       </div>
       <div class="home-priority-card" onclick="switchScreen('medicacoesScreen')">
-        <div class="home-priority-label">Proxima dose</div>
+        <div class="home-priority-label">Próxima dose</div>
         <div class="home-priority-value">${proximas[0] ? proximas[0].horario : '--:--'}</div>
         <div class="home-priority-sub">${proximas[0] ? `${proximas[0].nome} ${proximas[0].dosagem}` : 'Sem pendencias'}</div>
       </div>
@@ -366,60 +377,59 @@ function renderMedicacoes() {
   const today = getTodayISODate();
   const nowHHMM = getCurrentHHMM();
 
-  const ordered = [...mockData.medicacoes].sort((a, b) => {
-    const nextA = a.horarios.find(h => getMedicationStatusForDate(a, today, h, nowHHMM) !== 'tomado');
-    const nextB = b.horarios.find(h => getMedicationStatusForDate(b, today, h, nowHHMM) !== 'tomado');
-    if (!nextA && !nextB) return a.nome.localeCompare(b.nome);
-    if (!nextA) return 1;
-    if (!nextB) return -1;
-    return nextA.localeCompare(nextB);
+  const medsWithOrder = [...mockData.medicacoes].map((med) => {
+    const horariosOrdenados = [...(med.horarios || [])].sort((a, b) => a.localeCompare(b));
+    const slots = horariosOrdenados.map((h) => ({
+      horario: h,
+      status: getMedicationStatusForDate(med, today, h, nowHHMM)
+    }));
+    const nextSlot = slots.find((s) => s.status !== 'tomado') || null;
+    const firstHorario = horariosOrdenados[0] || '99:99';
+    return {
+      med,
+      hasPending: !!nextSlot,
+      nextHorario: nextSlot ? nextSlot.horario : '99:99',
+      firstHorario
+    };
   });
 
-  const dayEntries = getMedicationDayEntries(today);
-  const overdueCount = dayEntries.filter(e => e.status === 'atrasado').length;
-  const pendingCount = dayEntries.filter(e => e.status === 'pendente').length;
-  const activeTodayIds = new Set(dayEntries.filter(e => e.status !== 'tomado').map(e => e.medId));
+  const paraTomar = medsWithOrder
+    .filter((x) => x.hasPending)
+    .sort((a, b) => {
+      if (a.nextHorario !== b.nextHorario) return a.nextHorario.localeCompare(b.nextHorario);
+      if (a.firstHorario !== b.firstHorario) return a.firstHorario.localeCompare(b.firstHorario);
+      return a.med.nome.localeCompare(b.med.nome);
+    })
+    .map((x) => x.med);
 
-  const hojeList = ordered.filter(m => activeTodayIds.has(m.id));
-  const hojeHtml = hojeList.map(createMedicacaoCard).join('');
+  const tomadasHoje = medsWithOrder
+    .filter((x) => !x.hasPending)
+    .sort((a, b) => {
+      if (a.firstHorario !== b.firstHorario) return a.firstHorario.localeCompare(b.firstHorario);
+      return a.med.nome.localeCompare(b.med.nome);
+    })
+    .map((x) => x.med);
+
+  let hojeHtml = '';
+  if (paraTomar.length > 0) {
+    hojeHtml += '<div class="subsection-title">Para tomar agora (ordem do dia)</div>';
+    hojeHtml += paraTomar.map(createMedicacaoCard).join('');
+  }
+  if (tomadasHoje.length > 0) {
+    hojeHtml += '<div class="subsection-title">Já tomadas hoje</div>';
+    hojeHtml += tomadasHoje.map(createMedicacaoCard).join('');
+  }
+
   document.getElementById('medicacoesHoje').innerHTML = hojeHtml ||
-    '<div class="empty-state"><div class="empty-text">Nenhuma dose pendente para hoje.</div></div>';
+    '<div class="empty-state"><div class="empty-text">Nenhuma medicação cadastrada para hoje.</div></div>';
 
   const helperEl = document.getElementById('medTodayHelper');
   if (helperEl) {
-    helperEl.textContent = `Toque no horario para marcar como tomado. Para incluir um novo remedio, use "+ Adicionar". ${overdueCount} atrasada(s) e ${pendingCount} pendente(s).`;
+    helperEl.textContent = '';
   }
-
-  const cadastros = [...mockData.medicacoes].sort((a, b) => a.nome.localeCompare(b.nome));
-  const cadHtml = cadastros.map(createMedicacaoManageRow).join('');
-  document.getElementById('medicacoesCadastros').innerHTML = cadHtml ||
-    '<div class="empty-state"><div class="empty-text">Nenhuma medicação cadastrada</div></div>';
 
   renderMedicationOverdueSection();
   updateMedicationCalendarHeader();
-}
-
-function createMedicacaoManageRow(med) {
-  const catalog = (typeof mockData !== 'undefined' && mockData.catalogoMedicamentos)
-    ? mockData.catalogoMedicamentos.find(m => m.nome === med.nome)
-    : null;
-  const photoColumnHtml = getMedicationPhotoColumnHtml(med, catalog, 'manage');
-
-  return `
-    <div class="med-manage-row">
-      <div class="med-manage-left">
-        ${photoColumnHtml}
-        <div class="med-manage-text">
-          <div class="med-manage-name">${med.nome}</div>
-          <div class="med-manage-sub">${med.dosagem}</div>
-        </div>
-      </div>
-      <div class="med-manage-actions">
-        <button class="med-action-btn-enhanced" onclick="openEditMedicacaoModal(${med.id})" title="Editar">✏️</button>
-        <button class="med-action-btn-enhanced" onclick="deleteMedicacao(${med.id})" title="Deletar">🗑️</button>
-      </div>
-    </div>
-  `;
 }
 
 function renderAgenda() {
@@ -510,20 +520,6 @@ function renderPerfil() {
     { screenId: 'medicacoesScreen', icon: '💊', title: 'Medicações', subtitle: 'Mostrar no menu inferior' },
     { screenId: 'agendaScreen', icon: '📅', title: 'Agenda', subtitle: 'Mostrar no menu inferior' }
   ];
-  ensureConfigColetaPressao();
-  const fontePressao = getFontePressaoConfig();
-  const fontesPressao = ['Manual', 'Pulseira', 'Google Fit', 'Apple Health'];
-  const pressaoConfigHtml = `
-    <div class="section-title">🩸 Pressão arterial</div>
-    <div class="config-block-pressao">
-      <p class="config-block-desc">Forma de registrar novas medições (usada ao adicionar pressão).</p>
-      <div class="vital-fonte-buttons vital-fonte-buttons--config">
-        ${fontesPressao.map((f) => `
-          <button type="button" class="vital-fonte-btn config-pressao-fonte-btn ${fontePressao === f ? 'selected' : ''}" data-value="${f}" onclick="setFontePressaoPerfil(this.getAttribute('data-value'), this)">${f}</button>
-        `).join('')}
-      </div>
-    </div>
-  `;
 
   const navControlsHtml = navControlItems.map(item => `
     <div class="config-item">
@@ -554,7 +550,6 @@ function renderPerfil() {
     </div>
 
     <div class="section-title">⚙️ Configurações</div>
-    ${pressaoConfigHtml}
     <div class="config-item" onclick="openMeusIndicadoresModal()" style="cursor:pointer;">
       <div class="config-item-content">
         <div class="config-icon">📋</div>
@@ -641,12 +636,77 @@ function switchScreen(screenId) {
 
 function setSemDataFimMedicacaoUI(mode, semFimOn) {
   const btn = document.getElementById(mode === 'add' ? 'toggleSemDataFimMed' : 'toggleSemDataFimMedEdit');
-  const grp = document.getElementById(mode === 'add' ? 'dataFimMedGroup' : 'editDataFimMedGroup');
-  const inp = document.getElementById(mode === 'add' ? 'dataFimMedInput' : 'editDataFimMedInput');
+  const grp = document.getElementById(mode === 'add' ? 'duracaoDiasMedGroup' : 'editDuracaoDiasMedGroup');
+  const inp = document.getElementById(mode === 'add' ? 'duracaoDiasMedInput' : 'editDuracaoDiasMedInput');
+  const hint = document.getElementById(mode === 'add' ? 'estoqueSugeridoAddText' : 'estoqueSugeridoEditText');
   if (!btn || !grp) return;
   btn.classList.toggle('active', !!semFimOn);
   grp.style.display = semFimOn ? 'none' : 'block';
   if (inp && semFimOn) inp.value = '';
+  if (hint && semFimOn) hint.textContent = '';
+}
+
+function getDosesPorDiaFromHorarioInputs(selector) {
+  const filled = [...document.querySelectorAll(selector)].filter((i) => i.value).length;
+  if (filled > 0) return filled;
+  return 0;
+}
+
+function getDosesPorDiaFromFrequencia(frequencia) {
+  if (frequencia === '1x ao dia') return 1;
+  if (frequencia === '2x ao dia') return 2;
+  if (frequencia === '3x ao dia') return 3;
+  if (frequencia === '4x ao dia') return 4;
+  if (frequencia === 'Conforme necessário') return 1;
+  return 0;
+}
+
+function refreshEstoqueSugeridoAdd() {
+  const hint = document.getElementById('estoqueSugeridoAddText');
+  if (!hint) return;
+  const sem = document.getElementById('toggleSemDataFimMed')?.classList.contains('active');
+  if (sem) {
+    hint.textContent = '';
+    return;
+  }
+  const d = parseInt(document.getElementById('duracaoDiasMedInput')?.value, 10);
+  const freq = document.getElementById('frequenciaMedInput')?.value;
+  let dosesPorDia = getDosesPorDiaFromHorarioInputs('.horario-input');
+  if (dosesPorDia === 0 && freq) dosesPorDia = getDosesPorDiaFromFrequencia(freq);
+  if (!d || d < 1) {
+    hint.textContent = '';
+    return;
+  }
+  if (dosesPorDia < 1) {
+    hint.textContent = 'Defina a frequência e os horários para calcular o estoque sugerido.';
+    return;
+  }
+  const sug = d * dosesPorDia;
+  hint.textContent = `Sugestão de estoque para o período: ${sug} unidades (${d} dia(s) × ${dosesPorDia} dose(s)/dia).`;
+}
+
+function refreshEstoqueSugeridoEdit() {
+  const hint = document.getElementById('estoqueSugeridoEditText');
+  if (!hint) return;
+  const sem = document.getElementById('toggleSemDataFimMedEdit')?.classList.contains('active');
+  if (sem) {
+    hint.textContent = '';
+    return;
+  }
+  const d = parseInt(document.getElementById('editDuracaoDiasMedInput')?.value, 10);
+  const freq = document.getElementById('editFrequenciaMedInput')?.value;
+  let dosesPorDia = getDosesPorDiaFromHorarioInputs('.edit-horario-input');
+  if (dosesPorDia === 0 && freq) dosesPorDia = getDosesPorDiaFromFrequencia(freq);
+  if (!d || d < 1) {
+    hint.textContent = '';
+    return;
+  }
+  if (dosesPorDia < 1) {
+    hint.textContent = 'Defina a frequência e os horários para calcular o estoque sugerido.';
+    return;
+  }
+  const sug = d * dosesPorDia;
+  hint.textContent = `Sugestão de estoque para o período: ${sug} unidades (${d} dia(s) × ${dosesPorDia} dose(s)/dia).`;
 }
 
 function toggleSemDataFimMedicacao(mode) {
@@ -654,6 +714,8 @@ function toggleSemDataFimMedicacao(mode) {
   if (!btn) return;
   const next = !btn.classList.contains('active');
   setSemDataFimMedicacaoUI(mode, next);
+  if (mode === 'add') refreshEstoqueSugeridoAdd();
+  else refreshEstoqueSugeridoEdit();
 }
 
 /** Campos que `form.reset()` não restaura (toggles, select dinâmico, lista de busca). */
@@ -699,7 +761,25 @@ function setupMedicacaoModal() {
     cleanupAddMedicacaoForm();
   };
 
-  if (addNewMedBtn) addNewMedBtn.addEventListener('click', () => addModal.classList.add('active'));
+  if (addNewMedBtn) {
+    addNewMedBtn.addEventListener('click', () => {
+      const di = document.getElementById('dataInicioMedInput');
+      if (di) di.value = getTodayISODate();
+      const dur = document.getElementById('duracaoDiasMedInput');
+      if (dur) dur.value = '';
+      const hint = document.getElementById('estoqueSugeridoAddText');
+      if (hint) hint.textContent = '';
+      addModal.classList.add('active');
+      setTimeout(() => refreshEstoqueSugeridoAdd(), 0);
+    });
+  }
+  if (addModal) {
+    addModal.addEventListener('input', (e) => {
+      if (e.target && (e.target.id === 'duracaoDiasMedInput' || e.target.id === 'dataInicioMedInput')) {
+        refreshEstoqueSugeridoAdd();
+      }
+    });
+  }
   if (cancelAddBtn) cancelAddBtn.addEventListener('click', closeModal);
   if (addModal) addModal.addEventListener('click', (e) => { if (e.target === addModal) closeModal(); });
 
@@ -712,7 +792,7 @@ function setupMedicacaoModal() {
     const frequencia = document.getElementById('frequenciaMedInput').value;
     const dataInicio = document.getElementById('dataInicioMedInput').value;
     const semDataFim = document.getElementById('toggleSemDataFimMed')?.classList.contains('active');
-    const dataFim = semDataFim ? '' : document.getElementById('dataFimMedInput').value;
+    const duracaoDias = semDataFim ? null : parseInt(document.getElementById('duracaoDiasMedInput')?.value, 10);
     const estoqueAtual = document.getElementById('estoqueAtualMedInput').value;
     const estoqueMinimo = document.getElementById('estoqueMinMedInput').value;
 
@@ -726,31 +806,56 @@ function setupMedicacaoModal() {
       showFeedbackModal('O estoque atual deve ser maior ou igual ao estoque mínimo.', 'warning');
       return;
     }
-    if (!semDataFim && dataInicio && dataFim && dataFim < dataInicio) {
-      showFeedbackModal('A data fim deve ser igual ou posterior à data de início.', 'warning');
+    if (!semDataFim && (!duracaoDias || duracaoDias < 1)) {
+      showFeedbackModal('Informe por quantos dias o medicamento será tomado (ex.: 10, 20).', 'warning');
+      return;
+    }
+    const dataFim = semDataFim ? '' : (typeof computeDataFimFromInicioDuracao === 'function'
+      ? computeDataFimFromInicioDuracao(dataInicio, duracaoDias)
+      : '');
+    if (!semDataFim && !dataFim) {
+      showFeedbackModal('Verifique a data de início e a duração em dias.', 'warning');
       return;
     }
     if (horarios.length === 0) { showFeedbackModal('Informe pelo menos um horario.', 'warning'); return; }
 
-    const exibirDashboard = document.getElementById('toggleDashboardMed').classList.contains('active');
-    const alertas = {
-      lembrete: document.getElementById('toggleLembreteMed').classList.contains('active'),
-      antecedencia: parseInt(document.getElementById('antecedenciaMedInput').value),
-      atrasada: document.getElementById('toggleAtrasadaMed').classList.contains('active'),
-      estoqueBaixo: document.getElementById('toggleEstoqueMed').classList.contains('active')
+    const saveMedicacao = () => {
+      const exibirDashboard = document.getElementById('toggleDashboardMed').classList.contains('active');
+      const alertas = {
+        lembrete: document.getElementById('toggleLembreteMed').classList.contains('active'),
+        antecedencia: parseInt(document.getElementById('antecedenciaMedInput').value),
+        atrasada: document.getElementById('toggleAtrasadaMed').classList.contains('active'),
+        estoqueBaixo: document.getElementById('toggleEstoqueMed').classList.contains('active')
+      };
+
+      const newId = Math.max(...mockData.medicacoes.map(m => m.id), 0) + 1;
+      mockData.medicacoes.push({
+        id: newId, nome, dosagem, horarios, frequencia, dataInicio, dataFim,
+        duracaoDias: semDataFim ? null : duracaoDias,
+        estoqueAtual: parseInt(estoqueAtual, 10) || 30, estoqueMinimo: parseInt(estoqueMinimo, 10) || 7,
+        exibirDashboard, alertas, categoria: 'medicacao', foto: fotoAtualMedicacao, historico: []
+      });
+
+      showFeedbackModal(`${nome} ${dosagem} adicionado com sucesso.`, 'success');
+      addModal.classList.remove('active');
+      cleanupAddMedicacaoForm();
+      renderMedicacoes();
     };
 
-    const newId = Math.max(...mockData.medicacoes.map(m => m.id), 0) + 1;
-    mockData.medicacoes.push({
-      id: newId, nome, dosagem, horarios, frequencia, dataInicio, dataFim,
-      estoqueAtual: parseInt(estoqueAtual, 10) || 30, estoqueMinimo: parseInt(estoqueMinimo, 10) || 7,
-      exibirDashboard, alertas, categoria: 'medicacao', foto: fotoAtualMedicacao, historico: []
-    });
+    if (!semDataFim && duracaoDias && horarios.length > 0) {
+      const need = duracaoDias * horarios.length;
+      const est = parseInt(estoqueAtual, 10);
+      if (!Number.isNaN(est) && est < need) {
+        openConfirmModal(
+          `O estoque informado (${est}) é menor que o necessário para o período (${need} unidades = ${duracaoDias} dia(s) × ${horarios.length} dose(s)/dia). Deseja continuar mesmo assim?`,
+          saveMedicacao,
+          'Estoque abaixo do necessário'
+        );
+        return;
+      }
+    }
 
-    showFeedbackModal(`${nome} ${dosagem} adicionado com sucesso.`, 'success');
-    addModal.classList.remove('active');
-    cleanupAddMedicacaoForm();
-    renderMedicacoes();
+    saveMedicacao();
   });
 }
 
@@ -928,13 +1033,34 @@ function setupEditMedicacaoModal() {
   cancelBtn.addEventListener('click', closeModal);
   modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
+  modal.addEventListener('input', (e) => {
+    if (e.target && (e.target.id === 'editDuracaoDiasMedInput' || e.target.id === 'editDataInicioMedInput')) {
+      refreshEstoqueSugeridoEdit();
+    }
+  });
+
+  modal.addEventListener('click', (e) => {
+    const btn = e.target.closest('.edit-desmarcar-tomado-btn');
+    if (!btn) return;
+    e.preventDefault();
+    const medId = parseInt(btn.getAttribute('data-med-id'), 10);
+    const d = btn.getAttribute('data-d');
+    const h = btn.getAttribute('data-h');
+    if (!medId || !d || !h) return;
+    if (undoMedicationTaken(medId, d, h)) {
+      const m = mockData.medicacoes.find((x) => x.id === medId);
+      if (m && modal.classList.contains('active')) renderEditMedicacaoTomadasList(m);
+    }
+  });
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const nome = document.getElementById('editNomeMedInput').value;
     const dosagem = document.getElementById('editDosagemMedInput').value;
     const frequencia = document.getElementById('editFrequenciaMedInput').value;
+    const dataInicio = document.getElementById('editDataInicioMedInput').value;
     const semDataFim = document.getElementById('toggleSemDataFimMedEdit')?.classList.contains('active');
-    const dataFim = semDataFim ? '' : document.getElementById('editDataFimMedInput').value;
+    const duracaoDias = semDataFim ? null : parseInt(document.getElementById('editDuracaoDiasMedInput')?.value, 10);
     const estoqueAtual = document.getElementById('editEstoqueAtualMedInput').value;
     const estoqueMinimo = document.getElementById('editEstoqueMinMedInput').value;
 
@@ -946,25 +1072,55 @@ function setupEditMedicacaoModal() {
       showFeedbackModal('O estoque atual deve ser maior ou igual ao estoque mínimo.', 'warning');
       return;
     }
-
-    const med = mockData.medicacoes.find(m => m.id === currentEditMedId);
-    if (med) {
-      med.nome = nome;
-      med.dosagem = dosagem;
-      med.frequencia = frequencia;
-      med.horarios = horarios.length > 0 ? horarios : med.horarios;
-      med.dataFim = dataFim || '';
-      med.estoqueAtual = parseInt(estoqueAtual, 10) || med.estoqueAtual || 30;
-      med.estoqueMinimo = parseInt(estoqueMinimo, 10) || 7;
-      if (fotoAtualMedicacaoEdit) med.foto = fotoAtualMedicacaoEdit;
+    if (!semDataFim && (!duracaoDias || duracaoDias < 1)) {
+      showFeedbackModal('Informe por quantos dias o medicamento será tomado (ex.: 10, 20).', 'warning');
+      return;
+    }
+    const dataFim = semDataFim ? '' : (typeof computeDataFimFromInicioDuracao === 'function'
+      ? computeDataFimFromInicioDuracao(dataInicio, duracaoDias)
+      : '');
+    if (!semDataFim && !dataFim) {
+      showFeedbackModal('Verifique a data de início e a duração em dias.', 'warning');
+      return;
     }
 
-    showFeedbackModal(`${nome} atualizado com sucesso.`, 'success');
-    modal.classList.remove('active');
-    form.reset();
-    setSemDataFimMedicacaoUI('edit', false);
-    removerFotoEdit();
-    renderMedicacoes();
+    const saveEditMedicacao = () => {
+      const med = mockData.medicacoes.find(m => m.id === currentEditMedId);
+      if (med) {
+        med.nome = nome;
+        med.dosagem = dosagem;
+        med.frequencia = frequencia;
+        med.horarios = horarios.length > 0 ? horarios : med.horarios;
+        med.dataInicio = dataInicio || med.dataInicio;
+        med.duracaoDias = semDataFim ? null : duracaoDias;
+        med.dataFim = dataFim || '';
+        med.estoqueAtual = parseInt(estoqueAtual, 10) || med.estoqueAtual || 30;
+        med.estoqueMinimo = parseInt(estoqueMinimo, 10) || 7;
+        if (fotoAtualMedicacaoEdit) med.foto = fotoAtualMedicacaoEdit;
+      }
+
+      showFeedbackModal(`${nome} atualizado com sucesso.`, 'success');
+      modal.classList.remove('active');
+      form.reset();
+      setSemDataFimMedicacaoUI('edit', false);
+      removerFotoEdit();
+      renderMedicacoes();
+    };
+
+    if (!semDataFim && duracaoDias && horarios.length > 0) {
+      const need = duracaoDias * horarios.length;
+      const est = parseInt(estoqueAtual, 10);
+      if (!Number.isNaN(est) && est < need) {
+        openConfirmModal(
+          `O estoque informado (${est}) é menor que o necessário para o período (${need} unidades = ${duracaoDias} dia(s) × ${horarios.length} dose(s)/dia). Deseja continuar mesmo assim?`,
+          saveEditMedicacao,
+          'Estoque abaixo do necessário'
+        );
+        return;
+      }
+    }
+
+    saveEditMedicacao();
   });
 }
 
@@ -975,9 +1131,14 @@ function openEditMedicacaoModal(medicacaoId) {
     document.getElementById('editNomeMedInput').value = med.nome;
     document.getElementById('editDosagemMedInput').value = med.dosagem;
     document.getElementById('editFrequenciaMedInput').value = med.frequencia;
+    document.getElementById('editDataInicioMedInput').value = med.dataInicio || getTodayISODate();
     const temDataFim = !!(med.dataFim && String(med.dataFim).trim() !== '');
     setSemDataFimMedicacaoUI('edit', !temDataFim);
-    document.getElementById('editDataFimMedInput').value = temDataFim ? med.dataFim : '';
+    let dur = med.duracaoDias;
+    if ((dur == null || dur === undefined) && med.dataInicio && med.dataFim && typeof inferDuracaoDiasFromInicioFim === 'function') {
+      dur = inferDuracaoDiasFromInicioFim(med.dataInicio, med.dataFim);
+    }
+    document.getElementById('editDuracaoDiasMedInput').value = temDataFim && dur != null ? String(dur) : '';
     document.getElementById('editEstoqueAtualMedInput').value = med.estoqueAtual || 30;
     document.getElementById('editEstoqueMinMedInput').value = med.estoqueMinimo || 7;
     updateEditHorariosFields();
@@ -988,6 +1149,7 @@ function openEditMedicacaoModal(medicacaoId) {
         if (med.horarios[i]) input.value = med.horarios[i];
       });
     }, 50);
+    setTimeout(() => refreshEstoqueSugeridoEdit(), 80);
 
     if (med.foto && typeof med.foto === 'string' && med.foto.startsWith('data:')) {
       fotoAtualMedicacaoEdit = med.foto;
@@ -998,6 +1160,7 @@ function openEditMedicacaoModal(medicacaoId) {
       removerFotoEdit();
     }
 
+    renderEditMedicacaoTomadasList(med);
     document.getElementById('editMedicacaoModal').classList.add('active');
   }
 }
@@ -1497,18 +1660,20 @@ function renderMedicationOverdueSection() {
     return;
   }
 
+  const entry = overdueEntries[0];
+  const mais = overdueEntries.length - 1;
+
   container.innerHTML = `
     <div class="med-overdue-section">
-      <div class="med-overdue-title">Atrasadas agora (${overdueEntries.length})</div>
-      ${overdueEntries.map(entry => `
-        <div class="med-overdue-item">
-          <div class="med-overdue-label">
-            <span class="med-overdue-time">${entry.horario}</span>
-            ${entry.nome} ${entry.dosagem}
-          </div>
-          <button class="med-overdue-btn" onclick="markMedicationByIdAndTime(${entry.medId}, '${entry.horario}', '${today}')">Tomar</button>
+      <div class="med-overdue-title">Atrasada agora${overdueEntries.length > 1 ? ` <span class="med-overdue-count">(${overdueEntries.length})</span>` : ''}</div>
+      <div class="med-overdue-item">
+        <div class="med-overdue-label">
+          <span class="med-overdue-time">${entry.horario}</span>
+          ${entry.nome} ${entry.dosagem}
         </div>
-      `).join('')}
+        <button class="med-overdue-btn" onclick="markMedicationByIdAndTime(${entry.medId}, '${entry.horario}', '${today}')">Tomar</button>
+      </div>
+      ${mais > 0 ? `<p class="med-overdue-more">Mais ${mais} dose${mais === 1 ? '' : 's'} atrasada${mais === 1 ? '' : 's'} nos horários abaixo.</p>` : ''}
     </div>
   `;
 }
@@ -1543,11 +1708,11 @@ function renderDailySchedule(filtro = 'todos', dateISO = getTodayISODate()) {
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <div style="font-weight: bold; font-size: 16px;">${med.nome} ${med.dosagem}</div>
-              <div style="color: #666; font-size: 14px;">Horário: ${horario}</div>
+              <div style="color: #666; font-size: 16px;">Horário: ${horario}</div>
             </div>
             <div style="text-align: right;">
               <div style="font-size: 24px; margin-bottom: 4px;">${statusIcon}</div>
-              <button class="schedule-btn" onclick="markMedicationByIdAndTime(${med.id}, '${horario}', '${hoje}')" style="font-size: 12px; padding: 4px 8px;">Tomar</button>
+              <button class="schedule-btn" onclick="markMedicationByIdAndTime(${med.id}, '${horario}', '${hoje}')" style="font-size: 16px; padding: 8px 14px;">Tomar</button>
             </div>
           </div>
         </div>
@@ -1601,6 +1766,83 @@ function markMedicationByIdAndTime(medId, horario, dateISO = getTodayISODate(), 
     showSystemToast(`${med.nome} ${med.dosagem} tomado as ${horario}.`, 'success');
   }
   return true;
+}
+
+function undoMedicationTaken(medId, dateISO, horario) {
+  const med = mockData.medicacoes.find(m => m.id === medId);
+  if (!med || !med.historico) return false;
+  const idx = med.historico.findIndex(
+    (h) => h.data === dateISO && h.hora === horario && h.status === 'tomado'
+  );
+  if (idx < 0) return false;
+  med.historico.splice(idx, 1);
+  updateMedicationSummary();
+  renderMedicationOverdueSection();
+  renderMedicacoes();
+  if (document.getElementById('dailyScheduleModal')?.classList.contains('active')) {
+    renderDailySchedule('todos');
+  }
+  if (document.getElementById('medicationCalendarModal')?.classList.contains('active')) {
+    renderMedicationCalendarDay();
+  }
+  showSystemToast('Marcação de tomado removida.', 'success');
+  return true;
+}
+
+function handleMedicationScheduleClick(medId, horario, status, nome, dosagem, dateISO = getTodayISODate()) {
+  if (status === 'tomado') {
+    openConfirmModal(
+      `Desfazer "${nome} ${dosagem}" marcado como tomado às ${horario}?`,
+      () => {
+        const undone = undoMedicationTaken(medId, dateISO, horario);
+        if (!undone) {
+          showFeedbackModal('Não foi possível desfazer essa marcação.', 'warning');
+        }
+      },
+      'Cancelar registro'
+    );
+    return;
+  }
+  openTakeModal(nome, dosagem, horario, medId);
+}
+
+function renderEditMedicacaoTomadasList(med) {
+  const container = document.getElementById('editTomadasCorrecaoContainer');
+  if (!container || !med) return;
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 14);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  const tomados = (med.historico || [])
+    .filter((h) => h.status === 'tomado' && h.data >= cutoffStr)
+    .sort((a, b) => `${b.data} ${b.hora}`.localeCompare(`${a.data} ${a.hora}`));
+
+  if (tomados.length === 0) {
+    container.innerHTML =
+      '<p class="form-hint" style="margin:0;">Nenhuma dose marcada como tomada nos últimos 14 dias.</p>';
+    return;
+  }
+
+  const fmt = typeof formatDateForUI === 'function' ? formatDateForUI : (d) => d;
+  container.innerHTML = `
+    <p class="form-hint" style="margin:0 0 8px 0;">Toque em <strong>Desfazer</strong> para cancelar um registro errado.</p>
+    ${tomados
+    .map((h) => {
+      const label = `${fmt(h.data)} · ${h.hora}`;
+      const d = String(h.data || '').replace(/"/g, '');
+      const hh = String(h.hora || '').replace(/"/g, '');
+      return `
+      <div class="edit-tomada-row">
+        <span class="edit-tomada-label">${label}</span>
+        <button type="button" class="button-cancel edit-desmarcar-tomado-btn"
+          data-med-id="${med.id}"
+          data-d="${d}"
+          data-h="${hh}">Desfazer</button>
+      </div>`;
+    })
+    .join('')}
+  `;
 }
 
 function openMedicationCalendarModal() {
@@ -1821,6 +2063,7 @@ function updateHorariosFields() {
     `;
     container.innerHTML += html;
   }
+  if (typeof refreshEstoqueSugeridoAdd === 'function') refreshEstoqueSugeridoAdd();
 }
 
 function updateEditHorariosFields() {
@@ -1848,6 +2091,7 @@ function updateEditHorariosFields() {
     `;
     container.innerHTML += html;
   }
+  if (typeof refreshEstoqueSugeridoEdit === 'function') refreshEstoqueSugeridoEdit();
 }
 
 // ===== SETUP DAILY SCHEDULE MODAL =====
@@ -2227,6 +2471,25 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+  const confirmModal = document.getElementById('confirmModal');
+  const confirmOkBtn = document.getElementById('confirmModalOkBtn');
+  const confirmCancelBtn = document.getElementById('confirmModalCancelBtn');
+  if (confirmOkBtn) {
+    confirmOkBtn.addEventListener('click', () => {
+      const action = pendingConfirmAction;
+      closeConfirmModal();
+      if (typeof action === 'function') action();
+    });
+  }
+  if (confirmCancelBtn) {
+    confirmCancelBtn.addEventListener('click', closeConfirmModal);
+  }
+  if (confirmModal) {
+    confirmModal.addEventListener('click', (e) => {
+      if (e.target === confirmModal) closeConfirmModal();
+    });
+  }
+
   const modal = document.getElementById('feedbackModal');
   const okBtn = document.getElementById('feedbackModalOkBtn');
   if (okBtn) {
@@ -2473,18 +2736,30 @@ function renderMeusIndicadoresCorpo() {
 function removeIndicador(categoria, id) {
   if (categoria === 'vitais') {
     const v = mockData.sinaisVitais.find(v => v.id === id);
-    if (!v || !confirm(`Remover "${v.tipo}"?`)) return;
-    mockData.sinaisVitais = mockData.sinaisVitais.filter(v => v.id !== id);
-    delete mockData.configSinaisVitais[v.tipo];
-    renderMeusIndicadoresVitais();
-    renderSaude();
+    if (!v) return;
+    openConfirmModal(
+      `Remover "${v.tipo}"?`,
+      () => {
+        mockData.sinaisVitais = mockData.sinaisVitais.filter(x => x.id !== id);
+        delete mockData.configSinaisVitais[v.tipo];
+        renderMeusIndicadoresVitais();
+        renderSaude();
+      },
+      'Confirmar remoção'
+    );
   } else {
     const c = mockData.composicaoCorporal.find(c => c.id === id);
-    if (!c || !confirm(`Remover "${c.tipo}"?`)) return;
-    mockData.composicaoCorporal = mockData.composicaoCorporal.filter(c => c.id !== id);
-    delete mockData.configComposicao[c.tipo];
-    renderMeusIndicadoresCorpo();
-    renderComposicao();
+    if (!c) return;
+    openConfirmModal(
+      `Remover "${c.tipo}"?`,
+      () => {
+        mockData.composicaoCorporal = mockData.composicaoCorporal.filter(x => x.id !== id);
+        delete mockData.configComposicao[c.tipo];
+        renderMeusIndicadoresCorpo();
+        renderComposicao();
+      },
+      'Confirmar remoção'
+    );
   }
 }
 
@@ -2884,6 +3159,7 @@ function openVitalDetailModal(tipoVital, vitalId) {
   
   renderVitalDetailContent(currentVitalDetail.historico);
   renderSparklineChart(currentVitalDetail.historico);
+  renderVitalDetailTrendRow(currentVitalDetail.historico);
   document.getElementById('vitalDetailModal').classList.add('active');
 
   document.getElementById('addVitalMedicaoBtn').onclick = () => {
@@ -3033,6 +3309,39 @@ function filterVitalDetail() {
 
   renderVitalDetailContent(filtrado);
   renderSparklineChart(filtrado);
+  renderVitalDetailTrendRow(filtrado);
+}
+
+function renderVitalDetailTrendRow(historico) {
+  const el = document.getElementById('vitalDetailTrendRow');
+  if (!el || !currentVitalDetail) return;
+  if (!historico || historico.length === 0) {
+    el.innerHTML = '';
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = '';
+  const tipo = currentVitalDetail.tipo;
+  const ultimas3 = historico
+    .slice(0, 3)
+    .reverse()
+    .map((h) => (typeof formatHistoricValue === 'function' ? formatHistoricValue(tipo, h) : h.valor))
+    .join('→');
+  const tendencia =
+    typeof computeTrendDirFromHistoricoSlice === 'function'
+      ? computeTrendDirFromHistoricoSlice(tipo, historico)
+      : (currentVitalDetail.tendencia === 'down' ? 'down' : 'up');
+  const tendenciaArrow = tendencia === 'up' ? '↑' : '↓';
+  const tendenciaClass = tendencia === 'up' ? 'up' : 'down';
+  el.innerHTML = `
+    <div class="vital-tendencia-line vital-detail-tendencia-inner">
+      <span class="vital-historico">${ultimas3}</span>
+      <span class="vital-separator">|</span>
+      <span class="vital-tendencia-text">
+        Tendência
+        <span class="vital-tendencia-arrow ${tendenciaClass}" aria-hidden="true">${tendenciaArrow}</span>
+      </span>
+    </div>`;
 }
 
 function openAddVitalModal(tipoVital) {

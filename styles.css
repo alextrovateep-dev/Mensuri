@@ -10,6 +10,8 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
+  font-size: 18px;
+  line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: #F5F5F5;
@@ -81,7 +83,7 @@ body {
 }
 
 .date {
-  font-size: 14px;
+  font-size: 16px;
   color: #999999;
 }
 
@@ -109,7 +111,7 @@ body {
   justify-content: center;
   cursor: pointer;
   color: #999999;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   transition: color 0.3s;
   border: none;
@@ -157,14 +159,14 @@ body {
 
 .card-has-action {
   position: relative;
-  padding-bottom: 28px;
+  padding-bottom: 42px;
 }
 
 .card-action-plus {
   position: absolute;
   right: 10px;
   bottom: 8px;
-  font-size: 18px;
+  font-size: 27px;
   font-weight: 700;
   color: #9058A7;
   line-height: 1;
@@ -210,7 +212,7 @@ body {
 }
 
 .card-info {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
   margin-bottom: 3px;
   line-height: 1.35;
@@ -307,16 +309,6 @@ body {
   white-space: nowrap;
 }
 
-.med-warning {
-  font-size: 12px;
-  color: #FF6B6B;
-  font-weight: 600;
-  padding: 6px 8px;
-  background: #FFE5E5;
-  border-radius: 6px;
-  text-align: center;
-}
-
 /* Card com Foto - Estilo iFood */
 .card-medicacao-com-foto {
   display: flex;
@@ -365,7 +357,7 @@ body {
   border-radius: 6px;
   background: white;
   color: #7e91cd;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
@@ -408,7 +400,7 @@ body {
   color: #2E7D32;
   padding: 4px 8px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -422,7 +414,7 @@ body {
   display: flex;
   align-items: flex-start;
   margin-bottom: 8px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .exame-detail-icon {
@@ -445,14 +437,14 @@ body {
 }
 
 .resultado-title {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: #2E7D32;
   margin-bottom: 4px;
 }
 
 .resultado-text {
-  font-size: 12px;
+  font-size: 16px;
   color: #1B5E20;
 }
 
@@ -524,16 +516,16 @@ body {
 .home-priority-grid {
   display: grid;
   grid-template-columns: 1fr 1.4fr;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--space-card-gap);
+  margin-bottom: var(--space-card-gap);
 }
 
 .home-priority-card {
   background: var(--surface-card);
   border: var(--border-card);
   border-radius: var(--radius-card);
-  padding: 9px 10px;
-  min-height: 64px;
+  padding: var(--space-card-padding);
+  min-height: 76px;
   box-shadow: var(--shadow-card);
 }
 
@@ -542,48 +534,87 @@ body {
   background: #fffafa;
 }
 
+.home-priority-card.warning .home-priority-value {
+  color: #c62828;
+}
+
 .home-priority-card.ok {
   border-color: #d9edd9;
   background: #fbfffb;
 }
 
 .home-priority-label {
-  font-size: 10px;
-  color: #888;
+  font-size: 14px;
+  color: var(--text-muted);
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
 }
 
 .home-priority-value {
-  font-size: 22px;
-  line-height: 1.1;
+  font-size: 24px;
+  line-height: 1.15;
   font-weight: 800;
-  color: #333;
-  margin-top: 3px;
+  color: var(--text-title);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Horário da próxima dose: mesmo destaque cromático dos valores nos cards de Saúde */
+.home-priority-grid > .home-priority-card:nth-child(2) .home-priority-value {
+  color: #7e91cd;
 }
 
 .home-priority-sub {
-  margin-top: 2px;
-  font-size: 11px;
-  color: #777;
+  margin-top: 4px;
+  font-size: 16px;
+  color: #595959;
   font-weight: 600;
+  line-height: 1.3;
 }
 
 .home-today-row {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .home-today-chip {
   border-radius: 999px;
   border: 1px solid #e8e8e8;
   background: #fff;
-  color: #666;
-  font-size: 10px;
+  color: #444444;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 8px 14px;
+  line-height: 1.25;
+}
+
+/* Home — alinhado à base 18 e aos cards de Saúde / Agenda */
+#homeScreen .page-subtitle {
+  font-size: 15px;
+  color: #6f6f6f;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+#homeScreen #homeConsulta .card-title {
+  font-size: 18px;
   font-weight: 700;
-  padding: 3px 8px;
+  color: var(--text-title);
+  line-height: 1.25;
+}
+
+#homeScreen #homeConsulta .card-info {
+  font-size: 16px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+#homeScreen #homeConsulta .card-header .card-icon {
+  font-size: 28px;
 }
 
 .agenda-section {
@@ -591,7 +622,7 @@ body {
 }
 
 .agenda-section-title {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: #9058A7;
   margin-bottom: 12px;
@@ -652,7 +683,7 @@ body {
 }
 
 .profile-email {
-  font-size: 12px;
+  font-size: 14px;
   color: #7e91cd;
   margin-top: 4px;
 }
@@ -691,7 +722,7 @@ body {
 }
 
 .config-subtitle {
-  font-size: 12px;
+  font-size: 14px;
   color: #999999;
   margin-top: 2px;
 }
@@ -1231,7 +1262,7 @@ body {
   background: none;
   border: 1.5px solid #9058A7;
   border-radius: 20px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
   color: #9058A7;
@@ -1252,7 +1283,7 @@ body {
 }
 
 .form-label {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: #333333;
   margin-bottom: 8px;
@@ -1260,7 +1291,7 @@ body {
 }
 
 .form-hint {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: #777;
 }
@@ -1268,10 +1299,10 @@ body {
 .form-input,
 .form-select {
   width: 100%;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid #E0E0E0;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 18px;
   font-family: inherit;
   background: white;
 }
@@ -1287,61 +1318,41 @@ body {
   cursor: pointer;
 }
 
-.vital-fonte-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.vital-fonte-btn {
-  min-height: 44px;
-  border-radius: 12px;
-  border: 1px solid #e1e1e1;
-  background: #fff;
-  color: #2f2f2f;
+/* Saúde e Corpo: datas/horas legíveis (idoso) */
+#vitalDetailModal input[type="date"],
+#vitalDetailModal input[type="time"],
+#vitalDetailModal input[type="datetime-local"],
+#composicaoModal input[type="date"],
+#composicaoModal input[type="time"],
+#composicaoModal input[type="datetime-local"] {
   font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
+  line-height: 1.3;
+  padding: 10px 12px;
 }
 
-.vital-fonte-btn.selected {
-  border-color: #9058A7;
-  background: #f6edf9;
-  color: #6b3f7b;
-  box-shadow: 0 0 0 2px rgba(144, 88, 167, 0.12);
+#vitalDetailModal .vital-list-date {
+  font-size: 13px;
 }
 
-.vital-fonte-buttons--config {
-  grid-template-columns: 1fr 1fr;
+#composicaoModal #composicaoHistoricoContent .card-saude > .card-info:first-child,
+#composicaoModal #composicaoHistoricoContent .card-saude > .card-info:first-child strong {
+  font-size: 13px !important;
 }
 
-.config-block-pressao {
-  margin-bottom: 14px;
-  padding: 12px 14px;
-  background: #fcf9fe;
-  border-radius: 12px;
-  border: 1px solid #eadff0;
+#saudeScreen .vital-datetime {
+  font-size: 16px;
 }
 
-.config-block-desc {
-  font-size: 12px;
-  color: #5a5a5a;
-  margin: 0 0 10px;
-  line-height: 1.35;
+#homeScreen .vital-datetime {
+  font-size: 16px;
 }
 
-.vital-fonte-resumo-text {
+#saudeScreen .ecg-date {
   font-size: 14px;
-  color: #333;
-  margin: 0;
-  line-height: 1.35;
 }
 
-.vital-fonte-resumo-hint {
-  font-size: 12px;
-  color: #666;
-  margin: 8px 0 0;
-  line-height: 1.35;
+#composicaoScreen .composicao-date {
+  font-size: 14px;
 }
 
 .link-button {
@@ -1520,12 +1531,12 @@ body {
 
 .button-cancel {
   flex: 1;
-  padding: 12px;
+  padding: 14px;
   border-radius: 8px;
   border: 1px solid #E0E0E0;
   background: white;
   color: #333333;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
@@ -1537,12 +1548,12 @@ body {
 
 .button-submit {
   flex: 1;
-  padding: 12px;
+  padding: 14px;
   border-radius: 8px;
   border: none;
   background: #9058A7;
   color: white;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
@@ -1619,7 +1630,7 @@ body {
 }
 
 .alarm-time {
-  font-size: 14px;
+  font-size: 16px;
   color: #999999;
   margin-bottom: 24px;
 }
@@ -1749,12 +1760,12 @@ body {
 }
 
 .vital-icon {
-  font-size: 24px;
+  font-size: 36px;
   flex-shrink: 0;
 }
 
 .vital-title-text {
-  font-size: 14px;
+  font-size: 21px;
   font-weight: 700;
   color: var(--text-title);
   line-height: 1.2;
@@ -1765,27 +1776,27 @@ body {
 
 .vital-title-text::after {
   content: attr(data-ideal);
-  font-size: 11px;
+  font-size: 17px;
   font-weight: 500;
   color: #999999;
 }
 
 .vital-status-icon {
-  font-size: 18px;
+  font-size: 27px;
   flex-shrink: 0;
 }
 
 .vital-main-line {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 7px;
-  font-size: 13px;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 20px;
   flex-wrap: wrap;
 }
 
 .vital-value-main {
-  font-size: 16px;
+  font-size: 24px;
   font-weight: 700;
   color: #7e91cd;
   white-space: nowrap;
@@ -1800,6 +1811,7 @@ body {
   color: var(--text-muted);
   font-weight: 500;
   white-space: nowrap;
+  font-size: 20px;
 }
 
 .vital-historico {
@@ -1811,8 +1823,8 @@ body {
 .vital-tendencia-line {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 18px;
   color: #666666;
   font-weight: 600;
 }
@@ -1828,10 +1840,10 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
-  font-size: 16px;
+  font-size: 24px;
   line-height: 1;
   font-weight: 900;
   margin-left: 2px;
@@ -1848,6 +1860,44 @@ body {
   color: #1565c0;
   background: #e8f1fd;
   border-color: #bfd6f5;
+}
+
+.vital-24h-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 18px;
+  margin-top: 10px;
+  color: #555;
+  font-weight: 600;
+}
+
+.vital-24h-label {
+  font-weight: 800;
+  color: #444;
+}
+
+.vital-24h-mm {
+  color: #666;
+}
+
+.vital-24h-sep {
+  color: #ccc;
+  font-weight: 400;
+}
+
+.vital-24h-empty {
+  color: #999;
+  font-weight: 600;
+}
+
+.vital-detail-trend-row {
+  margin-bottom: 12px;
+}
+
+.vital-detail-trend-row .vital-detail-tendencia-inner {
+  justify-content: center;
 }
 
 /* ===== COMPOSIÇÃO CORPORAL ===== */
@@ -1878,7 +1928,7 @@ body {
 }
 
 .composicao-icon {
-  font-size: 28px;
+  font-size: 42px;
   flex-shrink: 0;
 }
 
@@ -1887,31 +1937,31 @@ body {
 }
 
 .composicao-title {
-  font-size: 14px;
+  font-size: 21px;
   font-weight: 700;
   color: #333333;
 }
 
 .composicao-ideal {
-  font-size: 11px;
+  font-size: 17px;
   color: #999999;
   margin-top: 2px;
 }
 
 .composicao-variacao {
-  font-size: 20px;
+  font-size: 30px;
   flex-shrink: 0;
 }
 
 .composicao-value {
-  font-size: 18px;
+  font-size: 27px;
   font-weight: 700;
   color: #FF9800;
   margin-bottom: 6px;
 }
 
 .composicao-date {
-  font-size: 11px;
+  font-size: 17px;
   color: #999999;
 }
 
@@ -1924,7 +1974,7 @@ body {
 }
 
 .composicao-source {
-  font-size: 11px;
+  font-size: 17px;
   margin-left: auto;
   max-width: 60%;
   overflow: hidden;
@@ -1962,7 +2012,7 @@ body {
 }
 
 .ecg-icon {
-  font-size: 28px;
+  font-size: 42px;
   flex-shrink: 0;
 }
 
@@ -1971,13 +2021,13 @@ body {
 }
 
 .ecg-title {
-  font-size: 14px;
+  font-size: 21px;
   font-weight: 700;
   color: #333333;
 }
 
 .ecg-date {
-  font-size: 11px;
+  font-size: 17px;
   color: #999999;
   margin-top: 2px;
 }
@@ -1995,7 +2045,7 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: 18px;
 }
 
 .ecg-label {
@@ -2009,10 +2059,10 @@ body {
 }
 
 .ecg-interpretation {
-  font-size: 11px;
+  font-size: 17px;
   color: #2E7D32;
   font-weight: 600;
-  padding: 6px;
+  padding: 8px;
   background: #E8F5E9;
   border-radius: 4px;
 }
@@ -2110,6 +2160,19 @@ body {
   margin-bottom: 7px;
   text-transform: uppercase;
   letter-spacing: 0.2px;
+}
+
+.med-overdue-count {
+  font-weight: 800;
+  color: #c62828;
+}
+
+.med-overdue-more {
+  font-size: 13px;
+  color: #666666;
+  font-weight: 600;
+  margin: 8px 0 0;
+  line-height: 1.35;
 }
 
 .med-overdue-item {
@@ -2247,6 +2310,25 @@ body {
   border-color: #ffcdd2;
 }
 
+.confirm-modal-content {
+  max-width: 380px;
+  border-top: 3px solid #9058A7;
+}
+
+.confirm-modal-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #2f2f2f;
+  margin-bottom: 8px;
+}
+
+.confirm-modal-message {
+  font-size: 16px;
+  color: #4f4f4f;
+  line-height: 1.4;
+  margin-bottom: 14px;
+}
+
 .calendar-day-summary {
   display: flex;
   gap: 8px;
@@ -2300,7 +2382,7 @@ body {
 }
 
 .calendar-med-dose {
-  font-size: 12px;
+  font-size: 14px;
   color: #7f4896;
   font-weight: 600;
 }
@@ -2314,7 +2396,7 @@ body {
 .calendar-slot {
   border-radius: 8px;
   padding: 4px 8px;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -2432,7 +2514,7 @@ body {
   border-radius: 8px;
   background: white;
   color: #666666;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
@@ -2471,7 +2553,7 @@ body {
   border-radius: 6px;
   background: white;
   color: #9058A7;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
@@ -2640,14 +2722,51 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 7px;
   padding-bottom: 7px;
   border-bottom: 1px solid #F0F0F0;
 }
 
-.med-title-enhanced {
+.med-header-inner {
+  display: flex;
   flex: 1;
+  align-items: flex-end;
+  gap: 14px;
+  min-width: 0;
+}
+
+.med-card-name-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.med-card-tomados-block {
+  flex-shrink: 0;
+  text-align: center;
+  padding-left: 12px;
+  border-left: 1px solid #ececec;
+}
+
+.med-col-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #888888;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+  line-height: 1.2;
+}
+
+.med-tomados-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #2e7d32;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.med-title-enhanced {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -2800,6 +2919,19 @@ body {
   color: #7f4896;
 }
 
+/* Nome + dosagem são o dado principal do card — acima da base 18 */
+.card-medicacao-enhanced .med-name {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--text-title);
+}
+
+.card-medicacao-enhanced .med-title-feature {
+  font-size: 18px;
+  font-weight: 700;
+}
+
 .med-actions-enhanced {
   display: flex;
   gap: 6px;
@@ -2921,7 +3053,7 @@ body {
   padding: 3px 7px;
   border-radius: 6px;
   border: 1px solid #E0E0E0;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .historico-hora {
@@ -2930,7 +3062,7 @@ body {
 }
 
 .historico-status {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* Estoque */
@@ -2946,12 +3078,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
+  padding: 5px 10px;
+  margin-bottom: 0;
 }
 
 .estoque-label {
-  font-size: 11px;
+  font-size: 17px;
   color: #7b7b7b;
   font-weight: 600;
   margin-bottom: 0;
@@ -2959,17 +3093,51 @@ body {
 }
 
 .estoque-text {
-  font-size: 11px;
+  font-size: 17px;
   color: #595959;
   font-weight: 600;
 }
 
-/* Warning */
-.med-warning {
-  font-size: 12px;
-  color: #FF6B6B;
+.med-estoque.compact .estoque-line-main {
+  font-size: 15px;
   font-weight: 600;
-  padding: 8px 10px;
+  line-height: 1.25;
+}
+
+.edit-tomada-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 15px;
+}
+
+.edit-tomada-row:last-child {
+  border-bottom: none;
+}
+
+.edit-tomada-label {
+  font-weight: 600;
+  color: #444;
+  flex: 1;
+  min-width: 0;
+}
+
+.edit-desmarcar-tomado-btn {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+/* Warning — texto auxiliar; menor que dados principais do card */
+.med-warning {
+  font-size: 14px;
+  line-height: 1.35;
+  color: #c62828;
+  font-weight: 600;
+  padding: 6px 9px;
   background: #FFE5E5;
   border-radius: 8px;
   text-align: center;
@@ -2983,13 +3151,13 @@ body {
   margin-bottom: 8px;
 }
 
-.horarios-label {
-  font-size: 10px;
-  color: #7b7b7b;
+.med-horarios-interactive .horarios-label {
+  font-size: 12px;
+  color: #666666;
   font-weight: 600;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   text-transform: uppercase;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.04em;
 }
 
 .horarios-list-interactive {
@@ -3008,20 +3176,22 @@ body {
 
 .horario-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 9px 10px;
+  gap: 2px;
+  padding: 8px 6px;
   border-radius: 9px;
   cursor: pointer;
   transition: all 0.3s;
   border: 1px solid #ececec;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 14px;
   min-width: 0;
   width: 100%;
-  min-height: 40px;
+  min-height: 44px;
   box-sizing: border-box;
+  text-align: center;
 }
 
 .horario-item:hover {
@@ -3030,16 +3200,20 @@ body {
 }
 
 .horario-time {
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-size: 18px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 
 .horario-status {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  opacity: 0.9;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0.95;
 }
 
 .horario-item.status-tomado {
@@ -3049,15 +3223,29 @@ body {
 }
 
 .horario-item.status-atrasado {
-  background: #ffebee;
-  border-color: #ffcdd2;
+  background: #fff5f5;
+  border-color: #ef9a9a;
+  color: #b71c1c;
+}
+
+.horario-item.status-atrasado .horario-time {
+  color: #b71c1c;
+}
+
+.horario-item.status-atrasado .horario-status {
   color: #c62828;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .horario-item.status-a-tomar {
   background: #f3e8f8;
   border-color: #e2cfee;
   color: #7f4896;
+}
+
+.horario-item.status-a-tomar .horario-status {
+  font-size: 12px;
 }
 
 #medicacoesScreen .section-title {
@@ -3079,7 +3267,7 @@ body {
 }
 
 .med-page-subtitle {
-  font-size: 12px;
+  font-size: 14px;
   color: #6f6f6f;
   font-weight: 600;
 }
@@ -3107,7 +3295,7 @@ body {
 .med-helper-text {
   margin-top: 0;
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: #666666;
   line-height: 1.45;
 }
@@ -3445,7 +3633,7 @@ body {
   padding: 10px 12px;
   background: white;
   border-bottom: 1px solid #F0F0F0;
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .vital-list-item:last-child {
@@ -3456,6 +3644,7 @@ body {
   flex: 1;
   color: #666666;
   font-weight: 500;
+  font-size: 16px;
 }
 
 .vital-list-value {
@@ -3463,11 +3652,11 @@ body {
   text-align: center;
   color: #333333;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 18px;
 }
 
 .vital-list-status {
-  font-size: 16px;
+  font-size: 18px;
   min-width: 20px;
   text-align: right;
 }
@@ -3581,7 +3770,7 @@ body {
 }
 
 .toggle-col-label {
-  font-size: 9px;
+  font-size: 12px;
   color: #AAAAAA;
   font-weight: 600;
   text-transform: uppercase;

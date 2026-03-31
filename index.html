@@ -110,10 +110,6 @@
                     <div class="med-helper-text" id="medTodayHelper"></div>
                     <div id="medicationsOverdueNow"></div>
                     <div id="medicacoesHoje"></div>
-
-                    <div class="med-page-divider"></div>
-                    <div class="section-title med-section-title">Meus remédios</div>
-                    <div id="medicacoesCadastros"></div>
                 </div>
 
                 <!-- Agenda Screen -->
@@ -208,6 +204,7 @@
                 <span id="vitalDetailTitle">Histórico de Sinal Vital</span>
                 <button class="modal-ok" id="closeVitalDetailModal">OK</button>
             </div>
+            <div id="vitalDetailTrendRow" class="vital-detail-trend-row" style="display: none;"></div>
             <canvas id="sparklineChart" width="720" height="220" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 16px;"></canvas>
             <div class="form-group">
                 <label class="form-label">Filtrar por Data</label>
@@ -304,16 +301,17 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Data Início</label>
+                    <label class="form-label">Quando começa</label>
                     <input type="date" class="form-input" id="dataInicioMedInput" required>
                 </div>
                 <div class="toggle-row" style="margin-bottom:8px;">
-                    <span class="toggle-label">Uso contínuo (sem data fim)</span>
+                    <span class="toggle-label">Uso contínuo (sem período previsto)</span>
                     <button type="button" class="toggle" id="toggleSemDataFimMed" onclick="toggleSemDataFimMedicacao('add')"></button>
                 </div>
-                <div class="form-group" id="dataFimMedGroup">
-                    <label class="form-label">Data fim <span class="form-hint">(opcional)</span></label>
-                    <input type="date" class="form-input" id="dataFimMedInput">
+                <div class="form-group" id="duracaoDiasMedGroup">
+                    <label class="form-label">Por quantos dias será tomado</label>
+                    <input type="number" class="form-input" id="duracaoDiasMedInput" min="1" max="3650" placeholder="Ex: 10, 20">
+                    <p class="form-hint" id="estoqueSugeridoAddText"></p>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Estoque Atual</label>
@@ -388,6 +386,15 @@
                 </div>
                 <div id="editHorariosContainer"></div>
                 <div class="form-group">
+                    <label class="form-label">Quando começa</label>
+                    <input type="date" class="form-input" id="editDataInicioMedInput" required>
+                </div>
+                <div class="form-group" id="editTomadasCorrecaoGroup">
+                    <label class="form-label">Cancelar registro “já tomei”</label>
+                    <p class="form-hint">Marcou por engano? Toque em <strong>Desfazer</strong> no horário desejado. O status volta para pendente ou atrasado automaticamente.</p>
+                    <div id="editTomadasCorrecaoContainer"></div>
+                </div>
+                <div class="form-group">
                     <label class="form-label">Foto do medicamento (opcional)</label>
                     <input type="file" class="form-input" id="editFotoMedInput" accept="image/*" style="display:none;">
                     <div class="photo-upload-area" id="editPhotoUploadArea" onclick="document.getElementById('editFotoMedInput').click()">
@@ -399,12 +406,13 @@
                     </div>
                 </div>
                 <div class="toggle-row" style="margin-bottom:8px;">
-                    <span class="toggle-label">Uso contínuo (sem data fim)</span>
+                    <span class="toggle-label">Uso contínuo (sem período previsto)</span>
                     <button type="button" class="toggle" id="toggleSemDataFimMedEdit" onclick="toggleSemDataFimMedicacao('edit')"></button>
                 </div>
-                <div class="form-group" id="editDataFimMedGroup">
-                    <label class="form-label">Data fim <span class="form-hint">(opcional)</span></label>
-                    <input type="date" class="form-input" id="editDataFimMedInput">
+                <div class="form-group" id="editDuracaoDiasMedGroup">
+                    <label class="form-label">Por quantos dias será tomado</label>
+                    <input type="number" class="form-input" id="editDuracaoDiasMedInput" min="1" max="3650" placeholder="Ex: 10, 20">
+                    <p class="form-hint" id="estoqueSugeridoEditText"></p>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Estoque Atual</label>
@@ -1171,6 +1179,18 @@
             <div id="alertasVitaisContent" class="tab-content active"></div>
             <div id="alertasMedsContent" class="tab-content"></div>
             <div id="alertasAgendaContent" class="tab-content"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação do Sistema -->
+    <div class="modal" id="confirmModal">
+        <div class="modal-content confirm-modal-content">
+            <div class="confirm-modal-title" id="confirmModalTitle">Confirmar ação</div>
+            <div class="confirm-modal-message" id="confirmModalMessage">Tem certeza que deseja continuar?</div>
+            <div class="button-group">
+                <button type="button" class="button-cancel" id="confirmModalCancelBtn">Cancelar</button>
+                <button type="button" class="button-submit" id="confirmModalOkBtn">Confirmar</button>
+            </div>
         </div>
     </div>
 
