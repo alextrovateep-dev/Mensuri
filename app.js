@@ -564,17 +564,6 @@ function renderPerfil() {
       <div>›</div>
     </div>
 
-    <div class="config-item" onclick="openAlertasModal()" style="cursor:pointer;">
-      <div class="config-item-content">
-        <div class="config-icon">🔔</div>
-        <div class="config-text">
-          <div class="config-title">Alertas</div>
-          <div class="config-subtitle">Central de alertas configurados</div>
-        </div>
-      </div>
-      <div>›</div>
-    </div>
-
     <div class="section-title">🧭 Itens do Menu</div>
     ${navControlsHtml}
 
