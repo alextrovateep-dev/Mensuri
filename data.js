@@ -965,9 +965,9 @@ function formatVital24hRangeLine(vital) {
   const mm = getVital24hMinMaxStrings(vital);
   const u = vital && vital.unidade ? ` ${vital.unidade}` : '';
   if (!mm) {
-    return `<div class="vital-24h-line"><span class="vital-24h-label">24 h</span><span class="vital-24h-empty">sem medições</span></div>`;
+    return `<div class="vital-24h-line"><span class="vital-24h-label">24Hrs</span><span class="vital-24h-empty">(sem medições)</span></div>`;
   }
-  return `<div class="vital-24h-line"><span class="vital-24h-label">24 h</span><span class="vital-24h-mm">Máx. ${mm.maxStr}${u}</span><span class="vital-24h-sep">·</span><span class="vital-24h-mm">Mín. ${mm.minStr}${u}</span></div>`;
+  return `<div class="vital-24h-line"><span class="vital-24h-label">24Hrs</span><span class="vital-24h-mm">(${mm.maxStr}${u} - ${mm.minStr}${u})</span></div>`;
 }
 
 function getNumericTrendValue(vitalTipo, historicoItem) {

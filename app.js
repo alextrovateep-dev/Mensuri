@@ -5,12 +5,15 @@ let currentVitalType = '';
 let currentVitalDetail = null;
 let lastMedicationAlertKey = null;
 let lastVitalAlertKey = null;
+let currentAlarmMedicationId = null;
+let currentAlarmScheduledTime = '';
 /** Dados validados antes de salvar (modal de confirmação) */
 let pendingVitalSavePayload = null;
 /** BPM pendente após informar batimento (mesmo modal de confirmação) */
 let pendingHeartRateBpm = null;
 let lastRescheduleAlertKey = null;
 let pendingConfirmAction = null;
+let currentDailyScheduleFilter = 'todos';
 
 function getTodayISODate() {
   return new Date().toISOString().slice(0, 10);
@@ -866,20 +869,35 @@ function setupAlarmModal() {
   const dismissBtn = document.getElementById('dismissAlarmBtn');
   const takeBtn = document.getElementById('takeAlarmBtn');
 
-  dismissBtn.addEventListener('click', () => {
+  const closeAlarmModal = () => {
     alarmModal.classList.remove('active');
+  };
+
+  dismissBtn.addEventListener('click', () => {
+    closeAlarmModal();
+    openOverdueMedicationsModal();
   });
 
   takeBtn.addEventListener('click', () => {
-    const medName = document.getElementById('alarmMedName').textContent;
-    showFeedbackModal(`${medName} marcado como tomado.`, 'success');
-    alarmModal.classList.remove('active');
+    if (currentAlarmMedicationId && currentAlarmScheduledTime) {
+      markMedicationByIdAndTime(currentAlarmMedicationId, currentAlarmScheduledTime, getTodayISODate(), true);
+    } else {
+      const medName = document.getElementById('alarmMedName').textContent;
+      showFeedbackModal(`${medName} marcado como tomado.`, 'success');
+    }
+    closeAlarmModal();
+  });
+
+  alarmModal.addEventListener('click', (e) => {
+    if (e.target === alarmModal) closeAlarmModal();
   });
 }
 
 function showMedicationAlarm(medicacaoId, horario) {
   const medicacao = mockData.medicacoes.find(m => m.id === medicacaoId);
   if (medicacao) {
+    currentAlarmMedicationId = medicacaoId;
+    currentAlarmScheduledTime = horario || '';
     document.getElementById('alarmMedName').textContent = `${medicacao.nome} ${medicacao.dosagem}`;
     document.getElementById('alarmTime').textContent = horario || '--:--';
     document.getElementById('alarmModal').classList.add('active');
@@ -1622,25 +1640,18 @@ function updateClockDisplay() {
 
 function updateMedicationSummary() {
   const hoje = getTodayISODate();
-  let tomadas = 0;
-  let pendentes = 0;
-  
-  mockData.medicacoes.forEach(med => {
-    med.horarios.forEach(horario => {
-      const registro = med.historico.find(h => h.data === hoje && h.hora === horario);
-      if (registro && registro.status === 'tomado') {
-        tomadas++;
-      } else {
-        pendentes++;
-      }
-    });
-  });
-  
+  const entries = getMedicationDayEntries(hoje);
+  const tomadas = entries.filter((e) => e.status === 'tomado').length;
+  const pendentes = entries.filter((e) => e.status === 'pendente').length;
+  const atrasadas = entries.filter((e) => e.status === 'atrasado').length;
+
   const tomadosEl = document.getElementById('medTomadas');
   const pendentesEl = document.getElementById('medPendentes');
-  
+  const atrasadasEl = document.getElementById('medAtrasadas');
+
   if (tomadosEl) tomadosEl.textContent = tomadas;
   if (pendentesEl) pendentesEl.textContent = pendentes;
+  if (atrasadasEl) atrasadasEl.textContent = atrasadas;
 }
 
 function updateMedicationCalendarHeader() {
@@ -1680,10 +1691,12 @@ function renderMedicationOverdueSection() {
 
 // ===== DAILY SCHEDULE MODAL =====
 
-function openDailyScheduleModal() {
+function openDailyScheduleModal(initialFilter = 'todos') {
   const hoje = getTodayISODate();
   document.getElementById('dailyScheduleTitle').textContent = `Agenda de Medicações - ${formatDateForUI(hoje)}`;
-  renderDailySchedule('todos');
+  currentDailyScheduleFilter = initialFilter;
+  renderDailySchedule(initialFilter);
+  setDailyScheduleActiveFilter(initialFilter);
   document.getElementById('dailyScheduleModal').classList.add('active');
 }
 
@@ -1691,46 +1704,83 @@ function renderDailySchedule(filtro = 'todos', dateISO = getTodayISODate()) {
   const hoje = dateISO;
   const agora = new Date();
   const horaAtual = String(agora.getHours()).padStart(2, '0') + ':' + String(agora.getMinutes()).padStart(2, '0');
-  
-  let html = '';
-  
+  currentDailyScheduleFilter = filtro;
+
+  const rows = [];
+
   mockData.medicacoes.forEach(med => {
     med.horarios.forEach(horario => {
       const status = getMedicationStatusForDate(med, hoje, horario, horaAtual);
-      
+
       if (filtro !== 'todos' && status !== filtro) return;
-      
-      const statusIcon = status === 'tomado' ? '✅' : status === 'atrasado' ? '🔴' : '⏳';
-      const statusColor = status === 'tomado' ? '#00AA00' : status === 'atrasado' ? '#FF0000' : '#FFA500';
-      
-      html += `
-        <div class="schedule-item" style="border-left: 4px solid ${statusColor}; padding: 12px; margin-bottom: 8px; background: #f9f9f9; border-radius: 4px;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <div style="font-weight: bold; font-size: 16px;">${med.nome} ${med.dosagem}</div>
-              <div style="color: #666; font-size: 16px;">Horário: ${horario}</div>
-            </div>
-            <div style="text-align: right;">
-              <div style="font-size: 24px; margin-bottom: 4px;">${statusIcon}</div>
-              <button class="schedule-btn" onclick="markMedicationByIdAndTime(${med.id}, '${horario}', '${hoje}')" style="font-size: 16px; padding: 8px 14px;">Tomar</button>
-            </div>
-          </div>
-        </div>
-      `;
+
+      const statusText = status === 'tomado'
+        ? 'Tomado'
+        : status === 'atrasado'
+        ? 'Atrasado'
+        : 'Pendente';
+
+      rows.push({
+        medId: med.id,
+        nome: med.nome,
+        dosagem: med.dosagem,
+        horario,
+        status,
+        statusText
+      });
     });
   });
-  
-  if (!html) {
+
+  rows.sort((a, b) => {
+    if (a.horario !== b.horario) return a.horario.localeCompare(b.horario);
+    return a.nome.localeCompare(b.nome);
+  });
+
+  let html = '';
+  if (!rows.length) {
     html = '<div class="empty-state"><div class="empty-text">Nenhuma medicação para este filtro</div></div>';
+  } else {
+    html = rows.map((row) => `
+      <div class="schedule-item schedule-item--${row.status}">
+        <div class="schedule-item-left">
+          <div class="schedule-med">${row.nome} ${row.dosagem}</div>
+          <div class="schedule-meta">Horário: ${row.horario}</div>
+        </div>
+        <div class="schedule-item-right">
+          <span class="schedule-status schedule-status--${row.status}">${row.statusText}</span>
+          <button class="schedule-btn" onclick="openTakeModal('${row.nome}', '${row.dosagem}', '${row.horario}', ${row.medId})">Tomar</button>
+        </div>
+      </div>
+    `).join('');
   }
-  
+
   document.getElementById('dailyScheduleContent').innerHTML = html;
 }
 
-function filterScheduleByStatus(status) {
-  document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-  event.target.classList.add('active');
+function setDailyScheduleActiveFilter(status) {
+  document.querySelectorAll('#dailyScheduleModal .filter-btn').forEach((btn) => {
+    const txt = (btn.textContent || '').toLowerCase();
+    const isActive = (status === 'todos' && txt.includes('todos'))
+      || (status === 'tomado' && txt.includes('tomadas'))
+      || (status === 'pendente' && txt.includes('pendentes'))
+      || (status === 'atrasado' && txt.includes('atrasadas'));
+    btn.classList.toggle('active', isActive);
+  });
+}
+
+function filterScheduleByStatus(status, btnEl = null) {
+  currentDailyScheduleFilter = status;
+  if (btnEl) {
+    document.querySelectorAll('#dailyScheduleModal .filter-btn').forEach(btn => btn.classList.remove('active'));
+    btnEl.classList.add('active');
+  } else {
+    setDailyScheduleActiveFilter(status);
+  }
   renderDailySchedule(status);
+}
+
+function openOverdueMedicationsModal() {
+  openDailyScheduleModal('atrasado');
 }
 
 function markMedicationAsTaken(nome, dosagem, horario) {
@@ -1757,7 +1807,8 @@ function markMedicationByIdAndTime(medId, horario, dateISO = getTodayISODate(), 
   updateMedicationSummary();
   renderMedicationOverdueSection();
   if (document.getElementById('dailyScheduleModal')?.classList.contains('active')) {
-    renderDailySchedule('todos');
+    renderDailySchedule(currentDailyScheduleFilter);
+    setDailyScheduleActiveFilter(currentDailyScheduleFilter);
   }
   if (document.getElementById('medicationCalendarModal')?.classList.contains('active')) {
     renderMedicationCalendarDay();
