@@ -938,17 +938,28 @@ function parseHistoricoPressurePair(h) {
   return null;
 }
 
+/** Faixas min–max nas últimas 24 h, separadas por componente (como no card de referência). */
+function getVital24hPressureRanges(vital) {
+  const historico = getHistoricoUltimas24Horas(vital?.historico);
+  const pairs = historico.map(parseHistoricoPressurePair).filter(Boolean);
+  if (pairs.length === 0) return null;
+  const sList = pairs.map((p) => p.s);
+  const dList = pairs.map((p) => p.d);
+  const sisMin = Math.min(...sList);
+  const sisMax = Math.max(...sList);
+  const diaMin = Math.min(...dList);
+  const diaMax = Math.max(...dList);
+  return {
+    sisRange: `${sisMin}-${sisMax}`,
+    diaRange: `${diaMin}-${diaMax}`
+  };
+}
+
 function getVital24hMinMaxStrings(vital) {
   const historico = getHistoricoUltimas24Horas(vital?.historico);
   if (historico.length === 0) return null;
   const tipo = vital && vital.tipo;
-  if (tipo === 'Pressão Arterial') {
-    const pairs = historico.map(parseHistoricoPressurePair).filter(Boolean);
-    if (pairs.length === 0) return null;
-    const maxP = pairs.reduce((a, b) => (b.s > a.s || (b.s === a.s && b.d > a.d) ? b : a));
-    const minP = pairs.reduce((a, b) => (b.s < a.s || (b.s === a.s && b.d < a.d) ? b : a));
-    return { maxStr: `${maxP.s}/${maxP.d}`, minStr: `${minP.s}/${minP.d}` };
-  }
+  if (tipo === 'Pressão Arterial') return null;
   const nums = historico
     .map((h) => {
       const v = h.valor;
@@ -962,6 +973,20 @@ function getVital24hMinMaxStrings(vital) {
 }
 
 function formatVital24hRangeLine(vital) {
+  if (vital && vital.tipo === 'Pressão Arterial') {
+    const pr = getVital24hPressureRanges(vital);
+    if (!pr) {
+      return `<div class="vital-24h-line vital-24h-line--pressure"><span class="vital-24h-label">24Hrs</span><span class="vital-24h-empty">(sem medições)</span></div>`;
+    }
+    return `<div class="vital-24h-line vital-24h-line--pressure">
+      <span class="vital-24h-label">24Hrs</span>
+      <div class="vital-24h-pressure-badges" aria-label="Faixa nas últimas 24 horas">
+        <div class="vital-24h-p-row"><span class="vital-24h-p-tag">SIS</span><span class="vital-24h-p-val">${pr.sisRange}</span></div>
+        <div class="vital-24h-p-row"><span class="vital-24h-p-tag">DIA</span><span class="vital-24h-p-val">${pr.diaRange}</span></div>
+      </div>
+    </div>`;
+  }
+
   const mm = getVital24hMinMaxStrings(vital);
   const u = vital && vital.unidade ? ` ${vital.unidade}` : '';
   if (!mm) {
