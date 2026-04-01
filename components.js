@@ -214,7 +214,6 @@ function createMedicacaoCard(med) {
       <div class="med-header-enhanced">
         <div class="med-header-inner">
           <div class="med-card-name-block">
-            <div class="med-col-label">Nome do remédio</div>
             <div class="med-title-enhanced">
               ${photoColumnHtml}
               <div class="med-title-text">
