@@ -1741,6 +1741,11 @@ body {
   margin-bottom: 10px !important;
 }
 
+/* Mantém espaço para o "+" — o padding shorthand acima anula .card-has-action */
+.vital-card.card-has-action {
+  padding-bottom: 52px !important;
+}
+
 .vital-card:hover {
   transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
@@ -1895,23 +1900,26 @@ body {
 
 /* Pressão: SIS / DIA com min–max nas 24 h (layout tipo referência) */
 .vital-24h-line--pressure {
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: flex-start;
-  gap: 12px;
+  gap: 6px 8px;
+  padding-right: 36px; /* evita texto sob o "+" absoluto */
 }
 
 .vital-24h-pressure-badges {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 6px;
   flex-shrink: 0;
+  min-width: 0;
 }
 
 .vital-24h-p-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 3rem 1fr;
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
 }
 
 .vital-24h-p-tag {
@@ -1923,6 +1931,10 @@ body {
   border-radius: 999px;
   padding: 4px 10px;
   line-height: 1;
+  justify-self: center;
+  min-width: 2.75rem;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .vital-24h-p-val {
@@ -1932,6 +1944,7 @@ body {
   font-variant-numeric: tabular-nums;
   min-width: 4.5ch;
   text-align: right;
+  justify-self: end;
 }
 
 .vital-detail-trend-row {
