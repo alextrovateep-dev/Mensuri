@@ -64,8 +64,16 @@ function getMedicationPhotoColumnHtml(med, catalog, variant) {
 // Card de Sinal Vital: ícone + valores (sem nome do indicador no cartão — o ícone identifica)
 function createVitalCard(vital) {
   const variacaoIcon = vital.variacao === 'normal' ? '🟢' : '🔴';
-  const vitalValue = typeof formatVitalValue === 'function' ? formatVitalValue(vital) : vital.valor;
   const unit = vital.unidade ? ` ${vital.unidade}` : '';
+  let valueHtml;
+  if (vital.tipo === 'Pressão Arterial' && vital.valor && typeof vital.valor === 'object') {
+    const s = vital.valor.sistolica;
+    const d = vital.valor.diastolica;
+    valueHtml = `<span class="vital-pressure-abbr">SIS</span> ${s} / <span class="vital-pressure-abbr">DIA</span> ${d}${unit}`;
+  } else {
+    const vitalValue = typeof formatVitalValue === 'function' ? formatVitalValue(vital) : vital.valor;
+    valueHtml = `${vitalValue}${unit}`;
+  }
 
   let dataHoraFormatada = '';
   if (vital.dataHora) {
@@ -79,11 +87,13 @@ function createVitalCard(vital) {
 
   const tipoSafe = String(vital.tipo).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   const tipoAttr = String(vital.tipo).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const valueMainClass =
+    vital.tipo === 'Pressão Arterial' ? 'vital-value-main vital-value-main--pressure' : 'vital-value-main';
   return `
     <div class="card card-saude vital-card card-has-action" role="article" aria-label="${tipoAttr}" style="cursor: pointer;" onclick="openVitalDetailModal('${tipoSafe}', ${vital.id})">
       <div class="vital-header-compact vital-header--icon-value">
         <span class="vital-icon" aria-hidden="true">${vital.icon}</span>
-        <span class="vital-value-main">${vitalValue}${unit}</span>
+        <span class="${valueMainClass}">${valueHtml}</span>
         <span class="vital-status-icon" aria-hidden="true">${variacaoIcon}</span>
       </div>
       <div class="vital-meta-line">

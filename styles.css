@@ -1956,6 +1956,24 @@ body {
   line-height: 1.15;
 }
 
+/* Pressão: SIS/DIA na mesma linha sem aumentar altura do card */
+.vital-value-main--pressure {
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.vital-pressure-abbr {
+  display: inline-block;
+  font-size: 0.82em;
+  font-weight: 800;
+  color: var(--text-muted);
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  padding: 0 5px;
+  line-height: 1.2;
+  vertical-align: 0.05em;
+}
+
 .vital-separator {
   color: #CCCCCC;
   font-weight: 300;
