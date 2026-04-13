@@ -8,6 +8,24 @@ const MOCK_META = {
   observacao: 'Dados não reais. Uso exclusivo para prototipação e análise.'
 };
 
+/**
+ * Amostras de FC ao longo de uma sessão (relógio): offset em segundos desde o início.
+ * Usado em exercicioSessao.amostras para o gráfico do detalhe.
+ */
+function gerarAmostrasFreqCardiacaDemo(duracaoSegundos, nPontos) {
+  const n = nPontos == null ? 40 : nPontos;
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    const offsetSec = Math.round((i / n) * duracaoSegundos);
+    const p = i / n;
+    let bpm = Math.round(96 + Math.sin(p * Math.PI * 4) * 20 + p * 32);
+    if (p > 0.82) bpm += 14;
+    bpm = Math.min(149, Math.max(88, bpm));
+    out.push({ offsetSec, bpm });
+  }
+  return out;
+}
+
 const mockData = {
   meta: MOCK_META,
   usuario: {
@@ -18,7 +36,9 @@ const mockData = {
     cpf: '123.456.789-00',
     dataNascimento: '1985-05-15',
     telefone: '(11) 98765-4321',
+    /** Emoji ou texto curto; se `fotoPerfilUrl` for data:image/…, o header usa a foto. */
     fotoPerfil: '👤',
+    fotoPerfilUrl: '',
     dataCadastro: '2024-01-01',
     ativo: true
   },
@@ -82,20 +102,55 @@ const mockData = {
     { 
       id: 1, 
       tipo: 'Batimento Cardíaco', 
-      valor: 78, 
+      valor: 76, 
       unidade: 'bpm', 
       ideal: '60-100', 
       fonte: 'Pulseira', 
       tempo: 'Há 2 horas', 
       categoria: 'saude', 
       status: 'normal', 
-      dataHora: '25/01/2024 14:30', 
+      dataHora: '25/01/2024 19:00', 
       icon: '🫀',
       variacao: 'normal',
       tendencia: 'up',
       percentualVariacao: 5,
       historico: [
-        { data: '2024-01-25', hora: '14:30', valor: 78, status: 'normal', anterior: 75 },
+        {
+          data: '2024-01-25',
+          hora: '19:00',
+          valor: 76,
+          status: 'normal',
+          anterior: 78,
+          fonteColeta: 'Pulseira'
+        },
+        {
+          data: '2024-01-25',
+          hora: '08:05',
+          valor: 118,
+          status: 'normal',
+          anterior: 75,
+          contextoColeta: 'exercicio',
+          fonteColeta: 'Pulseira',
+          exercicioSessao: {
+            nomeAtividade: 'Aparelhos musculação',
+            inicioISO: '2024-01-25T07:00:00',
+            fimISO: '2024-01-25T08:02:20',
+            duracaoSegundos: 3740,
+            caloriasKcal: 492,
+            freqMedia: 118,
+            freqMax: 149,
+            amostras: gerarAmostrasFreqCardiacaDemo(3740, 42)
+          }
+        },
+        {
+          data: '2024-01-25',
+          hora: '06:45',
+          valor: 62,
+          status: 'normal',
+          anterior: 70,
+          contextoColeta: 'repouso',
+          fonteColeta: 'Pulseira'
+        },
         { data: '2024-01-25', hora: '10:00', valor: 75, status: 'normal', anterior: 72 },
         { data: '2024-01-24', hora: '15:00', valor: 82, status: 'normal', anterior: 78 },
         { data: '2024-01-24', hora: '09:00', valor: 76, status: 'normal', anterior: 80 },
@@ -504,17 +559,7 @@ const mockData = {
       exibirDashboard: true,
       alertas: { lembrete: true, antecedencia: 10, atrasada: true, estoqueBaixo: true },
       categoria: 'medicacao',
-      historico: [
-        { data: '25/01/2024', hora: '08:00', status: 'tomado' },
-        { data: '25/01/2024', hora: '14:30', status: 'tomado' },
-        { data: '25/01/2024', hora: '20:00', status: 'pendente' },
-        { data: '24/01/2024', hora: '08:00', status: 'tomado' },
-        { data: '24/01/2024', hora: '14:30', status: 'tomado' },
-        { data: '24/01/2024', hora: '20:00', status: 'tomado' },
-        { data: '23/01/2024', hora: '08:00', status: 'tomado' },
-        { data: '23/01/2024', hora: '14:30', status: 'tomado' },
-        { data: '23/01/2024', hora: '20:00', status: 'tomado' }
-      ]
+      historico: []
     },
     { 
       id: 2, 
@@ -529,13 +574,7 @@ const mockData = {
       exibirDashboard: true,
       alertas: { lembrete: true, antecedencia: 10, atrasada: true, estoqueBaixo: true },
       categoria: 'medicacao',
-      historico: [
-        { data: '25/01/2024', hora: '08:00', status: 'tomado' },
-        { data: '24/01/2024', hora: '08:00', status: 'tomado' },
-        { data: '23/01/2024', hora: '08:00', status: 'tomado' },
-        { data: '22/01/2024', hora: '08:00', status: 'tomado' },
-        { data: '21/01/2024', hora: '08:00', status: 'tomado' }
-      ]
+      historico: []
     },
     { 
       id: 3, 
@@ -550,14 +589,7 @@ const mockData = {
       exibirDashboard: false,
       alertas: { lembrete: true, antecedencia: 15, atrasada: false, estoqueBaixo: true },
       categoria: 'medicacao',
-      historico: [
-        { data: '25/01/2024', hora: '08:00', status: 'tomado' },
-        { data: '25/01/2024', hora: '20:00', status: 'pendente' },
-        { data: '24/01/2024', hora: '08:00', status: 'tomado' },
-        { data: '24/01/2024', hora: '20:00', status: 'tomado' },
-        { data: '23/01/2024', hora: '08:00', status: 'tomado' },
-        { data: '23/01/2024', hora: '20:00', status: 'tomado' }
-      ]
+      historico: []
     },
     { 
       id: 4, 
@@ -572,13 +604,7 @@ const mockData = {
       exibirDashboard: false,
       alertas: { lembrete: true, antecedencia: 10, atrasada: true, estoqueBaixo: true },
       categoria: 'medicacao',
-      historico: [
-        { data: '25/01/2024', hora: '20:00', status: 'pendente' },
-        { data: '24/01/2024', hora: '20:00', status: 'tomado' },
-        { data: '23/01/2024', hora: '20:00', status: 'tomado' },
-        { data: '22/01/2024', hora: '20:00', status: 'tomado' },
-        { data: '21/01/2024', hora: '20:00', status: 'tomado' }
-      ]
+      historico: []
     },
     { 
       id: 5, 
@@ -593,13 +619,7 @@ const mockData = {
       exibirDashboard: true,
       alertas: { lembrete: true, antecedencia: 10, atrasada: true, estoqueBaixo: true },
       categoria: 'medicacao',
-      historico: [
-        { data: '25/01/2024', hora: '07:00', status: 'tomado' },
-        { data: '24/01/2024', hora: '07:00', status: 'tomado' },
-        { data: '23/01/2024', hora: '07:00', status: 'tomado' },
-        { data: '22/01/2024', hora: '07:00', status: 'tomado' },
-        { data: '21/01/2024', hora: '07:00', status: 'nao_tomado' }
-      ]
+      historico: []
     }
   ],
 
@@ -748,31 +768,31 @@ const mockData = {
 // Cores por categoria - Paleta Padrão do Projeto
 const categoryColors = {
   medicacao: {
-    primary: '#9058A7',
-    light: '#E8D5F2',
-    border: '#7d4a8f',
+    primary: '#6e6e6e',
+    light: '#ececec',
+    border: '#9e9e9e',
     icon: '💊'
   },
   saude: {
-    primary: '#7e91cd',
-    light: '#D4DFF0',
-    border: '#5a6ba8',
+    primary: '#6e6e6e',
+    light: '#ececec',
+    border: '#9e9e9e',
     icon: '❤️'
   },
   agenda: {
-    primary: '#2E7D9A',
-    light: '#D8EEF7',
-    border: '#1F627D',
+    primary: '#6e6e6e',
+    light: '#ececec',
+    border: '#9e9e9e',
     icon: '📅'
   }
 };
 
-// Status colors
+// Status colors (tons neutros — leitura)
 const statusColors = {
-  normal: '#00AA00',
-  atencao: '#F5A623',
-  aviso: '#FFA500',
-  critico: '#FF0000'
+  normal: '#5a5a5a',
+  atencao: '#6e6e6e',
+  aviso: '#7a7a7a',
+  critico: '#454545'
 };
 
 // =========================
@@ -908,6 +928,15 @@ function formatHistoricValue(vitalTipo, historicoItem) {
   return String(historicoItem?.valor ?? '-');
 }
 
+/** Tag curta no histórico: repouso / exercício (omitido em situação habitual). */
+function getLabelContextoColetaHistorico(entry) {
+  const c = entry && entry.contextoColeta;
+  if (!c || c === 'normal') return '';
+  if (c === 'repouso') return 'Repouso';
+  if (c === 'exercicio') return 'Exercício';
+  return '';
+}
+
 function historicoEntryToMs(entry) {
   if (!entry || !entry.data) return null;
   const timePart = entry.hora && String(entry.hora).length >= 4 ? String(entry.hora).slice(0, 5) : '12:00';
@@ -976,23 +1005,20 @@ function formatVital24hRangeLine(vital) {
   if (vital && vital.tipo === 'Pressão Arterial') {
     const pr = getVital24hPressureRanges(vital);
     if (!pr) {
-      return `<div class="vital-24h-line vital-24h-line--pressure"><span class="vital-24h-label">24Hrs</span><span class="vital-24h-empty">(sem medições)</span></div>`;
+      return `<div class="vital-24h-line vital-24h-line--pressure"><span class="vital-24h-clock" aria-hidden="true">🕐</span><span class="vital-24h-empty">—</span></div>`;
     }
     return `<div class="vital-24h-line vital-24h-line--pressure">
-      <span class="vital-24h-label">24Hrs</span>
-      <div class="vital-24h-pressure-badges" aria-label="Faixa nas últimas 24 horas">
-        <div class="vital-24h-p-row"><span class="vital-24h-p-tag">SIS</span><span class="vital-24h-p-val">${pr.sisRange}</span></div>
-        <div class="vital-24h-p-row"><span class="vital-24h-p-tag">DIA</span><span class="vital-24h-p-val">${pr.diaRange}</span></div>
-      </div>
+      <span class="vital-24h-clock" aria-hidden="true">🕐</span>
+      <span class="vital-24h-pressure-range" aria-label="Faixa nas últimas 24 horas">${pr.sisRange}<span class="vital-24h-p-mid">/</span>${pr.diaRange}</span>
     </div>`;
   }
 
   const mm = getVital24hMinMaxStrings(vital);
   const u = vital && vital.unidade ? ` ${vital.unidade}` : '';
   if (!mm) {
-    return `<div class="vital-24h-line"><span class="vital-24h-label">24Hrs</span><span class="vital-24h-empty">(sem medições)</span></div>`;
+    return `<div class="vital-24h-line"><span class="vital-24h-clock" aria-hidden="true">🕐</span><span class="vital-24h-empty">—</span></div>`;
   }
-  return `<div class="vital-24h-line"><span class="vital-24h-label">24Hrs</span><span class="vital-24h-mm">(${mm.maxStr}${u} - ${mm.minStr}${u})</span></div>`;
+  return `<div class="vital-24h-line"><span class="vital-24h-clock" aria-hidden="true">🕐</span><span class="vital-24h-mm">${mm.maxStr}${u} – ${mm.minStr}${u}</span></div>`;
 }
 
 function getNumericTrendValue(vitalTipo, historicoItem) {
@@ -1169,6 +1195,76 @@ function enrichItemDateFields(item) {
   }
 }
 
+/** Histórico de doses com datas ISO relativas ao dia corrente; executar antes de normalizeMockDataForAnalysis. */
+function injectMedicacaoHistoricoDemo(data) {
+  if (!data || !Array.isArray(data.medicacoes)) return;
+
+  const dayISO = (deltaDays) => {
+    const d = new Date();
+    d.setDate(d.getDate() + deltaDays);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const H0 = dayISO(0);
+  const H1 = dayISO(-1);
+  const H2 = dayISO(-2);
+  const H3 = dayISO(-3);
+  const H4 = dayISO(-4);
+
+  const apply = (id, rows) => {
+    const med = data.medicacoes.find((m) => m.id === id);
+    if (med) med.historico = rows.map((r) => ({ ...r }));
+  };
+
+  apply(1, [
+    { data: H0, hora: '08:00', status: 'tomado' },
+    { data: H0, hora: '14:30', status: 'tomado' },
+    { data: H0, hora: '20:00', status: 'pendente' },
+    { data: H1, hora: '08:00', status: 'tomado' },
+    { data: H1, hora: '14:30', status: 'tomado' },
+    { data: H1, hora: '20:00', status: 'tomado' },
+    { data: H2, hora: '08:00', status: 'tomado' },
+    { data: H2, hora: '14:30', status: 'tomado' },
+    { data: H2, hora: '20:00', status: 'tomado' }
+  ]);
+
+  apply(2, [
+    { data: H0, hora: '08:00', status: 'tomado' },
+    { data: H1, hora: '08:00', status: 'tomado' },
+    { data: H2, hora: '08:00', status: 'tomado' },
+    { data: H3, hora: '08:00', status: 'tomado' },
+    { data: H4, hora: '08:00', status: 'tomado' }
+  ]);
+
+  apply(3, [
+    { data: H0, hora: '08:00', status: 'tomado' },
+    { data: H0, hora: '20:00', status: 'pendente' },
+    { data: H1, hora: '08:00', status: 'tomado' },
+    { data: H1, hora: '20:00', status: 'tomado' },
+    { data: H2, hora: '08:00', status: 'tomado' },
+    { data: H2, hora: '20:00', status: 'tomado' }
+  ]);
+
+  apply(4, [
+    { data: H0, hora: '20:00', status: 'pendente' },
+    { data: H1, hora: '20:00', status: 'tomado' },
+    { data: H2, hora: '20:00', status: 'tomado' },
+    { data: H3, hora: '20:00', status: 'tomado' },
+    { data: H4, hora: '20:00', status: 'tomado' }
+  ]);
+
+  apply(5, [
+    { data: H0, hora: '07:00', status: 'tomado' },
+    { data: H1, hora: '07:00', status: 'tomado' },
+    { data: H2, hora: '07:00', status: 'tomado' },
+    { data: H3, hora: '07:00', status: 'tomado' },
+    { data: H4, hora: '07:00', status: 'nao_tomado' }
+  ]);
+}
+
 function normalizeMockDataForAnalysis(data) {
   // Sinais vitais
   data.sinaisVitais.forEach(vital => {
@@ -1268,5 +1364,6 @@ function normalizeMockDataForAnalysis(data) {
   });
 }
 
+injectMedicacaoHistoricoDemo(mockData);
 normalizeMockDataForAnalysis(mockData);
 injectDemoMedicoesUltimas24h(mockData);

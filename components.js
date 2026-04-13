@@ -28,10 +28,26 @@ function getMedicationPhotoHtml(med, catalog) {
   };
 }
 
-/** Miniatura + legenda: “Visualizar” (foto) ou “Detalhe” (placeholder → edição). */
+/**
+ * Miniatura: na lista (card) só a foto — sem “Detalhe”/“Visualizar” embaixo; toque abre foto ou edição.
+ * Em manage mantém legenda Visualizar / Detalhe.
+ */
 function getMedicationPhotoColumnHtml(med, catalog, variant) {
   const { isPhotoImage, html: photoHtml } = getMedicationPhotoHtml(med, catalog);
   const btnClass = variant === 'manage' ? 'med-manage-photo' : 'med-photo';
+
+  if (variant === 'card') {
+    const clickAttr = isPhotoImage
+      ? `onclick="openMedicationPhotoModalById(${med.id}); event.stopPropagation();"`
+      : `onclick="openEditMedicacaoModal(${med.id}); event.stopPropagation();"`;
+    return `
+    <div class="med-photo-column med-photo-column--card-clean">
+      <button type="button" class="${btnClass} is-clickable" ${clickAttr} title="${isPhotoImage ? 'Ver foto' : 'Editar medicação'}">
+        ${photoHtml}
+      </button>
+    </div>`;
+  }
+
   const hint = isPhotoImage
     ? `<button type="button" class="med-photo-hint-btn" onclick="openMedicationPhotoModalById(${med.id}); event.stopPropagation();">Visualizar</button>`
     : `<button type="button" class="med-photo-hint-btn med-photo-hint-btn--muted" onclick="openEditMedicacaoModal(${med.id}); event.stopPropagation();">Detalhe</button>`;
@@ -45,12 +61,11 @@ function getMedicationPhotoColumnHtml(med, catalog, variant) {
   `;
 }
 
-// Card de Sinal Vital: lista mostra só valor + faixa 24 h (tendência e 3 últimas ficam no modal com gráfico)
+// Card de Sinal Vital: ícone + valores (sem nome do indicador no cartão — o ícone identifica)
 function createVitalCard(vital) {
-  const colors = categoryColors.saude;
   const variacaoIcon = vital.variacao === 'normal' ? '🟢' : '🔴';
-  const idealLabel = typeof formatIdealLabel === 'function' ? formatIdealLabel(vital.ideal) : vital.ideal;
   const vitalValue = typeof formatVitalValue === 'function' ? formatVitalValue(vital) : vital.valor;
+  const unit = vital.unidade ? ` ${vital.unidade}` : '';
 
   let dataHoraFormatada = '';
   if (vital.dataHora) {
@@ -60,103 +75,78 @@ function createVitalCard(vital) {
   const rangeLine =
     typeof formatVital24hRangeLine === 'function'
       ? formatVital24hRangeLine(vital)
-      : '<div class="vital-24h-line"><span class="vital-24h-label">24 h</span><span class="vital-24h-empty">—</span></div>';
+      : '<div class="vital-24h-line"><span class="vital-24h-clock" aria-hidden="true">🕐</span><span class="vital-24h-empty">—</span></div>';
 
+  const tipoSafe = String(vital.tipo).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const tipoAttr = String(vital.tipo).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
   return `
-    <div class="card card-saude vital-card card-has-action" style="border-left-color: ${colors.border}; cursor: pointer;" onclick="openVitalDetailModal('${vital.tipo}', ${vital.id})">
-      <div class="vital-header-compact">
-        <div class="vital-title-with-ideal">
-          <span class="vital-icon">${vital.icon}</span>
-          <span class="vital-title-text">${vital.tipo} | ${idealLabel}</span>
-        </div>
-        <div class="vital-status-icon">${variacaoIcon}</div>
+    <div class="card card-saude vital-card card-has-action" role="article" aria-label="${tipoAttr}" style="cursor: pointer;" onclick="openVitalDetailModal('${tipoSafe}', ${vital.id})">
+      <div class="vital-header-compact vital-header--icon-value">
+        <span class="vital-icon" aria-hidden="true">${vital.icon}</span>
+        <span class="vital-value-main">${vitalValue}${unit}</span>
+        <span class="vital-status-icon" aria-hidden="true">${variacaoIcon}</span>
       </div>
-
-      <div class="vital-main-line">
-        <span class="vital-value-main">${vitalValue} ${vital.unidade}</span>
-        <span class="vital-separator">•</span>
+      <div class="vital-meta-line">
         <span class="vital-datetime">${dataHoraFormatada}</span>
       </div>
-
       ${rangeLine}
       <span class="card-action-plus" aria-hidden="true">+</span>
     </div>
   `;
 }
 
-// Card de Composição Corporal
+// Card de Composição Corporal: ícone + valores (sem título do indicador no cartão)
 function createComposicaoCard(item) {
   const variacaoClass = item.variacao === 'normal' ? 'variacao-normal' : 'variacao-alerta';
   const variacaoIcon = item.variacao === 'normal' ? '🟢' : '🔴';
   const fontePadrao = item.fonte || 'Manual';
-  const idealLabel = typeof formatIdealLabel === 'function' ? formatIdealLabel(item.ideal) : item.ideal;
   const dataHora = item.dataHora
     ? (typeof formatISODateTimeBR === 'function' ? formatISODateTimeBR(item.dataHora) : item.dataHora)
     : '';
-  
+  const tipoArg = JSON.stringify(item.tipo);
+  const tipoAttr = String(item.tipo).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
   return `
-    <div class="card card-composicao card-has-action" style="cursor: pointer;" onclick="openComposicaoModal(${item.id}, '${item.tipo}')">
-      <div class="composicao-header">
-        <div class="composicao-icon">${item.icon}</div>
-        <div class="composicao-info">
-          <div class="composicao-title">${item.tipo}</div>
-          <div class="composicao-ideal">Ideal: ${idealLabel}</div>
-        </div>
-        <div class="composicao-variacao ${variacaoClass}">${variacaoIcon}</div>
+    <div class="card card-composicao card-has-action" role="article" aria-label="${tipoAttr}" style="cursor: pointer;" onclick="openComposicaoModal(${item.id}, ${tipoArg})">
+      <div class="composicao-header composicao-header--value-only">
+        <div class="composicao-icon" aria-hidden="true">${item.icon}</div>
+        <div class="composicao-value">${item.valor} ${item.unidade}</div>
+        <div class="composicao-variacao ${variacaoClass}" aria-hidden="true">${variacaoIcon}</div>
       </div>
-      <div class="composicao-value">${item.valor} ${item.unidade}</div>
-      <div class="composicao-footer">
-        <span class="composicao-date">📅 ${dataHora}</span>
-        <span class="composicao-source">📍 ${fontePadrao}</span>
+      <div class="composicao-footer composicao-footer--compact">
+        <span class="composicao-date">${dataHora}</span>
+        <span class="composicao-source-icon" title="${fontePadrao}">📍</span>
       </div>
       <span class="card-action-plus" aria-hidden="true">+</span>
     </div>
   `;
 }
 
-// Card ECG
+// Card ECG (mesma lógica: ícone + números, sem rótulos de texto)
 function createEcgCard(ecg) {
   const dataHora = typeof formatISODateTimeBR === 'function' ? formatISODateTimeBR(ecg.dataHora) : ecg.dataHora;
   return `
-    <div class="card card-ecg card-has-action" onclick="openEcgDetail(${ecg.id})">
-      <div class="ecg-header">
-        <div class="ecg-icon">${ecg.icon}</div>
-        <div class="ecg-info">
-          <div class="ecg-title">Eletrocardiograma</div>
-          <div class="ecg-date">📅 ${dataHora}</div>
+    <div class="card card-ecg card-has-action" role="article" aria-label="Eletrocardiograma" onclick="openEcgDetail(${ecg.id})">
+      <div class="ecg-header ecg-header--compact">
+        <div class="ecg-icon" aria-hidden="true">${ecg.icon}</div>
+        <div class="ecg-value-stack">
+          <div class="ecg-value-line"><span class="ecg-value-num">${ecg.frequenciaCardiaca}</span><span class="ecg-value-unit"> bpm</span></div>
+          <div class="ecg-rhythm-line">${ecg.ritmo}</div>
         </div>
       </div>
-      <div class="ecg-details">
-        <div class="ecg-detail-item">
-          <span class="ecg-label">FC:</span>
-          <span class="ecg-value">${ecg.frequenciaCardiaca} bpm</span>
-        </div>
-        <div class="ecg-detail-item">
-          <span class="ecg-label">Ritmo:</span>
-          <span class="ecg-value">${ecg.ritmo}</span>
-        </div>
-      </div>
+      <div class="ecg-meta"><span class="ecg-date">📅 ${dataHora}</span></div>
       <div class="ecg-interpretation">${ecg.interpretacao}</div>
       <span class="card-action-plus" aria-hidden="true">+</span>
     </div>
   `;
 }
 
-// Card de Medicação - Enhanced com Horários Clicáveis
+// Card de Medicação — layout alinhado ao protótipo (lista de horários em grelha, estoque numa linha)
 function createMedicacaoCard(med) {
-  const colors = categoryColors.medicacao;
-  const ultimasDoses = getUltimasDoses(med, 3);
   const catalog = (typeof mockData !== 'undefined' && mockData.catalogoMedicamentos)
     ? mockData.catalogoMedicamentos.find(m => m.nome === med.nome)
     : null;
   const photoColumnHtml = getMedicationPhotoColumnHtml(med, catalog, 'card');
-  const estoqueAtual = med.estoqueAtual || 0;
-  const estoqueMinimo = med.estoqueMinimo || 7;
-  const temAviso = estoqueAtual <= estoqueMinimo;
-  const totalTomados = med.historico.filter(h => h.status === 'tomado').length;
-  const dosesPorDia = Math.max(1, (med.horarios || []).length);
-  const diasRestantes = estoqueAtual > 0 ? Math.ceil(estoqueAtual / dosesPorDia) : 0;
-  const faltaParaAcabar = Math.max(0, estoqueAtual);
 
   const hoje = typeof getTodayISODate === 'function'
     ? getTodayISODate()
@@ -166,7 +156,13 @@ function createMedicacaoCard(med) {
     ? getCurrentHHMM()
     : `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
 
-  const horariosHtml = med.horarios.map(horario => {
+  const estoqueAtual = med.estoqueAtual || 0;
+  const estoqueMinimo = med.estoqueMinimo || 7;
+  const dosesPorDia = Math.max(1, (med.horarios || []).length);
+  const diasRestantes = estoqueAtual > 0 ? Math.ceil(estoqueAtual / dosesPorDia) : 0;
+  const temAviso = estoqueAtual <= estoqueMinimo;
+
+  const horariosHtml = med.horarios.map((horario) => {
     const status = typeof getMedicationStatusForDate === 'function'
       ? getMedicationStatusForDate(med, hoje, horario, horaAtual)
       : 'pendente';
@@ -174,14 +170,14 @@ function createMedicacaoCard(med) {
     const statusClass = status === 'tomado'
       ? 'status-tomado'
       : status === 'atrasado'
-      ? 'status-atrasado'
-      : 'status-a-tomar';
+        ? 'status-atrasado'
+        : 'status-a-tomar';
 
     const statusLabel = status === 'tomado'
       ? 'Tomado'
       : status === 'atrasado'
-      ? 'Atrasado'
-      : 'A\u00A0tomar';
+        ? 'Atrasado'
+        : 'A\u00A0tomar';
 
     const clickHandler = status === 'tomado'
       ? `handleMedicationScheduleClick(${med.id}, '${horario}', 'tomado', '${med.nome}', '${med.dosagem}', '${hoje}')`
@@ -195,22 +191,18 @@ function createMedicacaoCard(med) {
     `;
   }).join('');
 
-  const historicoHtml = ultimasDoses.length > 0 ? `
-    <div class="med-historico">
-      <div class="historico-title">Últimas doses:</div>
-      <div class="historico-items">
-        ${ultimasDoses.map(dose => `
-          <div class="historico-item" title="${dose.data} ${dose.hora}">
-            <span class="historico-hora">${dose.hora}</span>
-            <span class="historico-status">${dose.status === 'tomado' ? '✅' : '❌'}</span>
-          </div>
-        `).join('')}
-      </div>
+  const estoqueHtml = `
+    <div class="med-estoque compact">
+      <span class="estoque-text estoque-line-main">
+        Restam <strong>${estoqueAtual}</strong> un.
+        ${estoqueAtual > 0 ? `· ~${diasRestantes} dia${diasRestantes === 1 ? '' : 's'}` : '· sem estoque'}
+        ${temAviso ? '<span class="med-estoque-aviso" title="Estoque abaixo do mínimo configurado">⚠️</span>' : ''}
+      </span>
     </div>
-  ` : '';
+  `;
 
   return `
-    <div class="card card-medicacao-enhanced" style="border-left-color: ${colors.border}">
+    <div class="card card-medicacao-enhanced">
       <div class="med-header-enhanced">
         <div class="med-header-inner">
           <div class="med-card-name-block">
@@ -221,45 +213,21 @@ function createMedicacaoCard(med) {
               </div>
             </div>
           </div>
-          <div class="med-card-tomados-block">
-            <div class="med-col-label">Tomados</div>
-            <div class="med-tomados-value" title="Total de doses registradas como tomadas (histórico)">${totalTomados}</div>
-          </div>
         </div>
         <div class="med-actions-enhanced">
-          <button class="med-action-btn-enhanced" onclick="openEditMedicacaoModal(${med.id})" title="Editar">✏️</button>
-          <button class="med-action-btn-enhanced" onclick="deleteMedicacao(${med.id})" title="Deletar">🗑️</button>
+          <button type="button" class="med-action-btn-enhanced" onclick="openEditMedicacaoModal(${med.id})" title="Editar">✏️</button>
         </div>
       </div>
 
       <div class="med-horarios-interactive">
-        <div class="horarios-label">Toque no horário para marcar:</div>
         <div class="horarios-list-interactive">
           ${horariosHtml}
         </div>
       </div>
 
-      ${historicoHtml}
-
-      <div class="med-estoque compact">
-        <div class="estoque-text estoque-line-main">Estoque: ${estoqueAtual}</div>
-        <div class="estoque-text estoque-line-main">Faltam: ${faltaParaAcabar}</div>
-      </div>
-
-      ${temAviso ? `<div class="med-warning">⚠️ Estoque baixo: faltam ${faltaParaAcabar} comprimidos (aprox. ${diasRestantes} dia${diasRestantes === 1 ? '' : 's'})</div>` : ''}
+      ${estoqueHtml}
     </div>
   `;
-}
-
-// Funções auxiliares para o card enhanced
-function getUltimasDoses(med, limite = 3) {
-  const hoje = typeof getTodayISODate === 'function'
-    ? getTodayISODate()
-    : new Date().toISOString().slice(0, 10);
-  return med.historico
-    .filter(h => h.data === hoje)
-    .sort((a, b) => b.hora.localeCompare(a.hora))
-    .slice(0, limite);
 }
 
 // Card de Consulta
@@ -269,7 +237,7 @@ function createConsultaCard(consulta) {
   const dataBR = typeof formatISODateBR === 'function' ? formatISODateBR(consulta.data) : consulta.data;
   
   return `
-    <div class="card card-agenda" style="border-left-color: ${colors.border}">
+    <div class="card card-agenda">
       <div class="card-header">
         <div class="card-icon">${colors.icon}</div>
         <div class="card-title">${consulta.medico}</div>
@@ -284,19 +252,17 @@ function createConsultaCard(consulta) {
 
 // Card de Exame
 function createExameCard(exame, isRealizado = false) {
-  const colors = categoryColors.agenda;
-  const statusColor = isRealizado ? '#2E7D32' : '#FFA500';
   const statusText = isRealizado ? '✅ Realizado' : '⏳ Agendado';
   const dataBR = typeof formatISODateBR === 'function' ? formatISODateBR(exame.data) : exame.data;
   
   return `
-    <div class="exame-card" style="border-left-color: ${colors.border}">
+    <div class="exame-card">
       <div class="exame-header">
         <div>
           <div class="exame-title">${exame.nome}</div>
           <div class="card-info" style="margin-top: 4px;">${dataBR} • ${exame.local}</div>
         </div>
-        <div class="exame-status" style="background-color: ${statusColor}20; color: ${statusColor}">
+        <div class="exame-status">
           ${statusText}
         </div>
       </div>
@@ -314,12 +280,11 @@ function createExameCard(exame, isRealizado = false) {
 
 // Card de Compartilhamento
 function createCompartilhamentoCard(compartilhamento) {
-  const colors = categoryColors.saude;
   const dados = compartilhamento.dadosCompartilhados.join(', ');
   const dataBR = typeof formatISODateBR === 'function' ? formatISODateBR(compartilhamento.dataAutorizacao) : compartilhamento.dataAutorizacao;
   
   return `
-    <div class="card card-saude" style="border-left-color: ${colors.border}">
+    <div class="card card-saude">
       <div class="card-header">
         <div class="card-icon">👨⚕️</div>
         <div class="card-title">${compartilhamento.medico}</div>
@@ -342,12 +307,16 @@ function calcularDiasRestantes(medicacao) {
 }
 
 function calcularComprimidosRestantes(medicacao) {
+  const base = medicacao.estoqueAtual != null ? medicacao.estoqueAtual : medicacao.estoque;
+  const est = parseInt(String(base), 10);
   const tomados = medicacao.historico.filter(h => h.status === 'tomado').length;
-  return parseInt(medicacao.estoque) - tomados;
+  return (Number.isNaN(est) ? 0 : est) - tomados;
 }
 
 function verificarSeTomadiHoje(medicacao) {
-  const hoje = new Date().toLocaleDateString('pt-BR');
+  const hoje = typeof getTodayISODate === 'function'
+    ? getTodayISODate()
+    : new Date().toISOString().slice(0, 10);
   return medicacao.historico.some(h => h.data === hoje && h.status === 'tomado');
 }
 
@@ -364,16 +333,35 @@ function getStatusIcon(status) {
   return icons[status] || '❓';
 }
 
-// Deletar medicação
+// Deletar medicação (ex.: a partir do modal Editar)
 function deleteMedicacao(medicacaoId) {
   const medicacao = mockData.medicacoes.find(m => m.id === medicacaoId);
-  if (medicacao && confirm(`Tem certeza que deseja deletar ${medicacao.nome}?`)) {
-    mockData.medicacoes = mockData.medicacoes.filter(m => m.id !== medicacaoId);
-    renderMedicacoes();
-    if (typeof showFeedbackModal === 'function') {
-      showFeedbackModal(`${medicacao.nome} deletado com sucesso.`, 'success');
-    } else {
-      alert(`${medicacao.nome} deletado com sucesso.`);
-    }
+  if (!medicacao) return false;
+  if (!confirm(`Tem certeza que deseja excluir ${medicacao.nome}?`)) return false;
+  mockData.medicacoes = mockData.medicacoes.filter(m => m.id !== medicacaoId);
+  renderMedicacoes();
+
+  const em = document.getElementById('editMedicacaoModal');
+  if (em) {
+    em.classList.remove('active');
+    const ef = document.getElementById('editMedicacaoForm');
+    if (ef) ef.reset();
   }
+  if (typeof setSemDataFimMedicacaoUI === 'function') {
+    try {
+      setSemDataFimMedicacaoUI('edit', false);
+    } catch (e) { /* app ainda não carregou */ }
+  }
+  if (typeof removerFotoEdit === 'function') {
+    try {
+      removerFotoEdit();
+    } catch (e) { /* */ }
+  }
+
+  if (typeof showFeedbackModal === 'function') {
+    showFeedbackModal(`${medicacao.nome} excluído.`, 'success');
+  } else {
+    alert(`${medicacao.nome} excluído.`);
+  }
+  return true;
 }

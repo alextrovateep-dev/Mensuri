@@ -3,6 +3,8 @@ let fotoAtualMedicacao = null;
 let fotoAtualMedicacaoEdit = null;
 let currentVitalType = '';
 let currentVitalDetail = null;
+/** Índice alinhado à lista renderizada em `renderVitalDetailContent` (respeita filtro de datas). */
+let currentVitalHistoricoView = [];
 let lastMedicationAlertKey = null;
 let lastVitalAlertKey = null;
 let currentAlarmMedicationId = null;
@@ -249,6 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ensureBottomNavConfig();
   ensureConfigColetaPressao();
   updateDate();
+  updateHeaderForScreen('homeScreen');
   renderHome();
   setupNavigation();
   applyBottomNavVisibility();
@@ -264,22 +267,94 @@ document.addEventListener('DOMContentLoaded', () => {
   checkRescheduledMeasurementAlerts();
 });
 
-// Atualizar data
+function getUsuarioPrimeiroNome() {
+  return mockData.usuario.nome.split(' ')[0];
+}
+
+function getIniciaisNome(nome) {
+  const p = String(nome || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!p.length) return '?';
+  if (p.length === 1) return p[0].slice(0, 2).toUpperCase();
+  return (p[0][0] + p[p.length - 1][0]).toUpperCase();
+}
+
+/** Avatar no header: foto em data URL, emoji em `fotoPerfil`, ou iniciais do nome. */
+function applyHeaderAvatar() {
+  const u = mockData.usuario;
+  const el = document.getElementById('headerAvatar');
+  if (!el) return;
+  const url = u.fotoPerfilUrl;
+  if (typeof url === 'string' && url.startsWith('data:image')) {
+    el.innerHTML = `<img src="${url}" alt="">`;
+    el.classList.add('header-avatar--photo');
+    return;
+  }
+  el.classList.remove('header-avatar--photo');
+  const mark = u.fotoPerfil;
+  if (typeof mark === 'string' && mark.trim() && !mark.startsWith('data:') && mark.length <= 8) {
+    el.textContent = mark.trim();
+    return;
+  }
+  el.textContent = getIniciaisNome(u.nome);
+}
+
+function updateHeaderGreeting() {
+  const greetEl = document.getElementById('headerUserGreet');
+  if (greetEl) greetEl.textContent = `Olá, ${getUsuarioPrimeiroNome()}`;
+}
+
+const SCREEN_HEADER = {
+  homeScreen: { title: '🏠 Home', actions: '' },
+  saudeScreen: {
+    title: '❤️ Saúde',
+    actions:
+      '<button type="button" class="config-gear-btn" onclick="openVitaisConfigModal()" aria-label="Configurações de sinais vitais">⚙️</button>'
+  },
+  composicaoScreen: {
+    title: '📊 Corpo',
+    actions:
+      '<button type="button" class="config-gear-btn" onclick="openComposicaoConfigModal()" aria-label="Configuração de indicadores">⚙️</button>'
+  },
+  medicacoesScreen: {
+    title: '💊 Medicações',
+    actions:
+      '<button type="button" class="med-chip-btn med-chip-btn-primary med-header-add-btn" onclick="openAddMedicacaoEntry()" title="Adicionar medicação">+ Adicionar</button>'
+  },
+  agendaScreen: {
+    title: '📅 Agenda',
+    actions:
+      '<button type="button" class="add-button header-agenda-add" onclick="openAddAgendaModal()" aria-label="Novo agendamento">+</button>'
+  },
+  perfilScreen: { title: '👤 Perfil', actions: '' }
+};
+
+function updateHeaderForScreen(screenId) {
+  const meta = SCREEN_HEADER[screenId] || SCREEN_HEADER.homeScreen;
+  const pageEl = document.getElementById('headerPageTitle');
+  const actionsEl = document.getElementById('headerScreenActions');
+  if (pageEl) pageEl.textContent = meta.title;
+  if (actionsEl) actionsEl.innerHTML = meta.actions || '';
+}
+
+// Atualizar data e textos do header
 function updateDate() {
   const today = new Date();
   const dateStr = formatDateForUI(today.toISOString().slice(0, 10));
-  document.getElementById('date').textContent = dateStr;
-  document.getElementById('greeting').textContent = `Olá, ${mockData.usuario.nome.split(' ')[0]}! 👋`;
+  const dateEl = document.getElementById('date');
+  if (dateEl) dateEl.textContent = dateStr;
+  updateHeaderGreeting();
+  applyHeaderAvatar();
 }
 
 // ===== RENDERIZAÇÃO DE TELAS =====
 
 function renderHome() {
   const hoje = getTodayISODate();
-  const agoraHHMM = getCurrentHHMM();
   const dayEntries = getMedicationDayEntries(hoje);
   const atrasadas = dayEntries.filter(e => e.status === 'atrasado');
-  const proximas = dayEntries.filter(e => e.status === 'pendente').slice(0, 2);
 
   const nowHtml = `
     <div class="home-priority-grid">
@@ -287,25 +362,9 @@ function renderHome() {
         <div class="home-priority-label">Atrasadas</div>
         <div class="home-priority-value">${atrasadas.length}</div>
       </div>
-      <div class="home-priority-card" onclick="switchScreen('medicacoesScreen')">
-        <div class="home-priority-label">Próxima dose</div>
-        <div class="home-priority-value">${proximas[0] ? proximas[0].horario : '--:--'}</div>
-        <div class="home-priority-sub">${proximas[0] ? `${proximas[0].nome} ${proximas[0].dosagem}` : 'Sem pendencias'}</div>
-      </div>
     </div>
   `;
   document.getElementById('homeNow').innerHTML = nowHtml;
-
-  const tomadasHoje = dayEntries.filter(e => e.status === 'tomado').length;
-  const pendentesHoje = dayEntries.filter(e => e.status !== 'tomado').length;
-  const todayHtml = `
-    <div class="home-today-row">
-      <div class="home-today-chip">Tomadas: ${tomadasHoje}</div>
-      <div class="home-today-chip">Pendentes: ${pendentesHoje}</div>
-      <div class="home-today-chip">Hora atual: ${agoraHHMM}</div>
-    </div>
-  `;
-  document.getElementById('homeToday').innerHTML = todayHtml;
 
   const vitalsHtml = mockData.sinaisVitais
     .filter(v => (mockData.configSinaisVitais[v.tipo] || {}).exibirDashboard)
@@ -368,7 +427,6 @@ function renderSaude() {
   }
 
   if (mockData.ecgs.length > 0) {
-    html += '<div class="subsection-title">Eletrocardiograma</div>';
     html += mockData.ecgs.map(createEcgCard).join('');
   }
 
@@ -415,7 +473,6 @@ function renderMedicacoes() {
 
   let hojeHtml = '';
   if (paraTomar.length > 0) {
-    hojeHtml += '<div class="subsection-title">Para tomar agora (ordem do dia)</div>';
     hojeHtml += paraTomar.map(createMedicacaoCard).join('');
   }
   if (tomadasHoje.length > 0) {
@@ -425,11 +482,6 @@ function renderMedicacoes() {
 
   document.getElementById('medicacoesHoje').innerHTML = hojeHtml ||
     '<div class="empty-state"><div class="empty-text">Nenhuma medicação cadastrada para hoje.</div></div>';
-
-  const helperEl = document.getElementById('medTodayHelper');
-  if (helperEl) {
-    helperEl.textContent = '';
-  }
 
   renderMedicationOverdueSection();
   updateMedicationCalendarHeader();
@@ -615,6 +667,7 @@ function switchScreen(screenId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(screenId).classList.add('active');
   currentScreen = screenId;
+  updateHeaderForScreen(screenId);
 
   if (screenId === 'homeScreen') renderHome();
   else if (screenId === 'saudeScreen') renderSaude();
@@ -710,6 +763,178 @@ function toggleSemDataFimMedicacao(mode) {
   else refreshEstoqueSugeridoEdit();
 }
 
+/** Wizard adicionar medicação (4 etapas) */
+let addMedStep = 1;
+const ADD_MED_TITLES = ['Qual medicamento?', 'Com que frequência?', 'Quando lembrar?', 'Estoque e alertas'];
+
+function updateAddMedProgressUI() {
+  for (let i = 1; i <= 4; i++) {
+    const dot = document.getElementById(`addMedDot${i}`);
+    if (dot) {
+      dot.classList.remove('active', 'done');
+      if (i < addMedStep) dot.classList.add('done');
+      else if (i === addMedStep) dot.classList.add('active');
+    }
+  }
+  const t = document.getElementById('addMedicacaoModalTitle');
+  if (t) t.textContent = ADD_MED_TITLES[addMedStep - 1] || 'Adicionar Medicação';
+}
+
+function updateAddMedNavButtons() {
+  const back = document.getElementById('addMedWizardBack');
+  const next = document.getElementById('addMedWizardNext');
+  const save = document.getElementById('addMedWizardSave');
+  if (back) back.style.display = addMedStep > 1 ? '' : 'none';
+  if (next) next.style.display = addMedStep < 4 ? '' : 'none';
+  if (save) save.style.display = addMedStep === 4 ? '' : 'none';
+}
+
+function resetAddMedFrequenciaExpand() {
+  const s = document.getElementById('frequenciaMedInput');
+  const moreBtn = document.getElementById('addMedFreqMoreBtn');
+  if (s) {
+    s.classList.add('visually-hidden');
+    s.style.width = '';
+    s.style.marginTop = '';
+  }
+  if (moreBtn) moreBtn.style.display = '';
+}
+
+function initAddMedicacaoWizard() {
+  addMedStep = 1;
+  resetAddMedFrequenciaExpand();
+  document.querySelectorAll('#addMedFreqButtons .add-med-freq-btn[data-freq]').forEach((b) => b.classList.remove('selected'));
+  const fi = document.getElementById('frequenciaMedInput');
+  if (fi) fi.value = '';
+  document.querySelectorAll('#addMedicacaoForm .add-med-step').forEach((el) => {
+    el.style.display = el.getAttribute('data-step') === '1' ? 'block' : 'none';
+  });
+  updateAddMedProgressUI();
+  updateAddMedNavButtons();
+  updateMedManualRegisterBtn();
+}
+
+function validateAddMedStep(step) {
+  const nome = document.getElementById('selectedMedName')?.value;
+  const dosagem = document.getElementById('dosagemMedInput')?.value;
+  const semDataFim = document.getElementById('toggleSemDataFimMed')?.classList.contains('active');
+  const dur = parseInt(document.getElementById('duracaoDiasMedInput')?.value, 10);
+  if (step === 1) {
+    if (!nome) return 'Selecione um medicamento para continuar.';
+    if (!dosagem) return 'Selecione a dosagem.';
+    if (!semDataFim && (!dur || dur < 1)) {
+      return 'Informe por quantos dias o medicamento será tomado ou ative uso contínuo (sem período previsto).';
+    }
+  }
+  if (step === 2) {
+    const f = document.getElementById('frequenciaMedInput')?.value;
+    if (!f) return 'Selecione com que frequência você toma este medicamento.';
+  }
+  if (step === 3) {
+    const dataInicio = document.getElementById('dataInicioMedInput')?.value;
+    const horarios = Array.from(document.querySelectorAll('.horario-input')).map((i) => i.value).filter(Boolean);
+    if (!dataInicio) return 'Informe a data de início.';
+    if (horarios.length === 0) return 'Informe os horários dos lembretes.';
+  }
+  return null;
+}
+
+function goToAddMedStep(step, skipValidation) {
+  if (step < 1 || step > 4) return;
+  if (!skipValidation && step > addMedStep) {
+    const err = validateAddMedStep(addMedStep);
+    if (err) {
+      showFeedbackModal(err, 'warning');
+      return;
+    }
+  }
+  addMedStep = step;
+  document.querySelectorAll('#addMedicacaoForm .add-med-step').forEach((el) => {
+    const s = parseInt(el.getAttribute('data-step'), 10);
+    el.style.display = s === step ? 'block' : 'none';
+  });
+  if (step === 3) {
+    updateHorariosFields();
+    if (typeof refreshEstoqueSugeridoAdd === 'function') refreshEstoqueSugeridoAdd();
+  }
+  updateAddMedProgressUI();
+  updateAddMedNavButtons();
+  if (step === 2) syncAddMedFreqButtons();
+}
+
+function setAddMedFrequencia(val) {
+  const s = document.getElementById('frequenciaMedInput');
+  if (!s) return;
+  s.value = val;
+  updateHorariosFields();
+  document.querySelectorAll('#addMedFreqButtons .add-med-freq-btn[data-freq]').forEach((b) => {
+    b.classList.toggle('selected', b.getAttribute('data-freq') === val);
+  });
+}
+
+function syncAddMedFreqButtons() {
+  const s = document.getElementById('frequenciaMedInput');
+  if (!s) return;
+  const val = s.value;
+  document.querySelectorAll('#addMedFreqButtons .add-med-freq-btn[data-freq]').forEach((b) => {
+    b.classList.toggle('selected', b.getAttribute('data-freq') === val);
+  });
+}
+
+function expandAddMedFrequenciaSelect() {
+  const s = document.getElementById('frequenciaMedInput');
+  const moreBtn = document.getElementById('addMedFreqMoreBtn');
+  if (!s) return;
+  s.classList.remove('visually-hidden');
+  s.style.width = '100%';
+  s.style.marginTop = '12px';
+  if (moreBtn) moreBtn.style.display = 'none';
+  setTimeout(() => s.focus(), 80);
+}
+
+function escapeHtmlText(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function updateMedManualRegisterBtn() {
+  const inp = document.getElementById('searchMedInput');
+  const btn = document.getElementById('medRegisterManualBtn');
+  if (!btn) return;
+  const ok = inp && inp.value.trim().length >= 2;
+  btn.disabled = !ok;
+}
+
+function registerCustomMedicamentoFromSearch() {
+  const termo = document.getElementById('searchMedInput')?.value.trim() || '';
+  if (termo.length < 2) {
+    showFeedbackModal('Digite pelo menos 2 caracteres do nome do medicamento.', 'warning');
+    return;
+  }
+  document.getElementById('selectedMedName').value = termo;
+  const displayName = document.getElementById('medSelectedDisplayName');
+  if (displayName) displayName.textContent = termo;
+  const dosagemSelect = document.getElementById('dosagemMedInput');
+  dosagemSelect.innerHTML = `
+    <option value="">Selecione a dosagem</option>
+    <option value="Conforme prescrição">Conforme prescrição</option>
+    <option value="Uso conforme orientação médica">Uso conforme orientação médica</option>
+    <option value="1 comprimido">1 comprimido</option>
+    <option value="5 ml">5 ml</option>
+    <option value="10 ml">10 ml</option>
+    <option value="Variável / ajuste pelo médico">Variável / ajuste pelo médico</option>
+  `;
+  setAddMedicacaoMedPickPhase(false);
+  const searchResults = document.getElementById('searchResults');
+  if (searchResults) {
+    searchResults.style.display = 'none';
+    searchResults.innerHTML = '';
+  }
+  setTimeout(() => dosagemSelect.focus(), 80);
+}
+
 /** Campos que `form.reset()` não restaura (toggles, select dinâmico, lista de busca). */
 function resetAddMedicacaoModalState() {
   const dosagemSelect = document.getElementById('dosagemMedInput');
@@ -729,6 +954,8 @@ function resetAddMedicacaoModalState() {
   const searchInput = document.getElementById('searchMedInput');
   if (searchInput) searchInput.value = '';
   setAddMedicacaoMedPickPhase(true);
+  initAddMedicacaoWizard();
+  updateMedManualRegisterBtn();
 }
 
 function cleanupAddMedicacaoForm() {
@@ -742,8 +969,21 @@ function cleanupAddMedicacaoForm() {
   resetAddMedicacaoModalState();
 }
 
+function openAddMedicacaoEntry() {
+  const addModal = document.getElementById('addMedicacaoModal');
+  initAddMedicacaoWizard();
+  const di = document.getElementById('dataInicioMedInput');
+  if (di) di.value = getTodayISODate();
+  const dur = document.getElementById('duracaoDiasMedInput');
+  if (dur) dur.value = '';
+  const hint = document.getElementById('estoqueSugeridoAddText');
+  if (hint) hint.textContent = '';
+  if (addModal) addModal.classList.add('active');
+  updateMedManualRegisterBtn();
+  setTimeout(() => refreshEstoqueSugeridoAdd(), 0);
+}
+
 function setupMedicacaoModal() {
-  const addNewMedBtn = document.getElementById('addMedBtn');
   const addModal = document.getElementById('addMedicacaoModal');
   const cancelAddBtn = document.getElementById('cancelAddBtn');
   const addForm = document.getElementById('addMedicacaoForm');
@@ -753,18 +993,10 @@ function setupMedicacaoModal() {
     cleanupAddMedicacaoForm();
   };
 
-  if (addNewMedBtn) {
-    addNewMedBtn.addEventListener('click', () => {
-      const di = document.getElementById('dataInicioMedInput');
-      if (di) di.value = getTodayISODate();
-      const dur = document.getElementById('duracaoDiasMedInput');
-      if (dur) dur.value = '';
-      const hint = document.getElementById('estoqueSugeridoAddText');
-      if (hint) hint.textContent = '';
-      addModal.classList.add('active');
-      setTimeout(() => refreshEstoqueSugeridoAdd(), 0);
-    });
-  }
+  const addMedNext = document.getElementById('addMedWizardNext');
+  const addMedBack = document.getElementById('addMedWizardBack');
+  if (addMedNext) addMedNext.addEventListener('click', () => goToAddMedStep(addMedStep + 1));
+  if (addMedBack) addMedBack.addEventListener('click', () => goToAddMedStep(addMedStep - 1, true));
   if (addModal) {
     addModal.addEventListener('input', (e) => {
       if (e.target && (e.target.id === 'duracaoDiasMedInput' || e.target.id === 'dataInicioMedInput')) {
@@ -779,6 +1011,7 @@ function setupMedicacaoModal() {
 
   addForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    if (addMedStep !== 4) return;
     const nome = document.getElementById('selectedMedName').value;
     const dosagem = document.getElementById('dosagemMedInput').value;
     const frequencia = document.getElementById('frequenciaMedInput').value;
@@ -1039,6 +1272,17 @@ function setupEditMedicacaoModal() {
 
   cancelBtn.addEventListener('click', closeModal);
   modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  const deleteFromEditBtn = document.getElementById('deleteMedicacaoFromEditBtn');
+  if (deleteFromEditBtn) {
+    deleteFromEditBtn.addEventListener('click', () => {
+      if (currentEditMedId == null) return;
+      const id = currentEditMedId;
+      if (typeof deleteMedicacao === 'function' && deleteMedicacao(id)) {
+        currentEditMedId = null;
+      }
+    });
+  }
 
   modal.addEventListener('input', (e) => {
     if (e.target && (e.target.id === 'editDuracaoDiasMedInput' || e.target.id === 'editDataInicioMedInput')) {
@@ -1339,6 +1583,11 @@ function removerFotoEdit() {
 
 // ===== MODAL DE AGENDAMENTO =====
 
+function openAddAgendaModal() {
+  const addAgendaModal = document.getElementById('addAgendaModal');
+  if (addAgendaModal) addAgendaModal.classList.add('active');
+}
+
 function setupAgendaModal() {
   const addAgendaBtn = document.getElementById('addAgendaBtn');
   const addAgendaModal = document.getElementById('addAgendaModal');
@@ -1347,7 +1596,7 @@ function setupAgendaModal() {
 
   const closeModal = () => { addAgendaModal.classList.remove('active'); addAgendaForm.reset(); };
 
-  addAgendaBtn.addEventListener('click', () => addAgendaModal.classList.add('active'));
+  if (addAgendaBtn) addAgendaBtn.addEventListener('click', openAddAgendaModal);
   cancelAddAgendaBtn.addEventListener('click', closeModal);
   addAgendaModal.addEventListener('click', (e) => { if (e.target === addAgendaModal) closeModal(); });
 
@@ -1438,28 +1687,19 @@ function openEcgDetail(ecgId) {
   const ecg = mockData.ecgs.find(e => e.id === ecgId);
   if (!ecg) return;
 
-  document.getElementById('ecgDetailTitle').textContent = `Eletrocardiograma - ${formatDateTimeForUI(ecg.dataHora)}`;
+  document.getElementById('ecgDetailTitle').textContent = formatDateTimeForUI(ecg.dataHora);
   
   let html = `
     <div class="card card-ecg" style="margin-bottom: 16px;">
-      <div class="ecg-header">
-        <div class="ecg-icon">${ecg.icon}</div>
-        <div class="ecg-info">
-          <div class="ecg-title">Exame Atual</div>
-          <div class="ecg-date">📅 ${formatDateTimeForUI(ecg.dataHora)}</div>
+      <div class="ecg-header ecg-header--compact">
+        <div class="ecg-icon" aria-hidden="true">${ecg.icon}</div>
+        <div class="ecg-value-stack">
+          <div class="ecg-value-line"><span class="ecg-value-num">${ecg.frequenciaCardiaca}</span><span class="ecg-value-unit"> bpm</span></div>
+          <div class="ecg-rhythm-line">${ecg.ritmo}</div>
         </div>
       </div>
-      <div class="ecg-details">
-        <div class="ecg-detail-item">
-          <span class="ecg-label">Frequência Cardíaca:</span>
-          <span class="ecg-value">${ecg.frequenciaCardiaca} bpm</span>
-        </div>
-        <div class="ecg-detail-item">
-          <span class="ecg-label">Ritmo:</span>
-          <span class="ecg-value">${ecg.ritmo}</span>
-        </div>
-      </div>
-      <div class="ecg-interpretation"><strong>Interpretação:</strong> ${ecg.interpretacao}</div>
+      <div class="ecg-meta"><span class="ecg-date">📅 ${formatDateTimeForUI(ecg.dataHora)}</span></div>
+      <div class="ecg-interpretation">${ecg.interpretacao}</div>
     </div>
   `;
 
@@ -1471,7 +1711,7 @@ function openEcgDetail(ecgId) {
       return `
         <div class="card card-saude" style="margin-bottom: 8px;">
           <div class="card-info"><strong>${dataFormatada}${hora}</strong></div>
-          <div class="card-info">FC: ${h.frequencia} bpm | Ritmo: ${h.ritmo}</div>
+          <div class="card-info">${h.frequencia} bpm · ${h.ritmo}</div>
           <div class="card-info">Interpretação: ${h.interpretacao}</div>
         </div>
       `;
@@ -1519,8 +1759,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const exercicioDetalheModal = document.getElementById('exercicioDetalheModal');
+  const exercicioDetalheOkBtn = document.getElementById('exercicioDetalheOkBtn');
+  if (exercicioDetalheOkBtn) {
+    exercicioDetalheOkBtn.addEventListener('click', () => closeExercicioDetalheModal());
+  }
+  if (exercicioDetalheModal) {
+    exercicioDetalheModal.addEventListener('click', (e) => {
+      if (e.target === exercicioDetalheModal) closeExercicioDetalheModal();
+    });
+  }
+
   setupAgendaModal();
   setupComposicaoModal();
+
+  window.addEventListener('resize', () => {
+    const m = document.getElementById('exercicioDetalheModal');
+    if (m && m.classList.contains('active') && window._lastExercicioSessaoCanvas) {
+      renderExercicioHrCanvas(window._lastExercicioSessaoCanvas);
+    }
+  });
 });
 
 
@@ -1595,7 +1853,7 @@ function renderComposicaoHistorico(historico) {
     return `
       <div class="card card-saude" style="margin-bottom: 8px;">
         <div class="card-info"><strong>${formatDateForUI(h.data)}</strong> ${variacaoIcon}</div>
-        <div class="card-value" style="color: #7e91cd; font-size: 16px;">${h.valor}</div>
+        <div class="card-value" style="font-size: 16px;">${h.valor}</div>
         <div class="card-info">Fonte: ${h.fonte}</div>
       </div>
     `;
@@ -1630,16 +1888,9 @@ function updateClockDisplay() {
 function updateMedicationSummary() {
   const hoje = getTodayISODate();
   const entries = getMedicationDayEntries(hoje);
-  const tomadas = entries.filter((e) => e.status === 'tomado').length;
-  const pendentes = entries.filter((e) => e.status === 'pendente').length;
   const atrasadas = entries.filter((e) => e.status === 'atrasado').length;
 
-  const tomadosEl = document.getElementById('medTomadas');
-  const pendentesEl = document.getElementById('medPendentes');
   const atrasadasEl = document.getElementById('medAtrasadas');
-
-  if (tomadosEl) tomadosEl.textContent = tomadas;
-  if (pendentesEl) pendentesEl.textContent = pendentes;
   if (atrasadasEl) atrasadasEl.textContent = atrasadas;
 }
 
@@ -1958,18 +2209,26 @@ function renderMedicationCalendarDay() {
 
 function searchMedicamentos(termo) {
   const searchResults = document.getElementById('searchResults');
-  
+  updateMedManualRegisterBtn();
+
   if (!termo.trim()) {
     searchResults.style.display = 'none';
+    searchResults.innerHTML = '';
     return;
   }
-  
-  const resultados = mockData.catalogoMedicamentos.filter(med => 
+
+  const termoEsc = escapeHtmlText(termo.trim());
+
+  const resultados = mockData.catalogoMedicamentos.filter(med =>
     med.nome.toLowerCase().includes(termo.toLowerCase())
   );
-  
+
   if (resultados.length === 0) {
-    searchResults.innerHTML = '<div style="padding: 8px; color: #999;">Nenhum medicamento encontrado</div>';
+    searchResults.innerHTML = `
+      <div class="search-no-result-panel">
+        <p class="search-no-result-text">Nenhum resultado no catálogo para “${termoEsc}”.</p>
+        <p class="search-no-result-hint">Use o botão <strong>Cadastrar com este nome</strong> abaixo do campo de busca.</p>
+      </div>`;
     searchResults.style.display = 'block';
     return;
   }
@@ -2017,7 +2276,14 @@ function searchMedicamentos(termo) {
       `;
     });
   });
-  
+
+  html += `
+    <div class="med-search-custom-footer">
+      <button type="button" class="med-search-custom-btn" onclick="registerCustomMedicamentoFromSearch()">
+        Não é nenhum destes — cadastrar “${termoEsc}” manualmente
+      </button>
+    </div>`;
+
   searchResults.innerHTML = html;
   searchResults.style.display = 'block';
 }
@@ -2051,6 +2317,7 @@ function trocarMedicamentoSelecionado() {
   const searchInput = document.getElementById('searchMedInput');
   if (searchInput) searchInput.value = '';
   setAddMedicacaoMedPickPhase(true);
+  updateMedManualRegisterBtn();
 }
 
 function selectMedicamento(medId) {
@@ -2396,10 +2663,10 @@ function renderAdherenceByMedication(startDate, endDate) {
     });
     
     const percentage = expected > 0 ? Math.round((taken / expected) * 100) : 0;
-    const color = percentage >= 80 ? '#2E7D32' : percentage >= 50 ? '#FFA500' : '#FF6B6B';
+    const barFill = '#8a8a8a';
     
     html += `
-      <div class=\"adherence-med-card\">\n        <div class=\"adherence-med-header\">\n          <div class=\"adherence-med-name\">${med.nome} ${med.dosagem}</div>\n          <div class=\"adherence-med-percentage\" style=\"color: ${color};\">${percentage}%</div>\n        </div>\n        <div class=\"adherence-med-bar\">\n          <div class=\"adherence-med-fill\" style=\"width: ${percentage}%; background-color: ${color};\"></div>\n        </div>\n        <div class=\"adherence-med-stats\">\n          <span>${taken}/${expected} tomadas</span>\n        </div>\n      </div>\n    `;
+      <div class=\"adherence-med-card\">\n        <div class=\"adherence-med-header\">\n          <div class=\"adherence-med-name\">${med.nome} ${med.dosagem}</div>\n          <div class=\"adherence-med-percentage\">${percentage}%</div>\n        </div>\n        <div class=\"adherence-med-bar\">\n          <div class=\"adherence-med-fill\" style=\"width: ${percentage}%; background-color: ${barFill};\"></div>\n        </div>\n        <div class=\"adherence-med-stats\">\n          <span>${taken}/${expected} tomadas</span>\n        </div>\n      </div>\n    `;
   });
   
   document.getElementById('adherenceByMedicationContent').innerHTML = html;
@@ -2583,7 +2850,7 @@ function renderAlertasVitais() {
         </div>
       </div>
       <button class="toggle active" onclick="toggleAlertaVitalAtivo(${v.id}, this)"></button>
-      <button onclick="editAlertaVital(${v.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#9058A7;padding:4px 2px;">✏️</button>
+      <button onclick="editAlertaVital(${v.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#454545;padding:4px 2px;">✏️</button>
     </div>
   `).join('');
 }
@@ -2751,7 +3018,7 @@ function renderMeusIndicadoresVitais() {
         title="${v.alerta && v.alerta.ativo ? 'Alerta configurado' : 'Sem alerta configurado'}">
         ${v.alerta && v.alerta.ativo ? '🔔' : '🔕'}
       </span>
-      <button onclick="editIndicador('vitais',${v.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#9058A7;padding:4px;">✏️</button>
+      <button onclick="editIndicador('vitais',${v.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#454545;padding:4px;">✏️</button>
       <button onclick="removeIndicador('vitais',${v.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#ddd;padding:4px;">🗑️</button>
     </div>
   `).join('');
@@ -2766,7 +3033,7 @@ function renderMeusIndicadoresCorpo() {
         <div class="vital-config-name">${c.tipo}</div>
         <div style="font-size:11px;color:#aaa;">${c.unidade} • Ideal: ${getIdealLabel(c.ideal)}</div>
       </div>
-      <button onclick="editIndicador('corpo',${c.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#9058A7;padding:4px;">✏️</button>
+      <button onclick="editIndicador('corpo',${c.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#454545;padding:4px;">✏️</button>
       <button onclick="removeIndicador('corpo',${c.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#ddd;padding:4px;">🗑️</button>
     </div>
   `).join('');
@@ -3110,6 +3377,23 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+function setPressureMedReminder(btn) {
+  const v = btn.getAttribute('data-pmed') || 'nenhum';
+  const hid = document.getElementById('pressureMedStatusInput');
+  if (hid) hid.value = v;
+  document.querySelectorAll('.pressure-med-btn').forEach((b) => {
+    b.classList.toggle('selected', b.getAttribute('data-pmed') === v);
+  });
+}
+
+function resetPressureMedReminderUI() {
+  const hid = document.getElementById('pressureMedStatusInput');
+  if (hid) hid.value = 'nenhum';
+  document.querySelectorAll('.pressure-med-btn').forEach((b) => {
+    b.classList.toggle('selected', b.getAttribute('data-pmed') === 'nenhum');
+  });
+}
+
 let lastPressureValue = null;
 let lastManualMeasurementMeta = { isSporadic: true, dateISO: null, timeHHMM: null };
 let currentMoodValue = 0;
@@ -3188,6 +3472,130 @@ function setAutoCaptureHint(fonte) {
   hint.textContent = copy[fonte] || copy.Pulseira;
 }
 
+function formatDuracaoHMS(totalSec) {
+  const s = Math.max(0, Math.floor(totalSec || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+/** Tempo decorrido desde o início da sessão (eixo do gráfico): mm:ss ou h:mm:ss */
+function formatElapsedMMSS(offsetSec) {
+  const s = Math.max(0, Math.floor(offsetSec || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
+}
+
+function openExercicioDetalheFromRow(index) {
+  const h = currentVitalHistoricoView[index];
+  if (!h || h.contextoColeta !== 'exercicio' || !h.exercicioSessao) return;
+  openExercicioDetalheModal(h.exercicioSessao);
+}
+
+function openExercicioDetalheModal(sessao) {
+  if (!sessao) return;
+  const nomeEl = document.getElementById('exercicioDetalheNome');
+  const durEl = document.getElementById('exercicioDetalheDuracao');
+  const periodoEl = document.getElementById('exercicioDetalhePeriodo');
+  const gridEl = document.getElementById('exercicioDetalheMetricas');
+  const axisEl = document.getElementById('exercicioDetalheAxis');
+  if (!nomeEl || !durEl || !gridEl || !axisEl) return;
+
+  nomeEl.textContent = sessao.nomeAtividade || 'Exercício';
+  durEl.textContent = formatDuracaoHMS(sessao.duracaoSegundos);
+  if (periodoEl) {
+    const ini = sessao.inicioISO ? formatDateTimeForUI(sessao.inicioISO) : '';
+    const fim = sessao.fimISO ? formatDateTimeForUI(sessao.fimISO) : '';
+    periodoEl.textContent = ini && fim ? `Início ${ini} · Fim ${fim}` : '';
+  }
+
+  const cal = sessao.caloriasKcal != null ? `${sessao.caloriasKcal} kcal` : '—';
+  gridEl.innerHTML = `
+    <div class="exercise-metric-cell">
+      <span class="exercise-metric-label">Duração total</span>
+      <span class="exercise-metric-value">${formatDuracaoHMS(sessao.duracaoSegundos)}</span>
+    </div>
+    <div class="exercise-metric-cell">
+      <span class="exercise-metric-label">Calorias (ativas)</span>
+      <span class="exercise-metric-value">${cal}</span>
+    </div>
+    <div class="exercise-metric-cell">
+      <span class="exercise-metric-label">Freq. card. média</span>
+      <span class="exercise-metric-value">${sessao.freqMedia != null ? `${sessao.freqMedia} bpm` : '—'}</span>
+    </div>
+    <div class="exercise-metric-cell">
+      <span class="exercise-metric-label">Freq. card. máxima</span>
+      <span class="exercise-metric-value">${sessao.freqMax != null ? `${sessao.freqMax} bpm` : '—'}</span>
+    </div>
+  `;
+
+  const dur = sessao.duracaoSegundos || 1;
+  const ticks = [0, dur / 4, dur / 2, (3 * dur) / 4, dur];
+  axisEl.innerHTML = `${ticks
+    .map((t) => `<span>${formatElapsedMMSS(t)}</span>`)
+    .join('')}<span class="exercise-axis-flag" title="Fim">🏁</span>`;
+
+  window._lastExercicioSessaoCanvas = sessao;
+  document.getElementById('exercicioDetalheModal').classList.add('active');
+  requestAnimationFrame(() => renderExercicioHrCanvas(sessao));
+  setTimeout(() => renderExercicioHrCanvas(sessao), 200);
+}
+
+function closeExercicioDetalheModal() {
+  const m = document.getElementById('exercicioDetalheModal');
+  if (m) m.classList.remove('active');
+}
+
+function renderExercicioHrCanvas(sessao) {
+  const canvas = document.getElementById('exercicioHrCanvas');
+  if (!canvas || !sessao || !sessao.amostras || sessao.amostras.length === 0) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(280, rect.width || canvas.parentElement.clientWidth || 320);
+  const h = 200;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = `${w}px`;
+  canvas.style.height = `${h}px`;
+
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const amp = sessao.amostras;
+  const bpms = amp.map((a) => a.bpm);
+  const minB = Math.min(...bpms) - 5;
+  const maxB = Math.max(...bpms) + 5;
+  const range = maxB - minB || 1;
+  const dur = sessao.duracaoSegundos || amp[amp.length - 1].offsetSec || 1;
+
+  const pad = 14;
+  const graphW = w - pad * 2;
+  const graphH = h - pad * 2;
+  const toX = (offsetSec) => pad + (offsetSec / dur) * graphW;
+  const toY = (bpm) => pad + graphH - ((bpm - minB) / range) * graphH;
+
+  ctx.fillStyle = '#f5f5f5';
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = '#6e6e6e';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  amp.forEach((pt, i) => {
+    const x = toX(pt.offsetSec);
+    const y = toY(pt.bpm);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
 function openVitalDetailModal(tipoVital, vitalId) {
   currentVitalDetail = mockData.sinaisVitais.find(v => v.id === vitalId);
   
@@ -3258,15 +3666,15 @@ function renderSparklineChart(historico) {
   ctx.fillStyle = '#F8F9FA';
   ctx.fillRect(0, 0, width, height);
 
-  // Faixa ideal (banda verde clara)
+  // Faixa ideal (banda neutra)
   if (idealMin !== null) {
     const yMax = toY(idealMax);
     const yMin = toY(idealMin);
-    ctx.fillStyle = 'rgba(46, 125, 50, 0.10)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
     ctx.fillRect(padding, yMax, graphWidth, yMin - yMax);
 
     // Linha ideal min
-    ctx.strokeStyle = 'rgba(46, 125, 50, 0.5)';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
@@ -3282,13 +3690,13 @@ function renderSparklineChart(historico) {
     ctx.setLineDash([]);
 
     // Label "Ideal"
-    ctx.fillStyle = 'rgba(46, 125, 50, 0.7)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.font = '9px sans-serif';
     ctx.fillText('ideal', padding + 2, toY(idealMax) - 2);
   }
 
   // Linha dos valores
-  ctx.strokeStyle = '#7e91cd';
+  ctx.strokeStyle = '#6e6e6e';
   ctx.lineWidth = 2;
   ctx.beginPath();
   values.forEach((value, index) => {
@@ -3303,7 +3711,7 @@ function renderSparklineChart(historico) {
     const x = padding + index * pointSpacing;
     const y = toY(value);
     const isIdeal = idealMin !== null && value >= idealMin && value <= idealMax;
-    ctx.fillStyle = isIdeal ? '#2E7D32' : '#E53935';
+    ctx.fillStyle = isIdeal ? '#5a5a5a' : '#8a8a8a';
     ctx.beginPath();
     ctx.arc(x, y, 3.5, 0, Math.PI * 2);
     ctx.fill();
@@ -3311,23 +3719,47 @@ function renderSparklineChart(historico) {
 }
 
 function renderVitalDetailContent(historico) {
-  if (historico.length === 0) {
+  currentVitalHistoricoView = Array.isArray(historico) ? historico : [];
+
+  if (currentVitalHistoricoView.length === 0) {
     document.getElementById('vitalDetailContent').innerHTML = '<div class=\"empty-state\"><div class=\"empty-text\">Nenhum registro encontrado</div></div>';
     return;
   }
 
-  const html = historico.map(h => {
+  const html = currentVitalHistoricoView.map((h, idx) => {
     const dataFormatada = formatDateForUI(h.data);
     const hora = h.hora ? ` ${h.hora}` : '';
     const statusIcon = h.status === 'normal' ? '🟢' : '🔴';
     const valorFormatado = typeof formatHistoricValue === 'function'
       ? formatHistoricValue(currentVitalDetail?.tipo, h)
       : h.valor;
-    
+    let pmed = '';
+    if (currentVitalDetail?.tipo === 'Pressão Arterial' && h.medicamentoPressao && h.medicamentoPressao !== 'nenhum') {
+      pmed = h.medicamentoPressao === 'tomados' ? ' · 💊 Tomados' : ' · 💊 Não tomados';
+    }
+
+    const ctxLabel = typeof getLabelContextoColetaHistorico === 'function' ? getLabelContextoColetaHistorico(h) : '';
+    const badgeHtml = ctxLabel
+      ? `<span class="vital-context-badge">${ctxLabel}</span>`
+      : '';
+
+    const isExercicio =
+      h.contextoColeta === 'exercicio' && h.exercicioSessao && currentVitalDetail?.tipo === 'Batimento Cardíaco';
+    const rowClass = isExercicio ? 'vital-list-item vital-list-item--exercicio' : 'vital-list-item';
+    const clickAttr = isExercicio ? ` role="button" tabindex="0" onclick="openExercicioDetalheFromRow(${idx})"` : '';
+
     return `
-      <div class=\"vital-list-item\">\n        <div class=\"vital-list-date\">${dataFormatada}${hora}</div>\n        <div class=\"vital-list-value\">${valorFormatado}</div>\n        <div class=\"vital-list-status\">${statusIcon}</div>\n      </div>\n    `;
+      <div class="${rowClass}"${clickAttr}>
+        <div class="vital-list-main">
+          <div class="vital-list-date">${dataFormatada}${hora}</div>
+          ${badgeHtml}
+        </div>
+        <div class="vital-list-value">${valorFormatado}${pmed}${isExercicio ? ' <span class="vital-list-chevron" aria-hidden="true">›</span>' : ''}</div>
+        <div class="vital-list-status">${statusIcon}</div>
+      </div>
+    `;
   }).join('');
-  
+
   document.getElementById('vitalDetailContent').innerHTML = html;
 }
 
@@ -3415,6 +3847,7 @@ function openAddVitalModal(tipoVital) {
   if (checklist) checklist.style.display = 'none';
   resetPulseiraStepButtons();
   clearVitalCaptureState();
+  resetPressureMedReminderUI();
 
   if (tipoVital === 'Pressão Arterial') {
     ensureConfigColetaPressao();
@@ -3439,6 +3872,9 @@ function renderVitalConfirmBodyFromPayload(p) {
   if (p.tipoVital === 'Pressão Arterial') {
     const s = p.sistolica;
     const d = p.diastolica;
+    const mp = p.medicamentoPressao && p.medicamentoPressao !== 'nenhum'
+      ? (p.medicamentoPressao === 'tomados' ? 'Medicamento da pressão: tomados' : 'Medicamento da pressão: não tomados')
+      : '';
     return `
       <div class="vital-confirm-block">
         <div class="vital-confirm-type">${p.tipoVital}</div>
@@ -3447,6 +3883,7 @@ function renderVitalConfirmBodyFromPayload(p) {
         </div>
         <div class="vital-confirm-unit">mmHg</div>
         <div class="vital-confirm-meta">Fonte: ${p.fonte}</div>
+        ${mp ? `<div class="vital-confirm-meta">${mp}</div>` : ''}
       </div>`;
   }
   const u = p.unidade ? ` ${p.unidade}` : '';
@@ -3504,13 +3941,18 @@ function buildAddVitalPendingPayload() {
       sistolica = capturedPressureFromSource.sistolica;
       diastolica = capturedPressureFromSource.diastolica;
     }
+    const medicamentoPressao =
+      fonte === 'Manual'
+        ? (document.getElementById('pressureMedStatusInput')?.value || 'nenhum')
+        : 'nenhum';
     return {
       ok: true,
       payload: {
         tipoVital,
         fonte,
         sistolica: parseInt(String(sistolica), 10),
-        diastolica: parseInt(String(diastolica), 10)
+        diastolica: parseInt(String(diastolica), 10),
+        medicamentoPressao
       }
     };
   }
@@ -3541,6 +3983,7 @@ function executePendingVitalSave() {
 
   if (p.tipoVital === 'Pressão Arterial') {
     const { sistolica, diastolica } = p;
+    const medicamentoPressao = p.medicamentoPressao || 'nenhum';
     lastPressureValue = `${sistolica}/${diastolica}`;
     lastManualMeasurementMeta = {
       isSporadic: true,
@@ -3554,12 +3997,14 @@ function executePendingVitalSave() {
       vital.fonte = p.fonte;
       vital.tempo = 'Agora';
       vital.dataHora = dataHora;
-      vital.historico.unshift({
+      const entry = {
         data: agora.toISOString().slice(0, 10),
         hora: agora.toTimeString().slice(0, 5),
         valor: { sistolica, diastolica },
         status: 'normal'
-      });
+      };
+      if (medicamentoPressao && medicamentoPressao !== 'nenhum') entry.medicamentoPressao = medicamentoPressao;
+      vital.historico.unshift(entry);
       checkVitalAlert(vital);
     }
 
