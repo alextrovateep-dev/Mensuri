@@ -105,7 +105,7 @@ function createVitalCard(vital) {
   `;
 }
 
-// Card de Composição Corporal: ícone + valores (sem título do indicador no cartão)
+// Card de Composição Corporal: ícone + nome do indicador + valores
 function createComposicaoCard(item) {
   const variacaoClass = item.variacao === 'normal' ? 'variacao-normal' : 'variacao-alerta';
   const variacaoIcon = item.variacao === 'normal' ? '🟢' : '🔴';
@@ -115,13 +115,22 @@ function createComposicaoCard(item) {
     : '';
   const tipoArg = JSON.stringify(item.tipo);
   const tipoAttr = String(item.tipo).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const tipoHtml = String(item.tipo)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 
   return `
     <div class="card card-composicao card-has-action" role="article" aria-label="${tipoAttr}" style="cursor: pointer;" onclick="openComposicaoModal(${item.id}, ${tipoArg})">
-      <div class="composicao-header composicao-header--value-only">
+      <div class="composicao-header composicao-header--with-title">
         <div class="composicao-icon" aria-hidden="true">${item.icon}</div>
-        <div class="composicao-value">${item.valor} ${item.unidade}</div>
-        <div class="composicao-variacao ${variacaoClass}" aria-hidden="true">${variacaoIcon}</div>
+        <div class="composicao-info">
+          <div class="composicao-title">${tipoHtml}</div>
+          <div class="composicao-value-row">
+            <div class="composicao-value">${item.valor} ${item.unidade}</div>
+            <div class="composicao-variacao ${variacaoClass}" aria-hidden="true">${variacaoIcon}</div>
+          </div>
+        </div>
       </div>
       <div class="composicao-footer composicao-footer--compact">
         <span class="composicao-date">${dataHora}</span>

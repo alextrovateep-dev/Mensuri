@@ -2125,6 +2125,32 @@ body {
   margin-bottom: 6px;
 }
 
+.composicao-header--with-title {
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.composicao-header--with-title .composicao-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.composicao-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.composicao-value-row .composicao-value {
+  flex: 1;
+  margin-bottom: 0;
+  min-width: 0;
+}
+
 .composicao-header--value-only .composicao-value {
   flex: 1;
   margin-bottom: 0;
@@ -2142,9 +2168,11 @@ body {
 }
 
 .composicao-title {
-  font-size: 21px;
+  font-size: 14px;
   font-weight: 700;
-  color: var(--text-title);
+  color: var(--text-muted);
+  line-height: 1.25;
+  margin-bottom: 4px;
 }
 
 .composicao-ideal {
