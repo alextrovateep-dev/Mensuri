@@ -2367,18 +2367,19 @@ body {
 
 /* ===== CLOCK WIDGET ===== */
 
-/* Medicações: calendário + hora + relatório num único card */
+/* Medicações: Calendário · Agenda · Atraso · Relatório — uma linha compacta */
 .med-calendar-unified {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: stretch;
-  gap: 8px;
+  gap: 0;
   background: var(--surface-card);
   border: var(--border-card);
   border-radius: var(--radius-card);
-  padding: 10px 10px;
-  margin-bottom: 10px;
+  padding: 5px 4px;
+  margin-bottom: 8px;
   box-shadow: var(--shadow-card);
+  overflow: hidden;
 }
 
 .med-cal-unified-seg {
@@ -2387,8 +2388,8 @@ body {
   font: inherit;
   cursor: pointer;
   text-align: left;
-  border-radius: 8px;
-  padding: 4px 6px;
+  border-radius: 6px;
+  padding: 3px 5px;
   display: flex;
   align-items: center;
   color: inherit;
@@ -2400,20 +2401,27 @@ body {
 }
 
 .med-cal-unified-seg--cal {
-  flex: 1 1 140px;
-  gap: 10px;
+  flex: 1 1 0;
+  gap: 6px;
   min-width: 0;
+  padding-left: 4px;
+  padding-right: 6px;
 }
 
-.med-cal-unified-seg--clock {
+.med-cal-unified-seg--clock,
+.med-cal-unified-seg--atraso {
   flex: 0 0 auto;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-width: 92px;
-  padding: 6px 12px;
+  min-width: 58px;
+  max-width: 76px;
+  padding: 2px 4px;
+}
+
+.med-cal-unified-seg + .med-cal-unified-seg,
+.med-calendar-unified > .med-calendar-actions {
   border-left: 1px solid #ececec;
-  border-right: 1px solid #ececec;
 }
 
 .med-cal-unified-texts {
@@ -2422,35 +2430,50 @@ body {
   min-width: 0;
 }
 
+.med-calendar-unified .med-cal-unified-seg--cal .med-calendar-title {
+  font-size: 13px;
+  line-height: 1.15;
+}
+
+.med-calendar-unified .med-cal-unified-seg--cal .med-calendar-subtitle {
+  font-size: 11px;
+  line-height: 1.15;
+}
+
 .med-cal-unified-time {
-  font-size: 26px !important;
+  font-size: 18px !important;
   font-family: 'Courier New', monospace;
-  margin-bottom: 2px !important;
+  margin-bottom: 1px !important;
   line-height: 1 !important;
 }
 
 .med-cal-unified-clock-caption {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
 }
 
 .med-calendar-unified .med-calendar-actions {
   display: flex;
   align-items: center;
-  margin-left: auto;
+  justify-content: center;
+  padding: 0 5px 0 7px;
   flex-shrink: 0;
 }
 
-.med-atrasadas-row {
-  margin-bottom: 8px;
+.med-calendar-unified .med-report-chip {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 700;
 }
 
-.med-atrasadas-card {
-  width: 100%;
-  min-height: 56px;
+.med-calendar-unified .med-calendar-icon {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .med-header-add-btn {
@@ -3883,25 +3906,32 @@ body {
 
 @media (max-width: 460px) {
   .med-calendar-unified {
-    flex-direction: column;
+    padding: 4px 2px;
   }
 
-  .med-cal-unified-seg--clock {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-    min-width: 0;
-    border-left: none;
-    border-right: none;
-    border-top: 1px solid #ececec;
-    padding-top: 10px;
+  .med-calendar-unified .med-cal-unified-seg--cal .med-calendar-title {
+    font-size: 12px;
   }
 
-  .med-calendar-unified .med-calendar-actions {
-    margin-left: 0;
-    width: 100%;
-    justify-content: flex-end;
+  .med-calendar-unified .med-cal-unified-seg--cal .med-calendar-subtitle {
+    font-size: 10px;
+  }
+
+  .med-cal-unified-time {
+    font-size: 16px !important;
+  }
+
+  .med-cal-unified-seg--clock,
+  .med-cal-unified-seg--atraso {
+    min-width: 52px;
+    max-width: 68px;
+    padding: 2px 3px;
+  }
+
+  .med-calendar-unified .med-report-chip {
+    height: 28px;
+    padding: 0 8px;
+    font-size: 10px;
   }
 }
 

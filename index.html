@@ -68,18 +68,15 @@
                         </button>
                         <button type="button" class="med-cal-unified-seg med-cal-unified-seg--clock" onclick="openDailyScheduleModal()" title="Agenda do dia">
                             <span class="med-cal-unified-time clock-time" id="clockTime">14:30</span>
-                            <span class="med-cal-unified-clock-caption">Hora atual</span>
+                            <span class="med-cal-unified-clock-caption">Agenda</span>
+                        </button>
+                        <button type="button" class="med-cal-unified-seg med-cal-unified-seg--atraso" id="medAtrasadasCard" onclick="openOverdueMedicationsModal()" title="Medicações atrasadas">
+                            <span class="med-cal-unified-time" id="medAtrasadas">0</span>
+                            <span class="med-cal-unified-clock-caption">Atraso</span>
                         </button>
                         <div class="med-calendar-actions">
-                            <button type="button" class="med-chip-btn med-chip-btn-secondary" id="reportBtn" title="Ver relatório de aderência">Relatório</button>
+                            <button type="button" class="med-chip-btn med-chip-btn-secondary med-report-chip" id="reportBtn" title="Ver relatório de aderência">Relatório</button>
                         </div>
-                    </div>
-
-                    <div class="med-atrasadas-row">
-                        <button type="button" class="summary-item summary-item-clickable med-atrasadas-card" id="medAtrasadasCard" onclick="openOverdueMedicationsModal()">
-                            <span class="summary-label">Atrasadas</span>
-                            <span class="summary-value" id="medAtrasadas">0</span>
-                        </button>
                     </div>
 
                     <div class="med-page-divider"></div>
