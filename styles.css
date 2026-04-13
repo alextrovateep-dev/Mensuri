@@ -625,12 +625,15 @@ body {
 }
 
 .home-priority-label {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--text-muted);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  line-height: 1.2;
+  letter-spacing: 0.03em;
+  line-height: 1.25;
+  max-width: 100%;
+  padding: 0 6px;
+  white-space: normal;
 }
 
 .home-priority-value {

@@ -359,7 +359,7 @@ function renderHome() {
   const nowHtml = `
     <div class="home-priority-grid">
       <div class="home-priority-card ${atrasadas.length ? 'warning' : 'ok'}" onclick="switchScreen('medicacoesScreen')">
-        <div class="home-priority-label">Atrasadas</div>
+        <div class="home-priority-label">Medicações em atraso</div>
         <div class="home-priority-value">${atrasadas.length}</div>
       </div>
     </div>
