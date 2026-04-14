@@ -934,13 +934,20 @@ function getLabelContextoColetaHistorico(entry) {
   if (!c || c === 'normal') return '';
   if (c === 'repouso') return 'Repouso';
   if (c === 'exercicio') return 'Exercício';
+  if (c === 'sono') return 'Sono';
   return '';
 }
 
 function historicoEntryToMs(entry) {
   if (!entry || !entry.data) return null;
+  const ds = String(entry.data).slice(0, 10);
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ds);
+  if (!dm) return null;
   const timePart = entry.hora && String(entry.hora).length >= 4 ? String(entry.hora).slice(0, 5) : '12:00';
-  const d = new Date(`${entry.data}T${timePart}:00`);
+  const tm = /^(\d{1,2}):(\d{2})/.exec(timePart);
+  const hh = tm ? parseInt(tm[1], 10) : 12;
+  const mm = tm ? parseInt(tm[2], 10) : 0;
+  const d = new Date(parseInt(dm[1], 10), parseInt(dm[2], 10) - 1, parseInt(dm[3], 10), hh, mm, 0, 0);
   const t = d.getTime();
   return Number.isNaN(t) ? null : t;
 }
@@ -1001,6 +1008,62 @@ function getVital24hMinMaxStrings(vital) {
   return { maxStr: String(Math.max(...nums)), minStr: String(Math.min(...nums)) };
 }
 
+/** Min/max para card de batimento: últimas 24 h; se vazio, usa todo o histórico numérico (fallback p/ demo). */
+function getBatimentoMinMaxForCard(vital) {
+  if (!vital || vital.tipo !== 'Batimento Cardíaco') return null;
+  const mm24 = getVital24hMinMaxStrings(vital);
+  if (mm24) return mm24;
+  const nums = (vital.historico || [])
+    .map((h) => {
+      const val = h && h.valor;
+      if (val != null && typeof val === 'object') return null;
+      const n = parseFloat(val);
+      return Number.isNaN(n) ? null : n;
+    })
+    .filter((n) => n != null);
+  if (nums.length === 0) {
+    const v = parseFloat(vital.valor);
+    if (!Number.isNaN(v)) return { minStr: String(v), maxStr: String(v) };
+    return null;
+  }
+  return { maxStr: String(Math.max(...nums)), minStr: String(Math.min(...nums)) };
+}
+
+/**
+ * Fundo do "cardizinho" da última medição + min/max: verde / amarelo / vermelho bem claros.
+ */
+function getBatimentoCardTone(vital) {
+  if (!vital || vital.tipo !== 'Batimento Cardíaco') return 'vital-batimento-tone--none';
+  const v = parseFloat(vital.valor);
+  if (Number.isNaN(v)) return 'vital-batimento-tone--none';
+  const ideal = vital.ideal;
+  if (!ideal || ideal.type === 'raw') {
+    return vital.variacao === 'normal' ? 'vital-batimento-tone--ok' : 'vital-batimento-tone--alert';
+  }
+  if (ideal.type === 'range' && ideal.min != null && ideal.max != null) {
+    const min = ideal.min;
+    const max = ideal.max;
+    const span = max - min;
+    const edge = Math.max(3, Math.min(8, span * 0.08));
+    if (v >= min && v <= max) {
+      if (v >= min + edge && v <= max - edge) return 'vital-batimento-tone--ok';
+      return 'vital-batimento-tone--warn';
+    }
+    const distOut = v < min ? min - v : v - max;
+    if (distOut <= edge * 1.5) return 'vital-batimento-tone--warn';
+    return 'vital-batimento-tone--alert';
+  }
+  if (ideal.type === 'max' && ideal.max != null) {
+    if (v <= ideal.max) return v <= ideal.max - 3 ? 'vital-batimento-tone--ok' : 'vital-batimento-tone--warn';
+    return v <= ideal.max + 5 ? 'vital-batimento-tone--warn' : 'vital-batimento-tone--alert';
+  }
+  if (ideal.type === 'min' && ideal.min != null) {
+    if (v >= ideal.min) return v >= ideal.min + 3 ? 'vital-batimento-tone--ok' : 'vital-batimento-tone--warn';
+    return v >= ideal.min - 5 ? 'vital-batimento-tone--warn' : 'vital-batimento-tone--alert';
+  }
+  return vital.variacao === 'normal' ? 'vital-batimento-tone--ok' : 'vital-batimento-tone--alert';
+}
+
 function formatVital24hRangeLine(vital) {
   if (vital && vital.tipo === 'Pressão Arterial') {
     const pr = getVital24hPressureRanges(vital);
@@ -1043,6 +1106,15 @@ function computeTrendDirFromHistoricoSlice(vitalTipo, historicoNewestFirst) {
   return 'up';
 }
 
+/** Remove medições geradas por `injectDemoMedicoesUltimas24h` (para reinjetar com a data de “hoje” correta). */
+function stripDemoMedicoesUltimas24h(data) {
+  if (!data || !Array.isArray(data.sinaisVitais)) return;
+  data.sinaisVitais.forEach((vital) => {
+    if (!Array.isArray(vital.historico)) return;
+    vital.historico = vital.historico.filter((h) => !h.demoUltimas24h);
+  });
+}
+
 /** Medições fictícias nas últimas 24 h para demonstrar Máx./Mín. nos cards (dados sempre atuais). */
 function injectDemoMedicoesUltimas24h(data) {
   const pad2 = (n) => String(n).padStart(2, '0');
@@ -1054,13 +1126,99 @@ function injectDemoMedicoesUltimas24h(data) {
       hora: `${pad2(t.getHours())}:${pad2(t.getMinutes())}`
     };
   };
+  const atDaysAgo = (daysAgo, hour, minute = 0) => {
+    const t = new Date(now);
+    t.setDate(t.getDate() - daysAgo);
+    t.setHours(hour, minute, 0, 0);
+    return {
+      data: `${t.getFullYear()}-${pad2(t.getMonth() + 1)}-${pad2(t.getDate())}`,
+      hora: `${pad2(t.getHours())}:${pad2(t.getMinutes())}`
+    };
+  };
 
   const demoRows = {
     'Batimento Cardíaco': [
       { ...at(0, 40), valor: 85, status: 'normal' },
+      (() => {
+        const slot = at(0, 55);
+        const ini = `${slot.data}T${String(slot.hora).slice(0, 5)}:00`;
+        const fimDate = new Date(new Date(ini).getTime() + 40 * 60000);
+        const fim = `${slot.data}T${String(fimDate.getHours()).padStart(2, '0')}:${String(fimDate.getMinutes()).padStart(2, '0')}:00`;
+        return {
+          ...slot,
+          valor: 108,
+          status: 'normal',
+          contextoColeta: 'exercicio',
+          exercicioSessao: {
+            nomeAtividade: 'Demo · Esteira',
+            inicioISO: ini,
+            fimISO: fim,
+            duracaoSegundos: 40 * 60,
+            caloriasKcal: 210,
+            freqMedia: 104,
+            freqMax: 112,
+            amostras: [
+              { offsetSec: 0, bpm: 92 },
+              { offsetSec: 600, bpm: 108 },
+              { offsetSec: 1200, bpm: 102 },
+              { offsetSec: 1800, bpm: 98 }
+            ]
+          }
+        };
+      })(),
       { ...at(3, 10), valor: 72, status: 'normal' },
       { ...at(9, 0), valor: 94, status: 'normal' },
-      { ...at(19, 30), valor: 64, status: 'normal' }
+      { ...at(19, 30), valor: 64, status: 'normal' },
+      (() => {
+        const slot = atDaysAgo(0, 4, 20);
+        const ini = `${slot.data}T04:20:00`;
+        const fim = `${slot.data}T11:45:00`;
+        return {
+          ...slot,
+          valor: 54,
+          status: 'normal',
+          contextoColeta: 'sono',
+          sonoSessao: {
+            inicioISO: ini,
+            fimISO: fim,
+            duracaoMinutos: 445,
+            score: 82,
+            leveMin: 210,
+            remMin: 88,
+            profundoMin: 92,
+            acordadoMin: 15
+          }
+        };
+      })(),
+      { ...atDaysAgo(1, 10, 15), valor: 70, status: 'normal' },
+      { ...atDaysAgo(1, 18, 0), valor: 88, status: 'normal' },
+      { ...atDaysAgo(2, 8, 0), valor: 62, status: 'normal' },
+      { ...atDaysAgo(2, 20, 0), valor: 78, status: 'normal' },
+      /* Dois valores distintos por dia civil: min–máx. da barra = agregado do dia, não uma medição só */
+      { ...atDaysAgo(3, 12, 30), valor: 82, status: 'normal' },
+      { ...atDaysAgo(3, 20, 15), valor: 96, status: 'normal' },
+      { ...atDaysAgo(4, 7, 0), valor: 58, status: 'normal' },
+      { ...atDaysAgo(4, 18, 30), valor: 74, status: 'normal' },
+      { ...atDaysAgo(5, 14, 0), valor: 68, status: 'normal' },
+      { ...atDaysAgo(5, 21, 45), valor: 81, status: 'normal' },
+      { ...atDaysAgo(6, 8, 5), valor: 68, status: 'normal' },
+      { ...atDaysAgo(6, 19, 0), valor: 84, status: 'normal' },
+      { ...atDaysAgo(7, 7, 40), valor: 62, status: 'normal' },
+      { ...atDaysAgo(7, 17, 20), valor: 78, status: 'normal' },
+      { ...atDaysAgo(8, 9, 10), valor: 71, status: 'normal' },
+      { ...atDaysAgo(8, 20, 0), valor: 88, status: 'normal' },
+      { ...atDaysAgo(9, 8, 20), valor: 65, status: 'normal' },
+      { ...atDaysAgo(9, 18, 40), valor: 79, status: 'normal' },
+      { ...atDaysAgo(10, 12, 0), valor: 73, status: 'normal' },
+      { ...atDaysAgo(10, 21, 15), valor: 86, status: 'normal' },
+      { ...atDaysAgo(11, 11, 15), valor: 69, status: 'normal' },
+      { ...atDaysAgo(11, 19, 30), valor: 82, status: 'normal' },
+      { ...atDaysAgo(12, 10, 45), valor: 66, status: 'normal' },
+      { ...atDaysAgo(12, 18, 0), valor: 77, status: 'normal' },
+      { ...atDaysAgo(13, 9, 30), valor: 72, status: 'normal' },
+      { ...atDaysAgo(13, 20, 10), valor: 89, status: 'normal' },
+      { ...atDaysAgo(14, 8, 0), valor: 64, status: 'normal' },
+      { ...atDaysAgo(14, 17, 45), valor: 80, status: 'normal' }
     ],
     'Pressão Arterial': [
       { ...at(0, 55), valor: { sistolica: 122, diastolica: 81 }, status: 'normal' },
@@ -1142,6 +1300,7 @@ function injectDemoMedicoesUltimas24h(data) {
       }
       h.dataISO = h.data;
       h.dataHoraISO = toISODateTime(h.data, h.hora || '00:00');
+      h.demoUltimas24h = true;
       vital.historico.unshift(h);
     }
 

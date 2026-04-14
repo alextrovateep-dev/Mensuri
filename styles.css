@@ -32,6 +32,14 @@ body {
   --text-muted: #6b6b6b;
   --accent-primary: #4a4a4a;
   --wizard-accent: #4a4a4a;
+  /* Tom alinhado ao logo Teep Saúde (lavanda → azul muito claro) */
+  --header-brand-gradient: linear-gradient(
+    165deg,
+    #e0e4fa 0%,
+    #e6eaf9 35%,
+    #ecf0fc 70%,
+    #f0f3fe 100%
+  );
 }
 
 #root {
@@ -61,37 +69,98 @@ body {
   padding: 12px 12px 60px 12px;
 }
 
-/* Header — avatar + Olá, nome · página (mesma linha) + data */
+/* Header — coluna tipo perfil (avatar + nome); ações à direita */
 .header {
-  background: white;
-  padding: 10px 14px 12px;
-  border-bottom: 1px solid #e8e8e8;
+  position: relative;
+  isolation: isolate;
+  background: var(--header-brand-gradient);
+  padding: 12px 14px 14px;
+  border-bottom: 1px solid rgba(100, 110, 180, 0.22);
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 4px;
+  overflow: hidden;
+  min-height: 96px;
+}
+
+/* Logo a ocupar todo o retângulo do cabeçalho (topo inteiro) */
+.header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('logo.png') no-repeat center center;
+  background-size: cover;
+  opacity: 0.3;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Véu à esquerda para avatar/nome; centro-direita mais livre para o gráfico do logo */
+.header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    rgba(248, 249, 255, 0.82) 0%,
+    rgba(248, 249, 255, 0.35) 28%,
+    rgba(248, 249, 255, 0.1) 50%,
+    transparent 65%
+  );
+  pointer-events: none;
+  z-index: 1;
 }
 
 .header-top-row {
+  position: relative;
+  z-index: 2;
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   min-height: 44px;
 }
 
+.header-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .header-avatar {
-  width: 42px;
-  height: 42px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background: #f0f0f0;
-  border: 1px solid #e8e8e8;
+  background: #fafafa;
+  border: 2px solid #dbdbdb;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 26px;
   line-height: 1;
   flex-shrink: 0;
   overflow: hidden;
+}
+
+.header-user-name {
+  display: block;
+  max-width: 140px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-title);
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.95), 0 1px 1px rgba(255, 255, 255, 0.85);
 }
 
 .header-avatar.header-avatar--photo {
@@ -106,39 +175,11 @@ body {
   display: block;
 }
 
-.header-main-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.header-line-primary {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 8px;
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--text-title);
-  line-height: 1.25;
-}
-
-.header-greet {
-  color: var(--text-title);
-}
-
-.header-sep {
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.header-page {
-  color: var(--text-title);
-}
-
 .header-screen-actions {
   flex-shrink: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  padding-top: 2px;
   gap: 6px;
 }
 
@@ -152,20 +193,10 @@ body {
   justify-content: center;
 }
 
-.header-date-row {
-  padding-left: 52px;
-}
-
 .header-title {
   font-size: 24px;
   font-weight: 700;
   color: #333333;
-}
-
-.date {
-  font-size: 14px;
-  color: var(--text-muted);
-  font-weight: 500;
 }
 
 .page-context-sub {
@@ -779,6 +810,24 @@ body {
   font-size: 14px;
   color: #999999;
   margin-top: 2px;
+}
+
+.config-item-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.config-gear-btn--nav-row {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 /* Toggle */
@@ -1977,6 +2026,99 @@ body {
   vertical-align: 0.05em;
 }
 
+/* Batimento cardíaco: última medição + data à esquerda; min–max só no selo colorido */
+.vital-card--batimento {
+  padding: 4px 8px 4px 6px !important;
+  margin-bottom: 8px !important;
+}
+
+.vital-card--batimento.card-has-action {
+  padding-bottom: 22px !important;
+}
+
+.vital-card--batimento .card-action-plus {
+  bottom: 4px;
+  right: 6px;
+  font-size: 20px;
+}
+
+.vital-batimento-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vital-icon--batimento {
+  font-size: 20px;
+  line-height: 1;
+  align-self: flex-start;
+  margin-top: 1px;
+}
+
+.vital-batimento-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vital-batimento-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.vital-value-main--batimento {
+  font-size: 17px;
+  display: block;
+  line-height: 1.1;
+}
+
+.vital-meta-line--batimento {
+  margin-top: 1px;
+}
+
+.vital-meta-line--batimento .vital-datetime {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+/* Tom só no bloco min — max */
+.vital-batimento-mm {
+  font-size: 11px;
+  font-weight: 700;
+  color: #4a4a4a;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.2;
+  padding: 5px 8px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.vital-batimento-mm--empty {
+  padding: 5px 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.vital-batimento-mm.vital-batimento-tone--ok {
+  background: #cafcbb;
+}
+
+.vital-batimento-mm.vital-batimento-tone--warn {
+  background: #f8fcc0;
+}
+
+.vital-batimento-mm.vital-batimento-tone--alert {
+  background: #fcdedf;
+}
+
+.vital-batimento-mm.vital-batimento-tone--none {
+  background: #ececec;
+}
+
 .vital-separator {
   color: #CCCCCC;
   font-weight: 300;
@@ -2091,12 +2233,334 @@ body {
   font-weight: 500;
 }
 
-.vital-detail-trend-row {
-  margin-bottom: 12px;
+/* Modal histórico vital — menos padding, mais área útil no mobile */
+#vitalDetailModal .modal-content {
+  padding: 10px 8px 12px;
+  max-width: min(420px, calc(100vw - 10px));
+  width: calc(100vw - 10px);
 }
 
-.vital-detail-trend-row .vital-detail-tendencia-inner {
-  justify-content: center;
+#vitalDetailModal .modal-header {
+  margin-bottom: 8px;
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+#vitalDetailModal .vital-detail-modal-header {
+  align-items: flex-start;
+}
+
+#vitalDetailModal .vital-detail-modal-title {
+  flex: 1;
+  min-width: 0;
+  padding-right: 8px;
+}
+
+#vitalDetailModal .vital-detail-header-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Toque amplo (≥48px) — Voltar e OK com o mesmo aspeto (.modal-ok) */
+#vitalDetailModal .vital-detail-header-actions .modal-ok,
+#vitalDetailModal .vital-batimento-header-back {
+  min-height: 48px;
+  padding: 12px 18px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  border-radius: 24px;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  background: none;
+  border: 1.5px solid #b8b8b8;
+  color: var(--text-title);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+#vitalDetailModal .vital-detail-header-actions .modal-ok:hover,
+#vitalDetailModal .vital-batimento-header-back:hover {
+  background: #4a4a4a;
+  color: #fff;
+  border-color: #4a4a4a;
+}
+
+#vitalDetailModal #vitalDetailContent {
+  max-height: min(360px, 42vh) !important;
+}
+
+#vitalDetailModal > .modal-content > .form-group {
+  margin-bottom: 8px;
+}
+
+#vitalDetailModal .button.button-confirm {
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+/* Modal histórico — Batimento: período + barras diárias */
+.vital-batimento-chrome {
+  margin-bottom: 8px;
+}
+
+.vital-period-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.vital-period-chip {
+  border: 1px solid #e8e8e8;
+  background: #fafafa;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-body);
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1.15;
+}
+
+.vital-period-chip.is-active {
+  background: #4a4a4a;
+  color: #fff;
+  border-color: #4a4a4a;
+}
+
+.vital-period-summary {
+  font-size: 11px;
+  color: #6f6f6f;
+  margin: 0 0 4px;
+  line-height: 1.3;
+}
+
+.vital-period-summary--compact {
+  margin: 0 0 2px;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vital-chart-hint {
+  font-size: 10px;
+  color: #949494;
+  margin: 2px 0 6px;
+  line-height: 1.3;
+}
+
+/* Gráfico colado à largura do modal */
+.vital-batimento-canvas {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 0 0 4px;
+  border-radius: 4px;
+  vertical-align: top;
+}
+
+.vital-batimento-livre .vital-livre-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.vital-batimento-livre .vital-livre-inputs .form-input {
+  flex: 1;
+}
+
+/* Vista dia (drill-down): resumo + barra 38–220 + gráfico por hora */
+.vital-batimento-day-scope {
+  margin-bottom: 6px;
+}
+
+.vital-batimento-day-head {
+  margin-bottom: 8px;
+}
+
+.vital-batimento-day-date {
+  font-size: 12px;
+  color: #6f6f6f;
+  margin-bottom: 2px;
+}
+
+.vital-batimento-day-range-big {
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--text-body);
+  line-height: 1.15;
+}
+
+.vital-batimento-dist-wrap {
+  margin-bottom: 6px;
+}
+
+.vital-batimento-dist-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #8e8e8e;
+  margin-bottom: 2px;
+}
+
+.vital-batimento-dist-canvas {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  vertical-align: top;
+}
+
+.vital-batimento-last-reading {
+  font-size: 11px;
+  color: #5c5c5c;
+  margin: 4px 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vital-batimento-hourly-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #4a4a4a;
+  margin: 0 0 4px;
+}
+
+.vital-batimento-hourly-wrap {
+  position: relative;
+}
+
+.vital-batimento-hourly-canvas {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border-radius: 4px;
+  vertical-align: top;
+}
+
+.vital-batimento-hourly-tooltip {
+  position: absolute;
+  z-index: 5;
+  min-width: 140px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(40, 40, 40, 0.94);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.35;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.vital-batimento-hourly-tooltip strong {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.vital-batimento-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 6px;
+  font-size: 10px;
+  color: #6f6f6f;
+}
+
+.vital-batimento-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.vb-leg {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.vb-leg--ex {
+  background: linear-gradient(180deg, #8ce99a, #2f9e44);
+}
+
+.vb-leg--no {
+  background: linear-gradient(180deg, #ffd4a8, #fd7e14);
+}
+
+.vb-leg--sl {
+  background: linear-gradient(180deg, #91a7ff, #4263eb);
+}
+
+/* Lista período: linha inteira abre detalhe do dia (como a coluna do gráfico) */
+.vital-list-item--day-nav {
+  cursor: pointer;
+}
+
+.vital-list-item--day-nav:active {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.vital-list-item--sono {
+  cursor: pointer;
+}
+
+/* Modal detalhe sono (demo) */
+.modal-sono-detalhe .modal-content--sono-detalhe {
+  max-width: min(400px, calc(100vw - 16px));
+}
+
+.sono-detalhe-titulo {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.sono-detalhe-periodo {
+  font-size: 13px;
+  color: #5c5c5c;
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.sono-detalhe-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+
+.sono-metric-cell {
+  background: #f6f6f6;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.sono-metric-label {
+  display: block;
+  font-size: 10px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+
+.sono-metric-value {
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-body);
+}
+
+.vital-detail-default-chrome canvas#sparklineChart {
+  margin-bottom: 16px;
 }
 
 /* ===== COMPOSIÇÃO CORPORAL (mesma paleta/tipografia das outras telas) ===== */
@@ -4154,6 +4618,11 @@ body {
   line-height: 1.25;
 }
 
+.vital-list-date--time-only {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
 .vital-context-badge {
   display: inline-block;
   margin-top: 6px;
@@ -4165,14 +4634,39 @@ body {
 
 .vital-list-item--exercicio {
   cursor: pointer;
-  background: #f3f4f6;
   border-radius: 8px;
   margin-bottom: 6px;
   border-bottom: none;
 }
 
+.vital-list-item--exercicio:not(.vital-list-item--bc-exercicio) {
+  background: #f3f4f6;
+}
+
 .vital-list-item--exercicio:active {
   background: #e8eaed;
+}
+
+.vital-list-item--bc-exercicio {
+  background: #f1faed;
+}
+
+.vital-list-item--bc-repouso {
+  background: #f5ebff;
+}
+
+.vital-list-item--bc-alerta {
+  background: #fceeed;
+}
+
+.vital-list-item--day-nav.vital-list-item--bc-exercicio:active,
+.vital-list-item--day-nav.vital-list-item--bc-repouso:active,
+.vital-list-item--day-nav.vital-list-item--bc-alerta:active {
+  filter: brightness(0.97);
+}
+
+.vital-list-item--exercicio.vital-list-item--bc-exercicio:active {
+  background: #e4f2dc;
 }
 
 .vital-list-chevron {
@@ -4302,9 +4796,9 @@ body {
 }
 
 .exercise-chart-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 6px;
+  height: 14px;
+  border-radius: 2px;
   background: var(--text-muted);
   flex-shrink: 0;
 }
@@ -4397,6 +4891,17 @@ body {
 
 .vital-config-row:last-child {
   border-bottom: none;
+}
+
+.vital-config-row--todos {
+  border-bottom: 2px solid #e8e8e8;
+  padding-bottom: 14px;
+  margin-bottom: 6px;
+}
+
+.vital-config-name--todos {
+  font-weight: 800;
+  color: var(--text-title);
 }
 
 .vital-config-icon {

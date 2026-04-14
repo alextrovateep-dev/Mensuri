@@ -80,13 +80,45 @@ function createVitalCard(vital) {
     dataHoraFormatada = typeof formatISODateTimeBR === 'function' ? formatISODateTimeBR(vital.dataHora) : vital.dataHora;
   }
 
+  const tipoSafe = String(vital.tipo).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const tipoAttr = String(vital.tipo).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
+  if (vital.tipo === 'Batimento Cardíaco') {
+    const toneClass =
+      typeof getBatimentoCardTone === 'function' ? getBatimentoCardTone(vital) : 'vital-batimento-tone--none';
+    const mm =
+      typeof getBatimentoMinMaxForCard === 'function' ? getBatimentoMinMaxForCard(vital) : null;
+    const mmText =
+      mm && mm.minStr != null && mm.maxStr != null
+        ? `${mm.minStr} — ${mm.maxStr}${unit}`
+        : '';
+    const mmBlock = mmText
+      ? `<span class="vital-batimento-mm ${toneClass}">${mmText}</span>`
+      : `<span class="vital-batimento-mm vital-batimento-mm--empty vital-batimento-tone--none" aria-hidden="true">—</span>`;
+    return `
+    <div class="card card-saude vital-card vital-card--batimento card-has-action" role="article" aria-label="${tipoAttr}" style="cursor: pointer;" onclick="openVitalDetailModal('${tipoSafe}', ${vital.id})">
+      <div class="vital-batimento-row">
+        <span class="vital-icon vital-icon--batimento" aria-hidden="true">${vital.icon}</span>
+        <div class="vital-batimento-main">
+          <div class="vital-batimento-col">
+            <span class="vital-value-main vital-value-main--batimento">${valueHtml}</span>
+            <div class="vital-meta-line vital-meta-line--batimento">
+              <span class="vital-datetime">${dataHoraFormatada}</span>
+            </div>
+          </div>
+          ${mmBlock}
+        </div>
+      </div>
+      <span class="card-action-plus" aria-hidden="true">+</span>
+    </div>
+  `;
+  }
+
   const rangeLine =
     typeof formatVital24hRangeLine === 'function'
       ? formatVital24hRangeLine(vital)
       : '<div class="vital-24h-line"><span class="vital-24h-clock" aria-hidden="true">🕐</span><span class="vital-24h-empty">—</span></div>';
 
-  const tipoSafe = String(vital.tipo).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  const tipoAttr = String(vital.tipo).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
   const valueMainClass =
     vital.tipo === 'Pressão Arterial' ? 'vital-value-main vital-value-main--pressure' : 'vital-value-main';
   return `

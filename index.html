@@ -9,21 +9,14 @@
 <body>
     <div id="root">
         <div class="mobile-container">
-            <!-- Header: avatar + Olá, nome · página (mesma linha) + data -->
+            <!-- Header: avatar em cima + nome embaixo (estilo perfil); ações à direita -->
             <div class="header" id="header">
                 <div class="header-top-row">
-                    <div class="header-avatar" id="headerAvatar" role="img" aria-label="Avatar do usuário">👤</div>
-                    <div class="header-main-text">
-                        <div class="header-line-primary" id="headerLinePrimary">
-                            <span class="header-greet" id="headerUserGreet">Olá</span>
-                            <span class="header-sep" aria-hidden="true">·</span>
-                            <span class="header-page" id="headerPageTitle">🏠 Home</span>
-                        </div>
+                    <div class="header-profile">
+                        <div class="header-avatar" id="headerAvatar" role="img" aria-label="Avatar do usuário">👤</div>
+                        <span class="header-user-name" id="headerUserName">Nome</span>
                     </div>
                     <div class="header-screen-actions" id="headerScreenActions"></div>
-                </div>
-                <div class="header-date-row">
-                    <span class="date" id="date"></span>
                 </div>
             </div>
 
@@ -163,23 +156,83 @@
     <!-- Modal de Histórico de Sinal Vital com Filtros -->
     <div class="modal" id="vitalDetailModal">
         <div class="modal-content">
-            <div class="modal-header">
-                <span id="vitalDetailTitle">Histórico de Sinal Vital</span>
-                <button class="modal-ok" id="closeVitalDetailModal">OK</button>
-            </div>
-            <div id="vitalDetailTrendRow" class="vital-detail-trend-row" style="display: none;"></div>
-            <canvas id="sparklineChart" width="720" height="220" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 16px;"></canvas>
-            <div class="form-group">
-                <label class="form-label">Filtrar por Data</label>
-                <div style="display: flex; gap: 8px;">
-                    <input type="date" class="form-input" id="filterVitalDataInicio" style="flex: 1;" onchange="filterVitalDetail()">
-                    <input type="date" class="form-input" id="filterVitalDataFim" style="flex: 1;" onchange="filterVitalDetail()">
+            <div class="modal-header vital-detail-modal-header">
+                <span id="vitalDetailTitle" class="vital-detail-modal-title">Histórico de Sinal Vital</span>
+                <div class="vital-detail-header-actions">
+                    <button
+                        type="button"
+                        class="vital-batimento-header-back"
+                        id="vitalBatimentoHeaderBackBtn"
+                        hidden
+                        onclick="clearVitalBatimentoDaySelection()"
+                        aria-label="Voltar ao período"
+                    >Voltar</button>
+                    <button type="button" class="modal-ok" id="closeVitalDetailModal">OK</button>
                 </div>
             </div>
-            <div class="form-group">
+
+            <!-- Batimento cardíaco: vista período (barras por dia) OU vista dia (padrão wearable: min–máx por hora) -->
+            <div id="vitalDetailBatimentoChrome" class="vital-batimento-chrome" style="display: none;">
+                <div id="vitalBatimentoPeriodScope">
+                    <div class="vital-period-chips" role="tablist" aria-label="Período do gráfico">
+                        <button type="button" class="vital-period-chip" data-period="7d" onclick="setVitalBatimentoPeriod('7d')">7 dias</button>
+                        <button type="button" class="vital-period-chip" data-period="15d" onclick="setVitalBatimentoPeriod('15d')">15 dias</button>
+                        <button type="button" class="vital-period-chip" data-period="30d" onclick="setVitalBatimentoPeriod('30d')">30 dias</button>
+                        <button type="button" class="vital-period-chip" data-period="year" onclick="setVitalBatimentoPeriod('year')">Ano</button>
+                        <button type="button" class="vital-period-chip" data-period="livre" onclick="setVitalBatimentoPeriod('livre')">Livre</button>
+                    </div>
+                    <p id="vitalDetailPeriodSummary" class="vital-period-summary vital-period-summary--compact" aria-live="polite"></p>
+                    <canvas id="vitalBatimentoDailyCanvas" class="vital-batimento-canvas" width="720" height="200" role="img" aria-label="Gráfico: uma barra por dia com mínimo e máximo desse dia. Toque numa coluna para ver o detalhe do dia."></canvas>
+                    <p id="vitalBatimentoChartHint" class="vital-chart-hint" style="display: none;" aria-live="polite"></p>
+                    <div id="vitalBatimentoLivreRow" class="form-group vital-batimento-livre" style="display: none;">
+                        <label class="form-label">Período livre</label>
+                        <div class="vital-livre-inputs">
+                            <input type="date" class="form-input" id="filterBatimentoLivreInicio" onchange="onBatimentoLivreRangeChange()">
+                            <input type="date" class="form-input" id="filterBatimentoLivreFim" onchange="onBatimentoLivreRangeChange()">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="vitalBatimentoDayScope" class="vital-batimento-day-scope" style="display: none;">
+                    <div class="vital-batimento-day-head">
+                        <div id="vitalBatimentoDayDate" class="vital-batimento-day-date"></div>
+                        <div id="vitalBatimentoDayRangeBig" class="vital-batimento-day-range-big"></div>
+                    </div>
+                    <div class="vital-batimento-dist-wrap" aria-hidden="true">
+                        <div class="vital-batimento-dist-labels"><span>38</span><span>220</span></div>
+                        <canvas id="vitalBatimentoDistCanvas" class="vital-batimento-dist-canvas" height="48"></canvas>
+                    </div>
+                    <p id="vitalBatimentoLastReading" class="vital-batimento-last-reading" style="display: none;"></p>
+                    <p class="vital-batimento-hourly-title">Frequência cardíaca mín./máx. por hora</p>
+                    <div class="vital-batimento-hourly-wrap">
+                        <canvas id="vitalBatimentoHourlyCanvas" class="vital-batimento-hourly-canvas" width="720" height="228" role="img" aria-label="Gráfico por hora: cada barra é o intervalo mínimo–máximo nessa hora."></canvas>
+                        <div id="vitalBatimentoHourlyTooltip" class="vital-batimento-hourly-tooltip" style="display: none;" role="tooltip"></div>
+                    </div>
+                    <div class="vital-batimento-legend">
+                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--ex"></span> Exercício</span>
+                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--no"></span> Normal</span>
+                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--sl"></span> Sono</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Demais sinais: sparkline + filtro por data -->
+            <div id="vitalDetailDefaultChrome" class="vital-detail-default-chrome">
+                <canvas id="sparklineChart" width="720" height="220" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 16px;"></canvas>
+                <div class="form-group">
+                    <label class="form-label">Filtrar por Data</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="date" class="form-input" id="filterVitalDataInicio" style="flex: 1;" onchange="filterVitalDetail()">
+                        <input type="date" class="form-input" id="filterVitalDataFim" style="flex: 1;" onchange="filterVitalDetail()">
+                    </div>
+                </div>
+            </div>
+
+            <div id="vitalDetailContent" class="vital-detail-content" style="max-height: 400px; overflow-y: auto;"></div>
+
+            <div class="form-group vital-detail-add-row">
                 <button class="button button-confirm" id="addVitalMedicaoBtn" style="width: 100%;">+ Adicionar Medição</button>
             </div>
-            <div id="vitalDetailContent" style="max-height: 400px; overflow-y: auto;"></div>
         </div>
     </div>
 
@@ -197,10 +250,22 @@
                 <div class="exercise-metrics-grid" id="exercicioDetalheMetricas"></div>
             </div>
             <div class="card exercise-detail-chart-card">
-                <div class="exercise-chart-legend"><span class="exercise-chart-dot" aria-hidden="true"></span> Frequência cardíaca</div>
-                <canvas id="exercicioHrCanvas" width="720" height="220"></canvas>
+                <div class="exercise-chart-legend"><span class="exercise-chart-dot" aria-hidden="true"></span> Frequência cardíaca (cada barra = 2 min)</div>
+                <canvas id="exercicioHrCanvas" width="720" height="220" role="img" aria-label="Gráfico de barras: frequência cardíaca média a cada 2 minutos ao longo do exercício"></canvas>
                 <div class="exercise-chart-axis" id="exercicioDetalheAxis"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- Detalhe da sessão de sono (demo — guia para integração futura) -->
+    <div class="modal modal-sono-detalhe" id="sonoDetalheModal">
+        <div class="modal-content modal-content--sono-detalhe">
+            <div class="modal-header">
+                <h2 class="sono-detalhe-titulo" id="sonoDetalheTitulo">Sono</h2>
+                <button type="button" class="modal-ok" id="sonoDetalheOkBtn">OK</button>
+            </div>
+            <p class="sono-detalhe-periodo" id="sonoDetalhePeriodo"></p>
+            <div class="sono-detalhe-grid" id="sonoDetalheMetricas"></div>
         </div>
     </div>
 
@@ -943,7 +1008,7 @@
                 <span>⚙️ Personalizar Sinais Vitais</span>
                 <button class="modal-ok" id="closeVitaisConfigModal">OK</button>
             </div>
-            <p style="font-size: 13px; color: #999; margin-bottom: 16px;">Escolha o que aparece em cada tela.</p>
+            <p style="font-size: 13px; color: #999; margin-bottom: 16px;">Escolha o que aparece em cada tela. Em <strong>Todos</strong> pode desligar ou ligar todos de uma vez e depois ajustar só o que precisa.</p>
             <div id="vitaisConfigContent"></div>
         </div>
     </div>
