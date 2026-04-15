@@ -5267,9 +5267,24 @@ function renderSparklineChart(historico) {
   });
 }
 
-/** Uma linha da lista do modal de Batimento (hora do dia ou data agregada — sem coluna de status). */
+/**
+ * Uma linha da lista do modal de Batimento (hora do dia ou data agregada — sem coluna de status).
+ * `hourDetail`: vista dia hora a hora — formato “61 a 89 bpm” em cima, intervalo em baixo (como lista de registos).
+ */
 function htmlVitalBatimentoListRow(opts) {
-  const { rowClass, clickAttr = '', primaryLine, badgeHtml = '', valueHtml } = opts;
+  const { rowClass, clickAttr = '', primaryLine, badgeHtml = '', valueHtml, hourDetail } = opts;
+  if (hourDetail) {
+    const trail = hourDetail.trailHtml || '';
+    return `
+      <div class="${rowClass}"${clickAttr}>
+        <div class="vital-list-main vital-list-main--hour-detail">
+          <div class="vital-list-measure-line">${hourDetail.measureLine}</div>
+          <div class="vital-list-time-line">${hourDetail.timeLine}</div>
+          ${badgeHtml}
+        </div>
+        <div class="vital-list-trail">${trail}</div>
+      </div>`;
+  }
   return `
       <div class="${rowClass}"${clickAttr}>
         <div class="vital-list-main">
@@ -5305,36 +5320,41 @@ function renderVitalDetailContent(historico) {
       const htmlDay = buckets
         .map((bucket) => {
           const h = bucket.hour;
-          const labelHora = `${String(h).padStart(2, '0')}:00 – ${String(h).padStart(2, '0')}:59`;
+          const labelHora = `${String(h).padStart(2, '0')}:00 - ${String(h).padStart(2, '0')}:59`;
           const hasRange =
             bucket.min != null &&
             bucket.max != null &&
             Number.isFinite(bucket.min) &&
             Number.isFinite(bucket.max);
-          const valStr = hasRange ? `${Math.round(bucket.min)}–${Math.round(bucket.max)}` : '—';
+          const measureLine = hasRange
+            ? `${Math.round(bucket.min)} a ${Math.round(bucket.max)} bpm`
+            : '—';
           const badgeHtml = batimentoBucketContextBadgeHtml(bucket);
           const bg = hasRange ? batimentoHourlyBucketRowBgClass(bucket) : '';
           let rowClass = 'vital-list-item vital-list-item--hour-bucket';
           if (bg) rowClass += ` ${bg}`;
           let clickAttr = '';
-          let chev = '';
+          let trailHtml = '';
           const ex = bucket.readings && bucket.readings.find((r) => r.contextoColeta === 'exercicio' && r.exercicioSessao);
           const sn = bucket.readings && bucket.readings.find((r) => r.contextoColeta === 'sono' && r.sonoSessao);
           if (ex) {
             rowClass += ' vital-list-item--exercicio';
             clickAttr = ` role="button" tabindex="0" onclick="openExercicioDetalheFromBatimentoHour(${h})"`;
-            chev = ' <span class="vital-list-chevron" aria-hidden="true">›</span>';
+            trailHtml = '<span class="vital-list-chevron" aria-hidden="true">›</span>';
           } else if (sn) {
             rowClass += ' vital-list-item--sono';
             clickAttr = ` role="button" tabindex="0" onclick="openSonoDetalheFromBatimentoHour(${h})"`;
-            chev = ' <span class="vital-list-chevron" aria-hidden="true">›</span>';
+            trailHtml = '<span class="vital-list-chevron" aria-hidden="true">›</span>';
           }
           return htmlVitalBatimentoListRow({
             rowClass,
             clickAttr,
-            primaryLine: labelHora,
             badgeHtml,
-            valueHtml: `${valStr}${chev}`
+            hourDetail: {
+              measureLine,
+              timeLine: labelHora,
+              trailHtml
+            }
           });
         })
         .join('');
