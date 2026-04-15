@@ -183,6 +183,11 @@
                     </div>
                     <p id="vitalDetailPeriodSummary" class="vital-period-summary vital-period-summary--compact" aria-live="polite"></p>
                     <canvas id="vitalBatimentoDailyCanvas" class="vital-batimento-canvas" width="720" height="200" role="img" aria-label="Gráfico: uma barra por dia com mínimo e máximo desse dia. Toque numa coluna para ver o detalhe do dia."></canvas>
+                    <div class="vital-batimento-legend vital-batimento-legend--period" aria-label="Legenda: Baixo, Normal e Alto segundo o valor ideal em Meus Indicadores (ou 60 a 100 bpm se não estiver definido)">
+                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--bc-below"></span> Baixo</span>
+                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--bc-ideal"></span> Normal</span>
+                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--bc-above"></span> Alto</span>
+                    </div>
                     <p id="vitalBatimentoChartHint" class="vital-chart-hint" style="display: none;" aria-live="polite"></p>
                     <div id="vitalBatimentoLivreRow" class="form-group vital-batimento-livre" style="display: none;">
                         <label class="form-label">Período livre</label>
@@ -199,19 +204,21 @@
                         <div id="vitalBatimentoDayRangeBig" class="vital-batimento-day-range-big"></div>
                     </div>
                     <div class="vital-batimento-dist-wrap" aria-hidden="true">
-                        <div class="vital-batimento-dist-labels"><span>38</span><span>220</span></div>
+                        <div class="vital-batimento-dist-labels"><span id="vitalBatimentoDistLabelLo">60</span><span id="vitalBatimentoDistLabelHi">100</span></div>
                         <canvas id="vitalBatimentoDistCanvas" class="vital-batimento-dist-canvas" height="48"></canvas>
                     </div>
                     <p id="vitalBatimentoLastReading" class="vital-batimento-last-reading" style="display: none;"></p>
                     <p class="vital-batimento-hourly-title">Frequência cardíaca mín./máx. por hora</p>
+                    <p class="vital-batimento-hourly-sub">Faixa verde: valor ideal (referência). Roxo sono · verde exercício · amarelo repouso · laranja demais medições.</p>
                     <div class="vital-batimento-hourly-wrap">
-                        <canvas id="vitalBatimentoHourlyCanvas" class="vital-batimento-hourly-canvas" width="720" height="228" role="img" aria-label="Gráfico por hora: cada barra é o intervalo mínimo–máximo nessa hora."></canvas>
+                        <canvas id="vitalBatimentoHourlyCanvas" class="vital-batimento-hourly-canvas" width="720" height="228" role="img" aria-label="Gráfico por hora: cor da barra conforme sono, exercício, repouso ou outro contexto; faixa tracejada é o ideal."></canvas>
                         <div id="vitalBatimentoHourlyTooltip" class="vital-batimento-hourly-tooltip" style="display: none;" role="tooltip"></div>
                     </div>
-                    <div class="vital-batimento-legend">
-                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--ex"></span> Exercício</span>
-                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--no"></span> Normal</span>
-                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--sl"></span> Sono</span>
+                    <div class="vital-batimento-legend vital-batimento-legend--day-detail" aria-label="Situação da medição na hora">
+                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--ctx-sono"></span> Sono</span>
+                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--ctx-exercicio"></span> Exercício</span>
+                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--ctx-repouso"></span> Repouso</span>
+                        <span class="vital-batimento-legend-item"><span class="vb-leg vb-leg--ctx-outros"></span> Demais</span>
                     </div>
                 </div>
             </div>

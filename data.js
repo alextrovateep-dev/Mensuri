@@ -1115,6 +1115,63 @@ function stripDemoMedicoesUltimas24h(data) {
   });
 }
 
+/**
+ * Duas leituras numéricas por hora (faixa mín./máx. por hora no gráfico e na lista).
+ * Curva tipo pulseira: noite mais baixa, dia mais alta, variação suave.
+ */
+function gerarBatimentoDemoPorHora(nowRef, daysBack = 16) {
+  const out = [];
+  const pad2 = (n) => String(n).padStart(2, '0');
+  for (let d = 0; d < daysBack; d += 1) {
+    const day = new Date(nowRef.getFullYear(), nowRef.getMonth(), nowRef.getDate() - d);
+    const dataStr = `${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}`;
+    for (let hour = 0; hour < 24; hour += 1) {
+      const wave = Math.sin(((hour + d * 0.4) / 24) * Math.PI * 2) * 6;
+      let lo = 70;
+      let hi = 82;
+      if (hour >= 0 && hour < 7) {
+        lo = 52;
+        hi = 66;
+      } else if (hour >= 7 && hour < 10) {
+        lo = 64;
+        hi = 84;
+      } else if (hour >= 10 && hour < 18) {
+        lo = 72;
+        hi = 94;
+      } else if (hour >= 18 && hour < 22) {
+        lo = 68;
+        hi = 88;
+      } else {
+        lo = 58;
+        hi = 78;
+      }
+      lo = Math.round(lo + wave * 0.35);
+      hi = Math.round(hi + wave * 0.35);
+      if (hi <= lo + 2) hi = lo + 4;
+      const j = (hour * 17 + d * 11) % 7;
+      const v1 = lo + (j % Math.max(1, hi - lo - 1));
+      const v2 = Math.min(hi, Math.max(v1 + 2, lo + ((j + 3) % Math.max(1, hi - lo))));
+      out.push({
+        data: dataStr,
+        hora: `${pad2(hour)}:06`,
+        valor: v1,
+        status: 'normal',
+        demoUltimas24h: true,
+        demoPorHora: true
+      });
+      out.push({
+        data: dataStr,
+        hora: `${pad2(hour)}:48`,
+        valor: v2,
+        status: 'normal',
+        demoUltimas24h: true,
+        demoPorHora: true
+      });
+    }
+  }
+  return out;
+}
+
 /** Medições fictícias nas últimas 24 h para demonstrar Máx./Mín. nos cards (dados sempre atuais). */
 function injectDemoMedicoesUltimas24h(data) {
   const pad2 = (n) => String(n).padStart(2, '0');
@@ -1218,7 +1275,8 @@ function injectDemoMedicoesUltimas24h(data) {
       { ...atDaysAgo(13, 9, 30), valor: 72, status: 'normal' },
       { ...atDaysAgo(13, 20, 10), valor: 89, status: 'normal' },
       { ...atDaysAgo(14, 8, 0), valor: 64, status: 'normal' },
-      { ...atDaysAgo(14, 17, 45), valor: 80, status: 'normal' }
+      { ...atDaysAgo(14, 17, 45), valor: 80, status: 'normal' },
+      ...gerarBatimentoDemoPorHora(now)
     ],
     'Pressão Arterial': [
       { ...at(0, 55), valor: { sistolica: 122, diastolica: 81 }, status: 'normal' },

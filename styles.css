@@ -2026,97 +2026,118 @@ body {
   vertical-align: 0.05em;
 }
 
-/* Batimento cardíaco: última medição + data à esquerda; min–max só no selo colorido */
+/* Batimento cardíaco: título + selo min–máx; valor grande + unidade (sem data) */
 .vital-card--batimento {
-  padding: 4px 8px 4px 6px !important;
+  padding: 12px 14px 12px 12px !important;
   margin-bottom: 8px !important;
 }
 
 .vital-card--batimento.card-has-action {
-  padding-bottom: 22px !important;
+  padding-bottom: 28px !important;
 }
 
 .vital-card--batimento .card-action-plus {
-  bottom: 4px;
-  right: 6px;
+  bottom: 6px;
+  right: 8px;
   font-size: 20px;
 }
 
-.vital-batimento-row {
+.vital-batimento-stack {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.vital-icon--batimento {
-  font-size: 20px;
-  line-height: 1;
-  align-self: flex-start;
-  margin-top: 1px;
-}
-
-.vital-batimento-main {
-  flex: 1;
-  min-width: 0;
+.vital-batimento-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 
-.vital-batimento-col {
-  flex: 1;
+.vital-batimento-top-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
-.vital-value-main--batimento {
-  font-size: 17px;
+.vital-icon--batimento {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #e53935;
+  line-height: 0;
+}
+
+.vital-batimento-heart {
+  width: 22px;
+  height: 22px;
   display: block;
-  line-height: 1.1;
 }
 
-.vital-meta-line--batimento {
-  margin-top: 1px;
+.vital-batimento-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+  letter-spacing: -0.01em;
 }
 
-.vital-meta-line--batimento .vital-datetime {
-  font-size: 11px;
-  line-height: 1.2;
+.vital-batimento-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  line-height: 1;
 }
 
-/* Tom só no bloco min — max */
-.vital-batimento-mm {
-  font-size: 11px;
+.vital-batimento-num {
+  font-size: 34px;
   font-weight: 700;
-  color: #4a4a4a;
+  color: #111827;
+  letter-spacing: -0.03em;
+}
+
+.vital-batimento-unit {
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+/* Selo tipo pílula: min–máx bpm */
+.vital-batimento-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
   white-space: nowrap;
   flex-shrink: 0;
   line-height: 1.2;
-  padding: 5px 8px;
-  border-radius: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
   transition: background 0.15s ease;
 }
 
-.vital-batimento-mm--empty {
-  padding: 5px 10px;
+.vital-batimento-badge--empty {
+  padding: 6px 12px;
   color: var(--text-muted);
   font-weight: 600;
 }
 
-.vital-batimento-mm.vital-batimento-tone--ok {
-  background: #cafcbb;
+.vital-batimento-badge.vital-batimento-tone--ok {
+  background: #22c55e;
 }
 
-.vital-batimento-mm.vital-batimento-tone--warn {
-  background: #f8fcc0;
+.vital-batimento-badge.vital-batimento-tone--warn {
+  background: #ca8a04;
 }
 
-.vital-batimento-mm.vital-batimento-tone--alert {
-  background: #fcdedf;
+.vital-batimento-badge.vital-batimento-tone--alert {
+  background: #dc2626;
 }
 
-.vital-batimento-mm.vital-batimento-tone--none {
-  background: #ececec;
+.vital-batimento-badge.vital-batimento-tone--none {
+  background: #e5e7eb;
+  color: #6b7280;
 }
 
 .vital-separator {
@@ -2376,7 +2397,7 @@ body {
   flex: 1;
 }
 
-/* Vista dia (drill-down): resumo + barra 38–220 + gráfico por hora */
+/* Vista dia (drill-down): resumo + barra na faixa do indicador + gráfico por hora */
 .vital-batimento-day-scope {
   margin-bottom: 6px;
 }
@@ -2433,6 +2454,13 @@ body {
   margin: 0 0 4px;
 }
 
+.vital-batimento-hourly-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+  line-height: 1.35;
+}
+
 .vital-batimento-hourly-wrap {
   position: relative;
 }
@@ -2475,6 +2503,11 @@ body {
   color: #6f6f6f;
 }
 
+.vital-batimento-legend--period {
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+
 .vital-batimento-legend-item {
   display: inline-flex;
   align-items: center;
@@ -2488,16 +2521,32 @@ body {
   display: inline-block;
 }
 
-.vb-leg--ex {
-  background: linear-gradient(180deg, #8ce99a, #2f9e44);
+.vb-leg--bc-below {
+  background: linear-gradient(180deg, #fdba74, #9a3412);
 }
 
-.vb-leg--no {
-  background: linear-gradient(180deg, #ffd4a8, #fd7e14);
+.vb-leg--bc-ideal {
+  background: linear-gradient(180deg, #ffedd5, #fb923c);
 }
 
-.vb-leg--sl {
-  background: linear-gradient(180deg, #91a7ff, #4263eb);
+.vb-leg--bc-above {
+  background: linear-gradient(180deg, #ffc9c9, #c92a2a);
+}
+
+.vb-leg--ctx-sono {
+  background: linear-gradient(180deg, #f3e8ff, #6b21a8);
+}
+
+.vb-leg--ctx-exercicio {
+  background: linear-gradient(180deg, #d1fae5, #047857);
+}
+
+.vb-leg--ctx-repouso {
+  background: linear-gradient(180deg, #fefce8, #ca8a04);
+}
+
+.vb-leg--ctx-outros {
+  background: linear-gradient(180deg, #ffedd5, #c2410c);
 }
 
 /* Lista período: linha inteira abre detalhe do dia (como a coluna do gráfico) */
@@ -4648,25 +4697,68 @@ body {
 }
 
 .vital-list-item--bc-exercicio {
-  background: #f1faed;
+  background: #d1fae5;
 }
 
 .vital-list-item--bc-repouso {
-  background: #f5ebff;
+  background: #fefce8;
 }
 
-.vital-list-item--bc-alerta {
-  background: #fceeed;
+.vital-list-item--bc-sono {
+  background: #f3e8ff;
+}
+
+.vital-list-item--bc-outros {
+  background: #fff4e6;
+}
+
+/* Lista período (uma linha por dia): pico Baixo / Normal / Alto vs faixa ideal — alinhado ao gráfico */
+.vital-list-item--bc-chart-baixo {
+  background: #fff4e6;
+}
+
+.vital-list-item--bc-chart-normal {
+  background: #fffbf5;
+}
+
+.vital-list-item--bc-chart-alto {
+  background: #fff0f0;
+}
+
+.vital-list-item--hour-bucket.vital-list-item--bc-sono:active {
+  background: #e9d5ff;
+}
+
+.vital-list-item--hour-bucket.vital-list-item--bc-repouso:active {
+  background: #fef08a;
+}
+
+.vital-list-item--hour-bucket.vital-list-item--bc-exercicio:active {
+  background: #bbf7d0;
+}
+
+.vital-list-item--hour-bucket.vital-list-item--bc-outros:active {
+  background: #fed7aa;
+}
+
+.vital-list-item--hour-bucket.vital-list-item--bc-chart-baixo:active,
+.vital-list-item--hour-bucket.vital-list-item--bc-chart-normal:active,
+.vital-list-item--hour-bucket.vital-list-item--bc-chart-alto:active {
+  filter: brightness(0.97);
 }
 
 .vital-list-item--day-nav.vital-list-item--bc-exercicio:active,
 .vital-list-item--day-nav.vital-list-item--bc-repouso:active,
-.vital-list-item--day-nav.vital-list-item--bc-alerta:active {
+.vital-list-item--day-nav.vital-list-item--bc-sono:active,
+.vital-list-item--day-nav.vital-list-item--bc-outros:active,
+.vital-list-item--day-nav.vital-list-item--bc-chart-baixo:active,
+.vital-list-item--day-nav.vital-list-item--bc-chart-normal:active,
+.vital-list-item--day-nav.vital-list-item--bc-chart-alto:active {
   filter: brightness(0.97);
 }
 
 .vital-list-item--exercicio.vital-list-item--bc-exercicio:active {
-  background: #e4f2dc;
+  background: #bbf7d0;
 }
 
 .vital-list-chevron {
