@@ -100,7 +100,7 @@ function createVitalCard(vital) {
     const numHtml = Number.isNaN(n) ? '—' : String(Math.round(n));
     const heartSvg = `<svg class="vital-batimento-heart" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z"/></svg>`;
     return `
-    <div class="card card-saude vital-card vital-card--batimento card-has-action" role="article" aria-label="${tipoAttr}" style="cursor: pointer;" onclick="openVitalDetailModal('${tipoSafe}', ${vital.id})">
+    <div class="card card-saude vital-card vital-card--batimento" role="article" aria-label="${tipoAttr}" style="cursor: pointer;" onclick="openVitalDetailModal('${tipoSafe}', ${vital.id})">
       <div class="vital-batimento-stack">
         <div class="vital-batimento-top">
           <div class="vital-batimento-top-left">
@@ -113,7 +113,6 @@ function createVitalCard(vital) {
           <span class="vital-batimento-num">${numHtml}</span><span class="vital-batimento-unit">bpm</span>
         </div>
       </div>
-      <span class="card-action-plus" aria-hidden="true">+</span>
     </div>
   `;
   }

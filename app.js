@@ -1839,6 +1839,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const bminModal = document.getElementById('batimentoMinutoModal');
+  const bminCloseBtn = document.getElementById('closeBatimentoMinutoModal');
+  if (bminCloseBtn) bminCloseBtn.addEventListener('click', closeBatimentoMinutoModal);
+  if (bminModal) bminModal.addEventListener('click', (e) => { if (e.target === bminModal) closeBatimentoMinutoModal(); });
+  window.addEventListener('resize', () => {
+    if (bminModal && bminModal.classList.contains('active')) {
+      const readings = Array.from(document.querySelectorAll('#batimentoMinutoLista .bmin-row')).map((_, i) => i);
+      // re-render via stored readings
+      const canvas = document.getElementById('batimentoMinutoCanvas');
+      if (canvas && canvas._readings) renderBatimentoMinutoCanvas(canvas._readings);
+    }
+  });
+
   setupAgendaModal();
   setupComposicaoModal();
 
@@ -3727,9 +3740,26 @@ function openSonoDetalheModal(sessao) {
   const cell = (label, val) =>
     `<div class="sono-metric-cell"><span class="sono-metric-label">${label}</span><span class="sono-metric-value">${val}</span></div>`;
 
+  // FC mín/máx durante o sono: busca leituras do dia com contextoColeta === 'sono'
+  let fcSonoMin = null;
+  let fcSonoMax = null;
+  if (currentVitalDetail && Array.isArray(currentVitalDetail.historico) && sessao.inicioISO) {
+    const dayIsoSono = sessao.inicioISO.slice(0, 10);
+    const sonoLeituras = currentVitalDetail.historico.filter(
+      (h) => historicoEntryDayISO(h) === dayIsoSono && h.contextoColeta === 'sono'
+    );
+    const sonoVals = sonoLeituras.map(parseBatimentoHistoricoValor).filter(Number.isFinite);
+    if (sonoVals.length > 0) {
+      fcSonoMin = Math.round(Math.min(...sonoVals));
+      fcSonoMax = Math.round(Math.max(...sonoVals));
+    }
+  }
+  const fcSonoLabel = fcSonoMin != null ? `${fcSonoMin} – ${fcSonoMax} bpm` : '—';
+
   grid.innerHTML = [
     cell('Duração registada', durLabel),
     cell('Pontuação', sessao.score != null ? String(sessao.score) : '—'),
+    cell('FC mín – máx', fcSonoLabel),
     cell('Leve', sessao.leveMin != null ? `${sessao.leveMin} min` : '—'),
     cell('REM', sessao.remMin != null ? `${sessao.remMin} min` : '—'),
     cell('Profundo', sessao.profundoMin != null ? `${sessao.profundoMin} min` : '—'),
@@ -3742,6 +3772,157 @@ function openSonoDetalheModal(sessao) {
 function closeSonoDetalheModal() {
   const m = document.getElementById('sonoDetalheModal');
   if (m) m.classList.remove('active');
+}
+
+// ===== MODAL DETALHE POR MINUTO (Batimento Cardíaco) =====
+
+function openBatimentoMinutoDetalhe(hour, contexto) {
+  if (!currentVitalDetail || !vitalBatimentoChartSelection || vitalBatimentoChartSelection.kind !== 'day') return;
+  const dayIso = vitalBatimentoChartSelection.iso;
+  const buckets = aggregateHeartRateByHourForDay(currentVitalDetail.historico, dayIso);
+  const bucket = buckets[hour];
+  if (!bucket) return;
+
+  const labelHora = String(hour).padStart(2, '0') + ':00 – ' + String(hour).padStart(2, '0') + ':59';
+  const modal = document.getElementById('batimentoMinutoModal');
+  if (!modal) return;
+
+  document.getElementById('batimentoMinutoTitulo').textContent = 'Detalhado por minuto';
+  document.getElementById('batimentoMinutoSubtitulo').textContent = formatDateForUI(dayIso) + ' · ' + labelHora;
+
+  // Estatísticas da hora
+  const hasRange = bucket.min != null && bucket.max != null;
+  document.getElementById('batimentoMinutoRange').textContent = hasRange
+    ? Math.round(bucket.min) + ' – ' + Math.round(bucket.max) + ' bpm'
+    : '—';
+
+  // Badge de contexto
+  const ctxMap = { exercicio: 'Exercício', sono: 'Sono', repouso: 'Repouso' };
+  const ctxEl = document.getElementById('batimentoMinutoContexto');
+  if (contexto && ctxMap[contexto]) {
+    ctxEl.textContent = ctxMap[contexto];
+    ctxEl.style.display = 'inline-block';
+  } else {
+    ctxEl.style.display = 'none';
+  }
+
+  // Lista de leituras individuais da hora
+  const readings = (bucket.readings || []).slice().sort((a, b) => {
+    const ta = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(a) : 0;
+    const tb = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(b) : 0;
+    return ta - tb;
+  });
+
+  const listaEl = document.getElementById('batimentoMinutoLista');
+  if (readings.length === 0) {
+    listaEl.innerHTML = '<div class="empty-state"><div class="empty-text">Nenhuma leitura nesta hora</div></div>';
+  } else {
+    listaEl.innerHTML = readings.map((r) => {
+      const v = parseBatimentoHistoricoValor(r);
+      const hora = r.hora ? String(r.hora).slice(0, 5) : '—';
+      const band = getBatimentoChartIdealBand();
+      let nivel = '';
+      if (Number.isFinite(v)) {
+        if (v < band.min) nivel = '<span class="bmin-nivel bmin-nivel--baixo">Baixo</span>';
+        else if (v > band.max) nivel = '<span class="bmin-nivel bmin-nivel--alto">Alto</span>';
+        else nivel = '<span class="bmin-nivel bmin-nivel--normal">Normal</span>';
+      }
+      const ctx = r.contextoColeta ? '<span class="vital-context-badge">' + (ctxMap[r.contextoColeta] || r.contextoColeta) + '</span>' : '';
+      return '<div class="bmin-row">' +
+        '<div class="bmin-row-left"><span class="bmin-hora">' + hora + '</span>' + ctx + '</div>' +
+        '<div class="bmin-row-right"><span class="bmin-valor">' + (Number.isFinite(v) ? Math.round(v) : '—') + '</span><span class="bmin-unit"> bpm</span>' + nivel + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  // Gráfico de barras por leitura
+  renderBatimentoMinutoCanvas(readings);
+
+  // Sub-modal exercício/sono se aplicável
+  const ex = bucket.readings && bucket.readings.find((r) => r.contextoColeta === 'exercicio' && r.exercicioSessao);
+  const sn = bucket.readings && bucket.readings.find((r) => r.contextoColeta === 'sono' && r.sonoSessao);
+  const subBtn = document.getElementById('batimentoMinutoSubBtn');
+  if (ex) {
+    subBtn.style.display = 'block';
+    subBtn.textContent = 'Ver detalhe do exercício';
+    subBtn.onclick = () => { closeBatimentoMinutoModal(); openExercicioDetalheModal(ex.exercicioSessao); };
+  } else if (sn) {
+    subBtn.style.display = 'block';
+    subBtn.textContent = 'Ver detalhe do sono';
+    subBtn.onclick = () => { closeBatimentoMinutoModal(); openSonoDetalheModal(sn.sonoSessao); };
+  } else {
+    subBtn.style.display = 'none';
+  }
+
+  modal.classList.add('active');
+  requestAnimationFrame(() => renderBatimentoMinutoCanvas(readings));
+}
+
+function closeBatimentoMinutoModal() {
+  const m = document.getElementById('batimentoMinutoModal');
+  if (m) m.classList.remove('active');
+}
+
+function renderBatimentoMinutoCanvas(readings) {
+  const canvas = document.getElementById('batimentoMinutoCanvas');
+  if (!canvas) return;
+  const vals = readings.map(parseBatimentoHistoricoValor).filter(Number.isFinite);
+  if (vals.length === 0) { canvas.style.display = 'none'; return; }
+  canvas.style.display = 'block';
+
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(260, canvas.parentElement ? canvas.parentElement.clientWidth : 300);
+  const h = 160;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+
+  const band = getBatimentoChartIdealBand();
+  const { yLow, yHigh } = getBatimentoPlotYBoundsFromDataRange(Math.min(...vals), Math.max(...vals));
+  const yRange = yHigh - yLow || 1;
+  const padL = 30, padR = 6, padT = 8, padB = 20;
+  const gw = w - padL - padR;
+  const gh = h - padT - padB;
+  const toY = (v) => padT + ((yHigh - v) / yRange) * gh;
+
+  // Fundo ideal
+  drawBatimentoChartIdealBackground(ctx, padL, gw, toY, yLow, yHigh, band.min, band.max);
+
+  // Eixo Y
+  ctx.fillStyle = '#8e8e8e'; ctx.font = '8px sans-serif'; ctx.textAlign = 'right';
+  [yHigh, yLow].forEach(yv => {
+    ctx.fillText(String(Math.round(yv)), padL - 4, toY(yv) + 3);
+  });
+
+  // Barras
+  const n = vals.length;
+  const slot = gw / Math.max(n, 1);
+  const barW = Math.min(20, Math.max(4, slot * 0.65));
+  const barR = Math.min(5, barW / 2 - 0.5);
+  ctx.save(); ctx.beginPath(); ctx.rect(padL, padT, gw, gh); ctx.clip();
+  vals.forEach((v, i) => {
+    const cx = padL + slot * i + slot / 2;
+    const x0 = cx - barW / 2;
+    const { lo, hi } = expandBatimentoBarBpmRange(v, v, yLow, yHigh);
+    drawBatimentoIdealSegmentedRangeBar(ctx, x0, barW, lo, hi, band.min, band.max, toY, barR, false);
+  });
+  ctx.restore();
+
+  // Labels eixo X (hora:minuto)
+  ctx.fillStyle = '#666'; ctx.font = '8px sans-serif'; ctx.textAlign = 'center';
+  const labelEvery = Math.max(1, Math.ceil(n / 6));
+  readings.forEach((r, i) => {
+    if (i % labelEvery !== 0 && i !== n - 1) return;
+    const cx = padL + slot * i + slot / 2;
+    const label = r.hora ? String(r.hora).slice(0, 5) : '';
+    ctx.fillText(label, cx, h - 4);
+  });
 }
 
 /** Lista do período: toque no dia → mesma vista que tocar na coluna do gráfico. */
@@ -4785,6 +4966,27 @@ function renderBatimentoDayDrilldown(dayIso) {
 
   renderBatimentoDistCanvas(stats.minV, stats.maxV, stats.lastVal);
 
+  // Painel repouso: mín/máx das leituras com contextoColeta === 'repouso' no dia
+  const repousoEl = document.getElementById('vitalBatimentoRepousoRange');
+  if (repousoEl) {
+    const repLeituras = (currentVitalDetail.historico || []).filter(
+      (h) => historicoEntryDayISO(h) === dayIso && h.contextoColeta === 'repouso'
+    );
+    if (repLeituras.length > 0) {
+      const vals = repLeituras.map(parseBatimentoHistoricoValor).filter(Number.isFinite);
+      if (vals.length > 0) {
+        const rMin = Math.round(Math.min(...vals));
+        const rMax = Math.round(Math.max(...vals));
+        repousoEl.textContent = `Repouso: ${rMin} – ${rMax} bpm`;
+        repousoEl.style.display = 'block';
+      } else {
+        repousoEl.style.display = 'none';
+      }
+    } else {
+      repousoEl.style.display = 'none';
+    }
+  }
+
   const buckets = aggregateHeartRateByHourForDay(currentVitalDetail.historico, dayIso);
   renderBatimentoHourlyRangeChart(dayIso, buckets);
 }
@@ -4796,7 +4998,7 @@ function updateVitalBatimentoModalTitle() {
   const base =
     typeof window.__vitalDetailModalTipoLabel === 'string' ? window.__vitalDetailModalTipoLabel : 'Batimento Cardíaco';
   if (vitalBatimentoChartSelection && vitalBatimentoChartSelection.kind === 'day') {
-    el.textContent = 'Detalhado';
+    el.textContent = 'Detalhado por hora';
   } else {
     el.textContent = `Histórico de ${base}`;
   }
@@ -5337,14 +5539,18 @@ function renderVitalDetailContent(historico) {
           let trailHtml = '';
           const ex = bucket.readings && bucket.readings.find((r) => r.contextoColeta === 'exercicio' && r.exercicioSessao);
           const sn = bucket.readings && bucket.readings.find((r) => r.contextoColeta === 'sono' && r.sonoSessao);
-          if (ex) {
-            rowClass += ' vital-list-item--exercicio';
-            clickAttr = ` role="button" tabindex="0" onclick="openExercicioDetalheFromBatimentoHour(${h})"`;
-            trailHtml = '<span class="vital-list-chevron" aria-hidden="true">›</span>';
-          } else if (sn) {
-            rowClass += ' vital-list-item--sono';
-            clickAttr = ` role="button" tabindex="0" onclick="openSonoDetalheFromBatimentoHour(${h})"`;
-            trailHtml = '<span class="vital-list-chevron" aria-hidden="true">›</span>';
+          if (hasRange) {
+            rowClass += ' vital-list-item--hora-clicavel';
+            trailHtml = '<span class=\"vital-list-chevron\" aria-hidden=\"true\">&#8250;</span>';
+            if (ex) {
+              rowClass += ' vital-list-item--exercicio';
+              clickAttr = ` role=\"button\" tabindex=\"0\" onclick=\"openBatimentoMinutoDetalhe(${h}, 'exercicio')\"`;
+            } else if (sn) {
+              rowClass += ' vital-list-item--sono';
+              clickAttr = ` role=\"button\" tabindex=\"0\" onclick=\"openBatimentoMinutoDetalhe(${h}, 'sono')\"`;
+            } else {
+              clickAttr = ` role=\"button\" tabindex=\"0\" onclick=\"openBatimentoMinutoDetalhe(${h}, null)\"`;
+            }
           }
           return htmlVitalBatimentoListRow({
             rowClass,
@@ -5368,25 +5574,32 @@ function renderVitalDetailContent(historico) {
         '<div class="empty-state"><div class="empty-text">Nenhum valor numérico no período</div></div>';
       return;
     }
-    const htmlBc = dailyRows
-      .map((row) => {
-        const leftPrimary = formatDateForUI(row.day);
-        const valStr = `${Math.round(row.min)}–${Math.round(row.max)}`;
-        const badgeHtml = row.ctxBadge
-          ? `<span class="vital-context-badge">${row.ctxBadge}</span>`
-          : '';
-        const rowClass = `vital-list-item vital-list-item--day-nav${row.rowBgClass ? ` ${row.rowBgClass}` : ''}`;
-        const clickAttr = ` role="button" tabindex="0" onclick="selectBatimentoDayFromList('${row.day}')"`;
-        const chev = ' <span class="vital-list-chevron" aria-hidden="true">›</span>';
-        return htmlVitalBatimentoListRow({
-          rowClass,
-          clickAttr,
-          primaryLine: leftPrimary,
-          badgeHtml,
-          valueHtml: `${valStr}${chev}`
-        });
-      })
-      .join('');
+    const PREVIEW = 3;
+    const buildRow = (row) => {
+      const leftPrimary = formatDateForUI(row.day);
+      const valStr = `${Math.round(row.min)}–${Math.round(row.max)}`;
+      const badgeHtml = row.ctxBadge
+        ? `<span class="vital-context-badge">${row.ctxBadge}</span>`
+        : '';
+      const rowClass = `vital-list-item vital-list-item--day-nav${row.rowBgClass ? ` ${row.rowBgClass}` : ''}`;
+      const clickAttr = ` role="button" tabindex="0" onclick="selectBatimentoDayFromList('${row.day}')"`;
+      const chev = ' <span class="vital-list-chevron" aria-hidden="true">›</span>';
+      return htmlVitalBatimentoListRow({ rowClass, clickAttr, primaryLine: leftPrimary, badgeHtml, valueHtml: `${valStr}${chev}` });
+    };
+    const visibleRows = dailyRows.slice(-PREVIEW).reverse();
+    const hiddenRows = dailyRows.slice(0, -PREVIEW).reverse();
+    let htmlBc = visibleRows.map(buildRow).join('');
+    if (hiddenRows.length > 0) {
+      const hiddenHtml = hiddenRows.map(buildRow).join('');
+      htmlBc += `
+        <div id="batimentoHistoricoExtra" style="display:none;">${hiddenHtml}</div>
+        <button type="button" class="vital-ver-mais-btn" onclick="
+          var el=document.getElementById('batimentoHistoricoExtra');
+          var open=el.style.display!=='none';
+          el.style.display=open?'none':'block';
+          this.textContent=open?'Ver mais (${hiddenRows.length})':'Ver menos';
+        ">Ver mais (${hiddenRows.length})</button>`;
+    }
     document.getElementById('vitalDetailContent').innerHTML = htmlBc;
     return;
   }

@@ -208,6 +208,7 @@
                         <canvas id="vitalBatimentoDistCanvas" class="vital-batimento-dist-canvas" height="48"></canvas>
                     </div>
                     <p id="vitalBatimentoLastReading" class="vital-batimento-last-reading" style="display: none;"></p>
+                    <p id="vitalBatimentoRepousoRange" class="vital-batimento-last-reading" style="display: none;"></p>
                     <p class="vital-batimento-hourly-title">Frequência cardíaca mín./máx. por hora</p>
                     <p class="vital-batimento-hourly-sub">Faixa verde: valor ideal (referência). Roxo sono · verde exercício · amarelo repouso · laranja demais medições.</p>
                     <div class="vital-batimento-hourly-wrap">
@@ -262,6 +263,26 @@
                 <div class="exercise-chart-axis" id="exercicioDetalheAxis"></div>
             </div>
         </div>
+    </div>
+
+    <!-- Modal Detalhe por Minuto (Batimento Cardíaco) -->
+    <div class="modal modal-bmin" id="batimentoMinutoModal">
+      <div class="modal-content modal-content--bmin">
+        <div class="modal-header">
+          <div class="bmin-header-text">
+            <h2 class="bmin-titulo" id="batimentoMinutoTitulo">Detalhado por minuto</h2>
+            <p class="bmin-subtitulo" id="batimentoMinutoSubtitulo"></p>
+          </div>
+          <button type="button" class="modal-ok" id="closeBatimentoMinutoModal">OK</button>
+        </div>
+        <div class="bmin-range-row">
+          <span class="bmin-range" id="batimentoMinutoRange">— bpm</span>
+          <span class="bmin-contexto" id="batimentoMinutoContexto" style="display:none;"></span>
+        </div>
+        <canvas id="batimentoMinutoCanvas" class="bmin-canvas"></canvas>
+        <div id="batimentoMinutoLista" class="bmin-lista"></div>
+        <button type="button" class="button button-confirm" id="batimentoMinutoSubBtn" style="display:none;margin-top:12px;"></button>
+      </div>
     </div>
 
     <!-- Detalhe da sessão de sono (demo — guia para integração futura) -->
