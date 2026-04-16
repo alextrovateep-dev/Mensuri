@@ -1845,8 +1845,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (bminModal) bminModal.addEventListener('click', (e) => { if (e.target === bminModal) closeBatimentoMinutoModal(); });
   window.addEventListener('resize', () => {
     if (bminModal && bminModal.classList.contains('active')) {
-      const readings = Array.from(document.querySelectorAll('#batimentoMinutoLista .bmin-row')).map((_, i) => i);
-      // re-render via stored readings
       const canvas = document.getElementById('batimentoMinutoCanvas');
       if (canvas && canvas._readings) renderBatimentoMinutoCanvas(canvas._readings);
     }
@@ -3774,6 +3772,81 @@ function closeSonoDetalheModal() {
   if (m) m.classList.remove('active');
 }
 
+/** Igual ao subtítulo do modal por minuto: faixa da hora em uma linha. */
+function formatBatimentoBpmRangeLine(minV, maxV) {
+  if (minV == null || maxV == null || !Number.isFinite(minV) || !Number.isFinite(maxV)) return '—';
+  return `${Math.round(minV)} – ${Math.round(maxV)} bpm`;
+}
+
+/** Igual ao subtítulo do modal por minuto: "08:00 – 08:59". */
+function formatBatimentoHourIntervalLabel(hour) {
+  const h = Math.floor(Number(hour));
+  const s = String(Number.isFinite(h) && h >= 0 && h <= 23 ? h : 0).padStart(2, '0');
+  return `${s}:00 – ${s}:59`;
+}
+
+const BATIMENTO_HISTORICO_PREVIEW = 3;
+
+let batimentoMinutoReadingsCache = [];
+
+/** Mesma hierarquia visual da lista “por hora” (medida em cima, horário em baixo, chevron). */
+function buildBatimentoMinutoHistoricoRowHtml(r) {
+  const v = parseBatimentoHistoricoValor(r);
+  const hora = r.hora ? String(r.hora).slice(0, 5) : '—';
+  const measureLine = Number.isFinite(v) ? `${Math.round(v)} bpm` : '—';
+  const ctxLabel = typeof getLabelContextoColetaHistorico === 'function' ? getLabelContextoColetaHistorico(r) : '';
+  const badgeHtml = ctxLabel ? `<span class="vital-context-badge">${ctxLabel}</span>` : '';
+  const bg = typeof batimentoHistoricoRowBgClassForEntry === 'function' ? batimentoHistoricoRowBgClassForEntry(r) : '';
+  let rowClass = 'vital-list-item vital-list-item--hour-bucket vital-list-item--minuto-historico';
+  if (bg) rowClass += ` ${bg}`;
+  const trailHtml = '<span class="vital-list-chevron" aria-hidden="true">&#8250;</span>';
+  return htmlVitalBatimentoListRow({
+    rowClass,
+    clickAttr: '',
+    badgeHtml,
+    hourDetail: {
+      measureLine,
+      timeLine: hora,
+      trailHtml
+    }
+  });
+}
+
+function renderBatimentoMinutoListaPreview() {
+  const listaEl = document.getElementById('batimentoMinutoLista');
+  const readings = batimentoMinutoReadingsCache;
+  if (!listaEl) return;
+
+  if (readings.length === 0) {
+    listaEl.innerHTML = '<div class="empty-state"><div class="empty-text">Nenhuma leitura nesta hora</div></div>';
+    return;
+  }
+
+  const n = readings.length;
+  const p = BATIMENTO_HISTORICO_PREVIEW;
+  let html = '';
+  if (n <= p) {
+    html = readings
+      .slice()
+      .reverse()
+      .map(buildBatimentoMinutoHistoricoRowHtml)
+      .join('');
+  } else {
+    const visible = readings.slice(-p).reverse();
+    const hidden = readings.slice(0, n - p);
+    html =
+      visible.map(buildBatimentoMinutoHistoricoRowHtml).join('') +
+      `<div id="batimentoMinutoExtra" style="display:none;">${hidden.map(buildBatimentoMinutoHistoricoRowHtml).join('')}</div>` +
+      `<button type="button" class="vital-ver-mais-btn" onclick="` +
+      `var el=document.getElementById('batimentoMinutoExtra');` +
+      `var open=el.style.display!=='none';` +
+      `el.style.display=open?'none':'block';` +
+      `this.textContent=open?'Ver mais (${hidden.length})':'Ver menos';` +
+      `">Ver mais (${hidden.length})</button>`;
+  }
+  listaEl.innerHTML = html;
+}
+
 // ===== MODAL DETALHE POR MINUTO (Batimento Cardíaco) =====
 
 function openBatimentoMinutoDetalhe(hour, contexto) {
@@ -3783,7 +3856,7 @@ function openBatimentoMinutoDetalhe(hour, contexto) {
   const bucket = buckets[hour];
   if (!bucket) return;
 
-  const labelHora = String(hour).padStart(2, '0') + ':00 – ' + String(hour).padStart(2, '0') + ':59';
+  const labelHora = formatBatimentoHourIntervalLabel(hour);
   const modal = document.getElementById('batimentoMinutoModal');
   if (!modal) return;
 
@@ -3793,7 +3866,7 @@ function openBatimentoMinutoDetalhe(hour, contexto) {
   // Estatísticas da hora
   const hasRange = bucket.min != null && bucket.max != null;
   document.getElementById('batimentoMinutoRange').textContent = hasRange
-    ? Math.round(bucket.min) + ' – ' + Math.round(bucket.max) + ' bpm'
+    ? formatBatimentoBpmRangeLine(bucket.min, bucket.max)
     : '—';
 
   // Badge de contexto
@@ -3813,27 +3886,8 @@ function openBatimentoMinutoDetalhe(hour, contexto) {
     return ta - tb;
   });
 
-  const listaEl = document.getElementById('batimentoMinutoLista');
-  if (readings.length === 0) {
-    listaEl.innerHTML = '<div class="empty-state"><div class="empty-text">Nenhuma leitura nesta hora</div></div>';
-  } else {
-    listaEl.innerHTML = readings.map((r) => {
-      const v = parseBatimentoHistoricoValor(r);
-      const hora = r.hora ? String(r.hora).slice(0, 5) : '—';
-      const band = getBatimentoChartIdealBand();
-      let nivel = '';
-      if (Number.isFinite(v)) {
-        if (v < band.min) nivel = '<span class="bmin-nivel bmin-nivel--baixo">Baixo</span>';
-        else if (v > band.max) nivel = '<span class="bmin-nivel bmin-nivel--alto">Alto</span>';
-        else nivel = '<span class="bmin-nivel bmin-nivel--normal">Normal</span>';
-      }
-      const ctx = r.contextoColeta ? '<span class="vital-context-badge">' + (ctxMap[r.contextoColeta] || r.contextoColeta) + '</span>' : '';
-      return '<div class="bmin-row">' +
-        '<div class="bmin-row-left"><span class="bmin-hora">' + hora + '</span>' + ctx + '</div>' +
-        '<div class="bmin-row-right"><span class="bmin-valor">' + (Number.isFinite(v) ? Math.round(v) : '—') + '</span><span class="bmin-unit"> bpm</span>' + nivel + '</div>' +
-        '</div>';
-    }).join('');
-  }
+  batimentoMinutoReadingsCache = readings;
+  renderBatimentoMinutoListaPreview();
 
   // Gráfico de barras por leitura
   renderBatimentoMinutoCanvas(readings);
@@ -3866,6 +3920,7 @@ function closeBatimentoMinutoModal() {
 function renderBatimentoMinutoCanvas(readings) {
   const canvas = document.getElementById('batimentoMinutoCanvas');
   if (!canvas) return;
+  canvas._readings = readings;
   const vals = readings.map(parseBatimentoHistoricoValor).filter(Number.isFinite);
   if (vals.length === 0) { canvas.style.display = 'none'; return; }
   canvas.style.display = 'block';
@@ -5519,51 +5574,62 @@ function renderVitalDetailContent(historico) {
         dayIso && Array.isArray(currentVitalDetail.historico)
           ? aggregateHeartRateByHourForDay(currentVitalDetail.historico, dayIso)
           : [];
-      const htmlDay = buckets
-        .map((bucket) => {
-          const h = bucket.hour;
-          const labelHora = `${String(h).padStart(2, '0')}:00 - ${String(h).padStart(2, '0')}:59`;
-          const hasRange =
-            bucket.min != null &&
-            bucket.max != null &&
-            Number.isFinite(bucket.min) &&
-            Number.isFinite(bucket.max);
-          const measureLine = hasRange
-            ? `${Math.round(bucket.min)} a ${Math.round(bucket.max)} bpm`
-            : '—';
-          const badgeHtml = batimentoBucketContextBadgeHtml(bucket);
-          const bg = hasRange ? batimentoHourlyBucketRowBgClass(bucket) : '';
-          let rowClass = 'vital-list-item vital-list-item--hour-bucket';
-          if (bg) rowClass += ` ${bg}`;
-          let clickAttr = '';
-          let trailHtml = '';
-          const ex = bucket.readings && bucket.readings.find((r) => r.contextoColeta === 'exercicio' && r.exercicioSessao);
-          const sn = bucket.readings && bucket.readings.find((r) => r.contextoColeta === 'sono' && r.sonoSessao);
-          if (hasRange) {
-            rowClass += ' vital-list-item--hora-clicavel';
-            trailHtml = '<span class=\"vital-list-chevron\" aria-hidden=\"true\">&#8250;</span>';
-            if (ex) {
-              rowClass += ' vital-list-item--exercicio';
-              clickAttr = ` role=\"button\" tabindex=\"0\" onclick=\"openBatimentoMinutoDetalhe(${h}, 'exercicio')\"`;
-            } else if (sn) {
-              rowClass += ' vital-list-item--sono';
-              clickAttr = ` role=\"button\" tabindex=\"0\" onclick=\"openBatimentoMinutoDetalhe(${h}, 'sono')\"`;
-            } else {
-              clickAttr = ` role=\"button\" tabindex=\"0\" onclick=\"openBatimentoMinutoDetalhe(${h}, null)\"`;
-            }
+      const buildHourBucketRow = (bucket) => {
+        const h = bucket.hour;
+        const labelHora = formatBatimentoHourIntervalLabel(h);
+        const hasRange =
+          bucket.min != null &&
+          bucket.max != null &&
+          Number.isFinite(bucket.min) &&
+          Number.isFinite(bucket.max);
+        const measureLine = hasRange ? formatBatimentoBpmRangeLine(bucket.min, bucket.max) : '—';
+        const badgeHtml = batimentoBucketContextBadgeHtml(bucket);
+        const bg = hasRange ? batimentoHourlyBucketRowBgClass(bucket) : '';
+        let rowClass = 'vital-list-item vital-list-item--hour-bucket';
+        if (bg) rowClass += ` ${bg}`;
+        let clickAttr = '';
+        let trailHtml = '';
+        const ex = bucket.readings && bucket.readings.find((r) => r.contextoColeta === 'exercicio' && r.exercicioSessao);
+        const sn = bucket.readings && bucket.readings.find((r) => r.contextoColeta === 'sono' && r.sonoSessao);
+        if (hasRange) {
+          rowClass += ' vital-list-item--hora-clicavel';
+          trailHtml = '<span class="vital-list-chevron" aria-hidden="true">&#8250;</span>';
+          if (ex) {
+            rowClass += ' vital-list-item--exercicio';
+            clickAttr = ` role="button" tabindex="0" onclick="openBatimentoMinutoDetalhe(${h}, 'exercicio')"`;
+          } else if (sn) {
+            rowClass += ' vital-list-item--sono';
+            clickAttr = ` role="button" tabindex="0" onclick="openBatimentoMinutoDetalhe(${h}, 'sono')"`;
+          } else {
+            clickAttr = ` role="button" tabindex="0" onclick="openBatimentoMinutoDetalhe(${h}, null)"`;
           }
-          return htmlVitalBatimentoListRow({
-            rowClass,
-            clickAttr,
-            badgeHtml,
-            hourDetail: {
-              measureLine,
-              timeLine: labelHora,
-              trailHtml
-            }
-          });
-        })
-        .join('');
+        }
+        return htmlVitalBatimentoListRow({
+          rowClass,
+          clickAttr,
+          badgeHtml,
+          hourDetail: {
+            measureLine,
+            timeLine: labelHora,
+            trailHtml
+          }
+        });
+      };
+      const rowFragments = buckets.map(buildHourBucketRow);
+      const visibleFr = rowFragments.slice(-BATIMENTO_HISTORICO_PREVIEW).reverse();
+      const hiddenFr = rowFragments.slice(0, -BATIMENTO_HISTORICO_PREVIEW);
+      let htmlDay = visibleFr.join('');
+      if (hiddenFr.length > 0) {
+        const hiddenHtml = hiddenFr.join('');
+        htmlDay += `
+        <div id="batimentoHistoricoExtraHora" style="display:none;">${hiddenHtml}</div>
+        <button type="button" class="vital-ver-mais-btn" onclick="
+          var el=document.getElementById('batimentoHistoricoExtraHora');
+          var open=el.style.display!=='none';
+          el.style.display=open?'none':'block';
+          this.textContent=open?'Ver mais (${hiddenFr.length})':'Ver menos';
+        ">Ver mais (${hiddenFr.length})</button>`;
+      }
       document.getElementById('vitalDetailContent').innerHTML = htmlDay;
       return;
     }
@@ -5574,10 +5640,9 @@ function renderVitalDetailContent(historico) {
         '<div class="empty-state"><div class="empty-text">Nenhum valor numérico no período</div></div>';
       return;
     }
-    const PREVIEW = 3;
     const buildRow = (row) => {
       const leftPrimary = formatDateForUI(row.day);
-      const valStr = `${Math.round(row.min)}–${Math.round(row.max)}`;
+      const valStr = formatBatimentoBpmRangeLine(row.min, row.max);
       const badgeHtml = row.ctxBadge
         ? `<span class="vital-context-badge">${row.ctxBadge}</span>`
         : '';
@@ -5586,8 +5651,8 @@ function renderVitalDetailContent(historico) {
       const chev = ' <span class="vital-list-chevron" aria-hidden="true">›</span>';
       return htmlVitalBatimentoListRow({ rowClass, clickAttr, primaryLine: leftPrimary, badgeHtml, valueHtml: `${valStr}${chev}` });
     };
-    const visibleRows = dailyRows.slice(-PREVIEW).reverse();
-    const hiddenRows = dailyRows.slice(0, -PREVIEW).reverse();
+    const visibleRows = dailyRows.slice(-BATIMENTO_HISTORICO_PREVIEW).reverse();
+    const hiddenRows = dailyRows.slice(0, -BATIMENTO_HISTORICO_PREVIEW).reverse();
     let htmlBc = visibleRows.map(buildRow).join('');
     if (hiddenRows.length > 0) {
       const hiddenHtml = hiddenRows.map(buildRow).join('');

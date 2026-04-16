@@ -1116,12 +1116,13 @@ function stripDemoMedicoesUltimas24h(data) {
 }
 
 /**
- * Duas leituras numéricas por hora (faixa mín./máx. por hora no gráfico e na lista).
+ * Várias leituras por hora (demo: paginação 5/minuto no modal; faixa mín./máx. coerente).
  * Curva tipo pulseira: noite mais baixa, dia mais alta, variação suave.
  */
 function gerarBatimentoDemoPorHora(nowRef, daysBack = 16) {
   const out = [];
   const pad2 = (n) => String(n).padStart(2, '0');
+  const minutosPorHora = [4, 12, 22, 32, 42, 52];
   for (let d = 0; d < daysBack; d += 1) {
     const day = new Date(nowRef.getFullYear(), nowRef.getMonth(), nowRef.getDate() - d);
     const dataStr = `${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}`;
@@ -1148,24 +1149,20 @@ function gerarBatimentoDemoPorHora(nowRef, daysBack = 16) {
       lo = Math.round(lo + wave * 0.35);
       hi = Math.round(hi + wave * 0.35);
       if (hi <= lo + 2) hi = lo + 4;
-      const j = (hour * 17 + d * 11) % 7;
-      const v1 = lo + (j % Math.max(1, hi - lo - 1));
-      const v2 = Math.min(hi, Math.max(v1 + 2, lo + ((j + 3) % Math.max(1, hi - lo))));
-      out.push({
-        data: dataStr,
-        hora: `${pad2(hour)}:06`,
-        valor: v1,
-        status: 'normal',
-        demoUltimas24h: true,
-        demoPorHora: true
-      });
-      out.push({
-        data: dataStr,
-        hora: `${pad2(hour)}:48`,
-        valor: v2,
-        status: 'normal',
-        demoUltimas24h: true,
-        demoPorHora: true
+      const span = hi - lo;
+      minutosPorHora.forEach((min, idx) => {
+        const t = minutosPorHora.length > 1 ? idx / (minutosPorHora.length - 1) : 0;
+        const jitter = ((hour * 3 + idx + d) % 5) - 2;
+        let v = Math.round(lo + span * (0.15 + t * 0.7) + jitter * 0.4);
+        v = Math.min(hi, Math.max(lo, v));
+        out.push({
+          data: dataStr,
+          hora: `${pad2(hour)}:${pad2(min)}`,
+          valor: v,
+          status: 'normal',
+          demoUltimas24h: true,
+          demoPorHora: true
+        });
       });
     }
   }

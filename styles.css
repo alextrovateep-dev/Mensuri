@@ -4749,70 +4749,45 @@ body {
   background: #fff;
 }
 
+.bmin-lista-wrap {
+  margin-top: 2px;
+}
+
 .bmin-lista {
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
-.bmin-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 9px 4px;
-  border-bottom: 1px solid #f0f0f0;
+/* Minuto a minuto: mesma hierarquia da lista por hora (valor em destaque, horário abaixo, chevron) */
+.modal-content--bmin .bmin-lista .vital-list-item--minuto-historico {
+  align-items: flex-start;
 }
 
-.bmin-row:last-child {
-  border-bottom: none;
-}
-
-.bmin-row-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.bmin-hora {
-  font-size: 14px;
+.modal-content--bmin .bmin-lista .vital-list-main--hour-detail .vital-list-measure-line {
+  font-size: 17px;
   font-weight: 700;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  min-width: 42px;
-}
-
-.bmin-row-right {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.bmin-valor {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-title);
+  color: #5a6a85;
+  letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
 }
 
-.bmin-unit {
+.modal-content--bmin .bmin-lista .vital-list-main--hour-detail .vital-list-time-line {
   font-size: 12px;
+  font-weight: 500;
   color: var(--text-muted);
-  font-weight: 600;
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
 }
 
-.bmin-nivel {
-  font-size: 10px;
-  font-weight: 800;
-  border-radius: 999px;
-  padding: 2px 7px;
-  margin-left: 4px;
+.modal-content--bmin .bmin-lista .vital-list-trail .vital-list-chevron {
+  color: #c5c5c5;
+  font-size: 18px;
 }
 
-.bmin-nivel--normal { background: #ececec; color: var(--text-muted); }
-.bmin-nivel--baixo  { background: #fff0e0; color: #c2410c; }
-.bmin-nivel--alto   { background: #fff0f0; color: #c92a2a; }
+.modal-content--bmin .bmin-lista .vital-ver-mais-btn {
+  margin-top: 6px;
+}
 
 .vital-list-item--hora-clicavel {
   cursor: pointer;
