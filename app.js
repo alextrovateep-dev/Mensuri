@@ -11,6 +11,8 @@ let vitalBatimentoPeriod = '7d';
 let vitalBatimentoChartSelection = null;
 /** Contexto exibido no modal de Batimento: all | sono_repouso */
 let vitalBatimentoContextMode = 'all';
+/** Painel "Ver análise completa" (Batimento) */
+let vitalBatimentoQuickExpanded = false;
 let lastMedicationAlertKey = null;
 let lastVitalAlertKey = null;
 let currentAlarmMedicationId = null;
@@ -110,6 +112,111 @@ function setVitalBatimentoContextMode(mode) {
 function toggleVitalBatimentoContextMode() {
   const next = vitalBatimentoContextMode === 'sono_repouso' ? 'all' : 'sono_repouso';
   setVitalBatimentoContextMode(next);
+}
+
+function percentileFromSorted(valuesAsc, p) {
+  if (!Array.isArray(valuesAsc) || valuesAsc.length === 0) return null;
+  const q = Math.max(0, Math.min(1, p));
+  const pos = q * (valuesAsc.length - 1);
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  if (lo === hi) return valuesAsc[lo];
+  const w = pos - lo;
+  return valuesAsc[lo] + (valuesAsc[hi] - valuesAsc[lo]) * w;
+}
+
+function getBatimentoSummaryScope(startISO, endISO) {
+  const sel = vitalBatimentoChartSelection;
+  if (sel && sel.kind === 'day') return { start: sel.iso, end: sel.iso };
+  if (sel && sel.kind === 'range') return { start: sel.start, end: sel.end };
+  return { start: startISO, end: endISO };
+}
+
+function updateBatimentoQuickAnalysisVisibility() {
+  const extra = document.getElementById('vitalBatimentoQuickExtra');
+  const btn = document.getElementById('vitalBatimentoQuickMoreBtn');
+  if (!extra || !btn) return;
+  extra.style.display = vitalBatimentoQuickExpanded ? 'block' : 'none';
+  btn.textContent = vitalBatimentoQuickExpanded ? 'Ocultar análise completa' : 'Ver análise completa';
+}
+
+function toggleBatimentoQuickAnalysis() {
+  vitalBatimentoQuickExpanded = !vitalBatimentoQuickExpanded;
+  updateBatimentoQuickAnalysisVisibility();
+}
+
+function updateBatimentoQuickSummary(entries, startISO, endISO) {
+  const elMedia = document.getElementById('vitalBatimentoKpiMedia');
+  const elIdeal = document.getElementById('vitalBatimentoKpiIdealPct');
+  const elPico = document.getElementById('vitalBatimentoKpiPico');
+  const elInsight = document.getElementById('vitalBatimentoQuickInsight');
+  const elMediana = document.getElementById('vitalBatimentoKpiMediana');
+  const elP95 = document.getElementById('vitalBatimentoKpiP95');
+  const elCobertura = document.getElementById('vitalBatimentoKpiCobertura');
+  if (!elMedia || !elIdeal || !elPico || !elInsight || !elMediana || !elP95 || !elCobertura) return;
+
+  const vals = (entries || []).map(parseBatimentoHistoricoValor).filter(Number.isFinite);
+  const band = getBatimentoChartIdealBand();
+  if (vals.length === 0) {
+    elMedia.textContent = '—';
+    elIdeal.textContent = '—';
+    elPico.textContent = '—';
+    elInsight.textContent = 'Sem dados suficientes para análise no filtro atual.';
+    elMediana.textContent = '—';
+    elP95.textContent = '—';
+    elCobertura.textContent = '—';
+    updateBatimentoQuickAnalysisVisibility();
+    return;
+  }
+
+  const sum = vals.reduce((acc, v) => acc + v, 0);
+  const avg = Math.round(sum / vals.length);
+  const peak = Math.round(Math.max(...vals));
+  const inIdeal = vals.filter((v) => v >= band.min && v <= band.max).length;
+  const idealPct = Math.round((inIdeal / vals.length) * 100);
+  const sorted = [...vals].sort((a, b) => a - b);
+  const med = percentileFromSorted(sorted, 0.5);
+  const p95 = percentileFromSorted(sorted, 0.95);
+
+  const scope = getBatimentoSummaryScope(startISO, endISO);
+  const uniqueHours = new Set(
+    (entries || [])
+      .map((h) => {
+        const ms = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(h) : null;
+        if (ms == null) return '';
+        const d = new Date(ms);
+        return `${dateToLocalISODate(d)}-${String(d.getHours()).padStart(2, '0')}`;
+      })
+      .filter(Boolean)
+  ).size;
+  const daysInScope = countInclusiveDaysBetween(scope.start, scope.end);
+  const expectedHours = Math.max(1, daysInScope * 24);
+  const coveragePct = Math.round((uniqueHours / expectedHours) * 100);
+
+  let insight = '';
+  if (vals.length < 4) {
+    insight = 'Poucas leituras no recorte; use com cautela para decisão.';
+  } else if (idealPct >= 80) {
+    insight = 'Padrão estável: maioria das leituras está na faixa ideal.';
+  } else if (peak > band.max + 15) {
+    insight = 'Há picos relevantes acima do ideal; vale investigar contexto.';
+  } else if (idealPct < 50) {
+    insight = 'Menos da metade na faixa ideal no período selecionado.';
+  } else {
+    insight = 'Perfil intermediário, com variação moderada no período.';
+  }
+  if (vitalBatimentoContextMode === 'sono_repouso') {
+    insight += ' (filtro Sono + Repouso ativo)';
+  }
+
+  elMedia.textContent = `${avg} bpm`;
+  elIdeal.textContent = `${idealPct}%`;
+  elPico.textContent = `${peak} bpm`;
+  elInsight.textContent = insight;
+  elMediana.textContent = `${Math.round(med)} bpm`;
+  elP95.textContent = `${Math.round(p95)} bpm`;
+  elCobertura.textContent = `${uniqueHours}/${expectedHours} h (${coveragePct}%)`;
+  updateBatimentoQuickAnalysisVisibility();
 }
 
 function getIdealLabel(value) {
@@ -4386,6 +4493,7 @@ function updateVitalBatimentoModalView() {
   const inPeriod = filterHistoricoByInclusiveDate(currentVitalDetail.historico, start, end);
   const filtrado = filterBatimentoByContext(inPeriod);
   const forList = historicoForBatimentoSelection(filtrado);
+  updateBatimentoQuickSummary(forList, start, end);
   currentVitalHistoricoView = sortHistoricoBatimentoDesc(forList);
   renderVitalDetailContent(currentVitalHistoricoView);
   renderBatimentoChromeCharts(filtrado, start, end);
@@ -5469,6 +5577,7 @@ function openVitalDetailModal(tipoVital, vitalId) {
     vitalBatimentoChartSelection = null;
     vitalBatimentoPeriod = '7d';
     vitalBatimentoContextMode = 'all';
+    vitalBatimentoQuickExpanded = false;
     const livreRow = document.getElementById('vitalBatimentoLivreRow');
     if (livreRow) livreRow.style.display = 'none';
     const di = document.getElementById('filterBatimentoLivreInicio');

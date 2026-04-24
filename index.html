@@ -173,6 +173,29 @@
 
             <!-- Batimento cardíaco: vista período (barras por dia) OU vista dia (padrão wearable: min–máx por hora) -->
             <div id="vitalDetailBatimentoChrome" class="vital-batimento-chrome" style="display: none;">
+                <div class="vital-batimento-quick-summary" id="vitalBatimentoQuickSummary">
+                    <div class="vital-batimento-kpis">
+                        <div class="vital-batimento-kpi">
+                            <span class="vital-batimento-kpi-label">Média</span>
+                            <span class="vital-batimento-kpi-value" id="vitalBatimentoKpiMedia">—</span>
+                        </div>
+                        <div class="vital-batimento-kpi">
+                            <span class="vital-batimento-kpi-label">% ideal</span>
+                            <span class="vital-batimento-kpi-value" id="vitalBatimentoKpiIdealPct">—</span>
+                        </div>
+                        <div class="vital-batimento-kpi">
+                            <span class="vital-batimento-kpi-label">Pico</span>
+                            <span class="vital-batimento-kpi-value" id="vitalBatimentoKpiPico">—</span>
+                        </div>
+                    </div>
+                    <p class="vital-batimento-quick-insight" id="vitalBatimentoQuickInsight">Sem dados suficientes para análise.</p>
+                    <button type="button" class="vital-batimento-more-btn" id="vitalBatimentoQuickMoreBtn" onclick="toggleBatimentoQuickAnalysis()">Ver análise completa</button>
+                    <div class="vital-batimento-extra" id="vitalBatimentoQuickExtra" style="display:none;">
+                        <div class="vital-batimento-extra-row"><span>Mediana</span><strong id="vitalBatimentoKpiMediana">—</strong></div>
+                        <div class="vital-batimento-extra-row"><span>P95</span><strong id="vitalBatimentoKpiP95">—</strong></div>
+                        <div class="vital-batimento-extra-row"><span>Cobertura</span><strong id="vitalBatimentoKpiCobertura">—</strong></div>
+                    </div>
+                </div>
                 <div id="vitalBatimentoPeriodScope">
                     <div class="vital-period-chips" role="tablist" aria-label="Período do gráfico">
                         <button type="button" class="vital-period-chip" data-period="7d" onclick="setVitalBatimentoPeriod('7d')">7 dias</button>
