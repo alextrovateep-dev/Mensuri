@@ -2364,10 +2364,11 @@ body {
 
 .vital-batimento-context-row {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   width: fit-content;
   max-width: 100%;
-  margin-left: auto;
+  margin-left: 0;
+  margin-right: auto;
   gap: 6px;
   margin-bottom: 4px;
 }
@@ -4744,10 +4745,11 @@ body {
 
 .bmin-context-filter-row {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   width: fit-content;
   max-width: 100%;
-  margin-left: auto;
+  margin-left: 0;
+  margin-right: auto;
   gap: 6px;
   margin: 0 0 8px;
 }
