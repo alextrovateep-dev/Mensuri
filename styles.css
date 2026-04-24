@@ -2365,6 +2365,9 @@ body {
 .vital-batimento-context-row {
   display: flex;
   justify-content: flex-end;
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
   gap: 6px;
   margin-bottom: 4px;
 }
@@ -4742,6 +4745,9 @@ body {
 .bmin-context-filter-row {
   display: flex;
   justify-content: flex-end;
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
   gap: 6px;
   margin: 0 0 8px;
 }
