@@ -2259,6 +2259,10 @@ body {
   padding: 10px 8px 12px;
   max-width: min(420px, calc(100vw - 10px));
   width: calc(100vw - 10px);
+  height: min(88vh, 740px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 #vitalDetailModal .modal-header {
@@ -2312,7 +2316,10 @@ body {
 }
 
 #vitalDetailModal #vitalDetailContent {
-  max-height: min(360px, 42vh) !important;
+  flex: 1 1 auto;
+  min-height: 140px;
+  max-height: none !important;
+  overflow-y: auto !important;
 }
 
 #vitalDetailModal > .modal-content > .form-group {
@@ -2353,6 +2360,13 @@ body {
   background: #4a4a4a;
   color: #fff;
   border-color: #4a4a4a;
+}
+
+.vital-batimento-context-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 4px;
 }
 
 .vital-period-summary {
@@ -4689,8 +4703,10 @@ body {
 .modal-content--bmin {
   max-width: min(420px, calc(100vw - 16px));
   width: calc(100vw - 16px);
-  max-height: 88vh;
-  overflow-y: auto;
+  height: min(88vh, 740px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 16px 16px 20px;
   border-radius: 14px;
 }
@@ -4723,6 +4739,13 @@ body {
   margin: 10px 0 8px;
 }
 
+.bmin-context-filter-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
 .bmin-range {
   font-size: 28px;
   font-weight: 800;
@@ -4750,6 +4773,9 @@ body {
 }
 
 .bmin-lista-wrap {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow-y: auto;
   margin-top: 2px;
 }
 

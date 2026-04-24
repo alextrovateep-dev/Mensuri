@@ -181,6 +181,10 @@
                         <button type="button" class="vital-period-chip" data-period="year" onclick="setVitalBatimentoPeriod('year')">Ano</button>
                         <button type="button" class="vital-period-chip" data-period="livre" onclick="setVitalBatimentoPeriod('livre')">Livre</button>
                     </div>
+                    <div class="vital-batimento-context-row">
+                        <button type="button" class="vital-period-chip vital-batimento-context-chip" data-batimento-context-mode="all" onclick="setVitalBatimentoContextMode('all')" aria-pressed="true">Todos</button>
+                        <button type="button" class="vital-period-chip vital-batimento-context-chip" data-batimento-context-mode="sono_repouso" onclick="setVitalBatimentoContextMode('sono_repouso')" aria-pressed="false">Sono + Repouso</button>
+                    </div>
                     <p id="vitalDetailPeriodSummary" class="vital-period-summary vital-period-summary--compact" aria-live="polite"></p>
                     <canvas id="vitalBatimentoDailyCanvas" class="vital-batimento-canvas" width="720" height="200" role="img" aria-label="Gráfico: uma barra por dia com mínimo e máximo desse dia. Toque numa coluna para ver o detalhe do dia."></canvas>
                     <div class="vital-batimento-legend vital-batimento-legend--period" aria-label="Legenda: Baixo, Normal e Alto segundo o valor ideal em Meus Indicadores (ou 60 a 100 bpm se não estiver definido)">
@@ -202,6 +206,10 @@
                     <div class="vital-batimento-day-head">
                         <div id="vitalBatimentoDayDate" class="vital-batimento-day-date"></div>
                         <div id="vitalBatimentoDayRangeBig" class="vital-batimento-day-range-big"></div>
+                    </div>
+                    <div class="vital-batimento-context-row">
+                        <button type="button" class="vital-period-chip vital-batimento-context-chip" data-batimento-context-mode="all" onclick="setVitalBatimentoContextMode('all')" aria-pressed="true">Todos</button>
+                        <button type="button" class="vital-period-chip vital-batimento-context-chip" data-batimento-context-mode="sono_repouso" onclick="setVitalBatimentoContextMode('sono_repouso')" aria-pressed="false">Sono + Repouso</button>
                     </div>
                     <div class="vital-batimento-dist-wrap" aria-hidden="true">
                         <div class="vital-batimento-dist-labels"><span id="vitalBatimentoDistLabelLo">60</span><span id="vitalBatimentoDistLabelHi">100</span></div>
@@ -278,6 +286,10 @@
         <div class="bmin-range-row">
           <span class="bmin-range" id="batimentoMinutoRange">— bpm</span>
           <span class="bmin-contexto" id="batimentoMinutoContexto" style="display:none;"></span>
+        </div>
+        <div class="bmin-context-filter-row">
+          <button type="button" class="vital-period-chip vital-batimento-context-chip" data-batimento-context-mode="all" onclick="setVitalBatimentoContextMode('all')" aria-pressed="true">Todos</button>
+          <button type="button" class="vital-period-chip vital-batimento-context-chip" data-batimento-context-mode="sono_repouso" onclick="setVitalBatimentoContextMode('sono_repouso')" aria-pressed="false">Sono + Repouso</button>
         </div>
         <canvas id="batimentoMinutoCanvas" class="bmin-canvas"></canvas>
         <div class="bmin-lista-wrap">
