@@ -24,6 +24,8 @@ let pendingHeartRateBpm = null;
 let lastRescheduleAlertKey = null;
 let pendingConfirmAction = null;
 let currentDailyScheduleFilter = 'todos';
+let passosSelectedDayIso = null;
+let passosSelectedHour = null;
 
 /** YYYY-MM-DD no calendário local. Evita `toISOString()` (UTC), que desloca o dia e quebra filtros 7d/15d e o gráfico. */
 function dateToLocalISODate(d) {
@@ -61,6 +63,154 @@ function getStepsDailyGoalValue(vital) {
     if (Number.isFinite(minV) && Number.isFinite(maxV)) return Math.max(1, Math.round((minV + maxV) / 2));
   }
   return 10000;
+}
+
+function aggregatePassosByDay(entries) {
+  const byDay = new Map();
+  (Array.isArray(entries) ? entries : []).forEach((h) => {
+    const dayIso = (typeof historicoEntryDayISO === 'function') ? historicoEntryDayISO(h) : String(h?.data || '').slice(0, 10);
+    const v = Number(h?.valor);
+    if (!dayIso || !Number.isFinite(v)) return;
+    if (!byDay.has(dayIso)) byDay.set(dayIso, { day: dayIso, total: 0, entries: [] });
+    const g = byDay.get(dayIso);
+    g.total = Math.max(g.total, Math.max(0, Math.round(v)));
+    g.entries.push(h);
+  });
+  return Array.from(byDay.values()).sort((a, b) => b.day.localeCompare(a.day));
+}
+
+function buildPassosHourlyBucketsForDay(dayEntries) {
+  const buckets = Array.from({ length: 24 }, () => 0);
+  const list = (Array.isArray(dayEntries) ? dayEntries : [])
+    .slice()
+    .sort((a, b) => {
+      const ta = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(a) : 0;
+      const tb = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(b) : 0;
+      return ta - tb;
+    });
+  let prev = null;
+  list.forEach((h) => {
+    const raw = Number(h?.valor);
+    if (!Number.isFinite(raw)) return;
+    const hh = Number.parseInt(String(h?.hora || '').slice(0, 2), 10);
+    if (!Number.isInteger(hh) || hh < 0 || hh > 23) return;
+    const cur = Math.max(0, Math.round(raw));
+    let delta = prev == null ? cur : (cur - prev);
+    if (!Number.isFinite(delta) || delta < 0) delta = cur;
+    buckets[hh] += delta;
+    prev = cur;
+  });
+  if (buckets.every((v) => v === 0) && list.length > 0) {
+    const latest = list[list.length - 1];
+    const latestVal = Number(latest?.valor);
+    const hh = Number.parseInt(String(latest?.hora || '').slice(0, 2), 10);
+    if (Number.isFinite(latestVal) && Number.isInteger(hh) && hh >= 0 && hh <= 23) {
+      buckets[hh] = Math.max(0, Math.round(latestVal));
+    }
+  }
+  return buckets;
+}
+
+function renderPassosHourlyCanvas(dayIso, dayEntries, goal) {
+  const canvas = document.getElementById('passosHourlyCanvas');
+  const subtitle = document.getElementById('passosHourlySubtitle');
+  if (!canvas) return;
+  const hhTxt = Number.isInteger(passosSelectedHour)
+    ? ` · ${String(passosSelectedHour).padStart(2, '0')}:00–${String(passosSelectedHour).padStart(2, '0')}:59`
+    : '';
+  if (subtitle) subtitle.textContent = dayIso ? `${formatDateForUI(dayIso)}${hhTxt}` : '';
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  ctx.clearRect(0, 0, width, height);
+
+  const values = buildPassosHourlyBucketsForDay(dayEntries);
+  const maxV = Math.max(...values, 1);
+  const targetPerHour = Math.max(1, Math.round((goal || 10000) / 24));
+  const yMax = Math.max(maxV * 1.15, targetPerHour * 1.6, 1);
+  const padL = 18;
+  const padR = 8;
+  const padT = 8;
+  const padB = 18;
+  const gw = width - padL - padR;
+  const gh = height - padT - padB;
+  const toY = (v) => padT + ((yMax - v) / yMax) * gh;
+
+  ctx.fillStyle = '#fafafa';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = 'rgba(34, 197, 94, 0.45)';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(padL, toY(targetPerHour));
+  ctx.lineTo(padL + gw, toY(targetPerHour));
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const slot = gw / 24;
+  const barW = Math.max(3, Math.min(12, slot * 0.55));
+  const hourHits = [];
+  values.forEach((v, h) => {
+    const cx = padL + h * slot + slot / 2;
+    const x = cx - barW / 2;
+    hourHits.push({ x0: padL + h * slot, x1: padL + (h + 1) * slot, hour: h });
+    if (v > 0) {
+      const y = toY(v);
+      const hb = Math.max(1, toY(0) - y);
+      const isSelected = Number.isInteger(passosSelectedHour) && passosSelectedHour === h;
+      ctx.fillStyle = isSelected ? '#16a34a' : '#67d38f';
+      if (typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(x, y, barW, hb, 2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(x, y, barW, hb);
+      }
+    }
+  });
+
+  ctx.strokeStyle = '#d9dde3';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padL, toY(0));
+  ctx.lineTo(padL + gw, toY(0));
+  ctx.stroke();
+
+  ctx.fillStyle = '#8b93a0';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  [0, 6, 12, 18].forEach((h) => {
+    const x = padL + h * slot + slot / 2;
+    ctx.fillText(String(h), x, height - 4);
+  });
+  canvas.style.cursor = 'pointer';
+  canvas.onclick = (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / Math.max(1, rect.width);
+    const x = (ev.clientX - rect.left) * sx;
+    const hit = hourHits.find((b) => x >= b.x0 && x <= b.x1);
+    if (!hit) return;
+    passosSelectedHour = passosSelectedHour === hit.hour ? null : hit.hour;
+    renderVitalDetailContent(currentVitalHistoricoView);
+  };
+}
+
+function setPassosDayFromChart(dayIso) {
+  if (!dayIso) return;
+  if (!currentVitalDetail || currentVitalDetail.tipo !== 'Passos') return;
+  passosSelectedDayIso = dayIso;
+  passosSelectedHour = null;
+  renderVitalDetailContent(currentVitalHistoricoView);
+  renderSparklineChart(currentVitalHistoricoView);
+}
+
+function setPassosDayFromList(dayIso) {
+  if (!dayIso) return;
+  if (!currentVitalDetail || currentVitalDetail.tipo !== 'Passos') return;
+  passosSelectedDayIso = dayIso;
+  passosSelectedHour = null;
+  renderVitalDetailContent(currentVitalHistoricoView);
+  renderSparklineChart(currentVitalHistoricoView);
 }
 
 function updateVitalDefaultPeriodChipActive() {
@@ -5644,6 +5794,10 @@ function openVitalDetailModal(tipoVital, vitalId) {
     }
     if (isPressao || isPassos) {
       vitalDefaultPeriod = '7d';
+      if (isPassos) {
+        passosSelectedDayIso = null;
+        passosSelectedHour = null;
+      }
       if (defaultLivreRow) defaultLivreRow.style.display = 'none';
       const di = document.getElementById('filterVitalLivreInicio');
       const df = document.getElementById('filterVitalLivreFim');
@@ -5680,6 +5834,8 @@ function openVitalDetailModal(tipoVital, vitalId) {
 function renderSparklineChart(historico) {
   const canvas = document.getElementById('sparklineChart');
   if (!canvas) return;
+  canvas.onclick = null;
+  canvas.style.cursor = 'default';
 
   const ctx = canvas.getContext('2d');
   const width = canvas.width;
@@ -5782,14 +5938,8 @@ function renderSparklineChart(historico) {
   }
 
   if (currentVitalDetail && currentVitalDetail.tipo === 'Passos') {
-    const rows = (Array.isArray(historico) ? historico : [])
-      .slice(0, 10)
-      .reverse()
-      .map((h) => ({
-        h,
-        v: Number(h && h.valor)
-      }))
-      .filter((r) => Number.isFinite(r.v));
+    const dayRows = aggregatePassosByDay(historico).slice(0, 10).reverse();
+    const rows = dayRows.map((g) => ({ h: { data: g.day }, v: g.total, day: g.day }));
     if (rows.length === 0) return;
 
     const goal = getStepsDailyGoalValue(currentVitalDetail);
@@ -5825,14 +5975,17 @@ function renderSparklineChart(historico) {
     const slot = gw / Math.max(1, n);
     const barW = Math.min(18, Math.max(7, slot * 0.58));
     const barR = Math.min(5, barW / 2 - 0.5);
+    canvas.style.cursor = 'pointer';
+    const hitBoxes = [];
     rows.forEach((row, i) => {
+      const isSelected = row.day === passosSelectedDayIso;
       const cx = padL + slot * i + slot / 2;
       const x0 = cx - barW / 2;
       const yTop = toY(row.v);
       const yBot = toY(0);
       const g = ctx.createLinearGradient(0, yTop, 0, yBot);
-      g.addColorStop(0, '#6ee7a0');
-      g.addColorStop(1, '#22c55e');
+      g.addColorStop(0, isSelected ? '#34d399' : '#6ee7a0');
+      g.addColorStop(1, isSelected ? '#16a34a' : '#22c55e');
       ctx.fillStyle = g;
       const hBar = Math.max(1, yBot - yTop);
       if (typeof ctx.roundRect === 'function') {
@@ -5842,6 +5995,13 @@ function renderSparklineChart(historico) {
       } else {
         ctx.fillRect(x0, yTop, barW, hBar);
       }
+      if (isSelected) {
+        ctx.strokeStyle = '#16a34a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x0 - 0.5, yTop - 0.5, barW + 1, hBar + 1);
+      }
+      const slotX0 = padL + slot * i;
+      hitBoxes.push({ x0: slotX0, x1: slotX0 + slot, dayIso: row.day });
     });
 
     ctx.fillStyle = '#8e8e8e';
@@ -5863,6 +6023,13 @@ function renderSparklineChart(historico) {
       const short = parts.length === 3 ? String(Number(parts[2])) : '';
       ctx.fillText(short, cx, height - 4);
     });
+    canvas.onclick = (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = canvas.width / Math.max(1, rect.width);
+      const x = (ev.clientX - rect.left) * sx;
+      const hit = hitBoxes.find((b) => x >= b.x0 && x <= b.x1);
+      if (hit && hit.dayIso) setPassosDayFromChart(hit.dayIso);
+    };
     return;
   }
 
@@ -6201,48 +6368,64 @@ function renderVitalDetailContent(historico) {
 
   if (currentVitalDetail?.tipo === 'Passos') {
     const goal = getStepsDailyGoalValue(currentVitalDetail);
-    const rows = currentVitalHistoricoView
-      .slice()
-      .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
-    const latest = rows[0] || null;
-    const latestValRaw = Number(latest?.valor);
-    const latestVal = Number.isFinite(latestValRaw) ? Math.max(0, Math.round(latestValRaw)) : 0;
-    const pct = goal > 0 ? Math.max(0, Math.min(999, Math.round((latestVal / goal) * 100))) : 0;
-    const distKm = (latestVal * 0.00075).toFixed(2).replace('.', ',');
-    const kcal = Math.round(latestVal * 0.04);
-    const floors = Math.max(0, Math.round(latestVal / 1200));
+    const dayRows = aggregatePassosByDay(currentVitalHistoricoView);
+    if (dayRows.length === 0) {
+      document.getElementById('vitalDetailContent').innerHTML =
+        '<div class="empty-state"><div class="empty-text">Nenhum registro encontrado</div></div>';
+      return;
+    }
+    const selectedExists = passosSelectedDayIso && dayRows.some((r) => r.day === passosSelectedDayIso);
+    const selectedDay = selectedExists ? passosSelectedDayIso : dayRows[0].day;
+    passosSelectedDayIso = selectedDay;
+    const selectedRow = dayRows.find((r) => r.day === selectedDay) || dayRows[0];
+    const selectedHourValid = Number.isInteger(passosSelectedHour) && passosSelectedHour >= 0 && passosSelectedHour <= 23;
+    const daySteps = Math.max(0, Math.round(Number(selectedRow?.total || 0)));
+    const dayPct = goal > 0 ? Math.max(0, Math.min(999, Math.round((daySteps / goal) * 100))) : 0;
+    const dayDistKm = (daySteps * 0.00075).toFixed(2).replace('.', ',');
+    const dayKcal = Math.round(daySteps * 0.04);
+    const dayElevacaoM = Math.max(0, Math.round((daySteps / 1200) * 3));
 
-    const listHtml = rows.map((h) => {
-      const dateTxt = formatDateForUI(h.data);
-      const v = Number(h.valor);
-      const value = Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0;
-      const rowPct = goal > 0 ? Math.max(0, Math.min(100, Math.round((value / goal) * 100))) : 0;
-      return `
-        <div class="passos-historico-row">
-          <div class="passos-historico-top">
-            <span class="passos-historico-valor">${value.toLocaleString('pt-BR')} passos</span>
-            <span class="passos-historico-pct">${rowPct}%</span>
-          </div>
-          <div class="passos-historico-data">${dateTxt}</div>
-        </div>`;
-    }).join('');
+    const hourlyBuckets = buildPassosHourlyBucketsForDay(selectedRow?.entries || []);
+    const hourSteps = selectedHourValid
+      ? Math.max(0, Math.round(Number(hourlyBuckets[passosSelectedHour] || 0)))
+      : null;
+    const hourDistKm = hourSteps != null ? (hourSteps * 0.00075).toFixed(2).replace('.', ',') : null;
+    const hourKcal = hourSteps != null ? Math.round(hourSteps * 0.04) : null;
+    const hourElevacaoM = hourSteps != null ? Math.max(0, Math.round((hourSteps / 1200) * 3)) : null;
+    const hourInfoHtml = selectedHourValid
+      ? `
+        <div class="passos-footer-hour">${String(passosSelectedHour).padStart(2, '0')}:00–${String(passosSelectedHour).padStart(2, '0')}:59</div>
+        <div class="passos-footer-meta">
+          <span>${hourDistKm} km</span>
+          <span>${hourKcal} kcal</span>
+          <span>${hourElevacaoM} m elevação</span>
+        </div>`
+      : '<div class="passos-footer-empty">Toque em uma barra do gráfico por hora para ver distância, calorias e elevação da hora.</div>';
 
     document.getElementById('vitalDetailContent').innerHTML = `
       <div class="passos-resumo-card">
         <div class="passos-resumo-head">
-          <div class="passos-resumo-num">${latestVal.toLocaleString('pt-BR')} passos</div>
-          <div class="passos-resumo-pct">${pct}%</div>
+          <div class="passos-resumo-num">${daySteps.toLocaleString('pt-BR')} passos</div>
         </div>
-        <div class="passos-resumo-goal">/${goal.toLocaleString('pt-BR')} passos</div>
-        <div class="passos-resumo-bar"><span style="width:${Math.max(0, Math.min(100, pct))}%;"></span></div>
+        <div class="passos-resumo-bar"><span style="width:${Math.max(0, Math.min(100, dayPct))}%;"></span></div>
+        <div class="passos-resumo-scale">
+          <span>0</span>
+          <span>Meta: ${goal.toLocaleString('pt-BR')}</span>
+        </div>
         <div class="passos-resumo-meta">
-          <span>${distKm} km</span>
-          <span>${kcal} kcal</span>
-          <span>${floors} andares</span>
+          <span>${dayDistKm} km</span>
+          <span>${dayKcal} kcal</span>
+          <span>${dayElevacaoM} m elevação</span>
         </div>
       </div>
-      <div class="passos-historico-list">${listHtml}</div>
+      <div class="passos-hourly-card">
+        <div class="passos-hourly-title">Passos por hora do dia</div>
+        <div id="passosHourlySubtitle" class="passos-hourly-subtitle"></div>
+        <canvas id="passosHourlyCanvas" class="passos-hourly-canvas" width="720" height="180"></canvas>
+      </div>
+      <div class="passos-footer-note">${hourInfoHtml}</div>
     `;
+    renderPassosHourlyCanvas(selectedDay, selectedRow?.entries || [], goal);
     return;
   }
 
@@ -6557,8 +6740,17 @@ function executePendingVitalSave() {
 
   renderSaude();
   if (currentVitalDetail && currentVitalDetail.tipo === p.tipoVital && vital) {
-    renderVitalDetailContent(vital.historico);
-    renderSparklineChart(vital.historico);
+    // Re-sincroniza referência do detalhe para evitar estado antigo após re-render.
+    const refreshed = mockData.sinaisVitais.find((v) => v.id === currentVitalDetail.id);
+    if (refreshed) currentVitalDetail = refreshed;
+
+    // Pressão e Passos usam o mesmo fluxo de abertura (período + gráfico principal + conteúdo).
+    if (p.tipoVital === 'Pressão Arterial' || p.tipoVital === 'Passos') {
+      applyVitalDefaultPeriodView();
+    } else {
+      renderVitalDetailContent(vital.historico);
+      renderSparklineChart(vital.historico);
+    }
   }
 }
 

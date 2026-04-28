@@ -6317,8 +6317,8 @@ body {
 .passos-resumo-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: center;
+  gap: 8px;
 }
 
 .passos-resumo-num {
@@ -6326,16 +6326,6 @@ body {
   font-weight: 700;
   color: #4F4F4F;
   line-height: 1.05;
-}
-
-.passos-resumo-pct {
-  font-size: 14px;
-  font-weight: 700;
-  color: #16a34a;
-  background: #bbf7d0;
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-variant-numeric: tabular-nums;
 }
 
 .passos-resumo-goal {
@@ -6357,6 +6347,16 @@ body {
   display: block;
   height: 100%;
   background: linear-gradient(90deg, #74df9a 0%, #22c55e 100%);
+}
+
+.passos-resumo-scale {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #9aa1ad;
+  font-weight: 500;
 }
 
 .passos-resumo-meta {
@@ -6393,12 +6393,25 @@ body {
 }
 
 .passos-historico-row {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
   padding: 10px 0;
   border-bottom: 1px solid #f1f2f4;
 }
 
 .passos-historico-row:last-child {
   border-bottom: none;
+}
+
+.passos-historico-row.is-active .passos-historico-valor {
+  color: #1f9d52;
+}
+
+.passos-historico-row.is-active .passos-historico-pct {
+  color: #1f9d52;
 }
 
 .passos-historico-top {
@@ -6424,6 +6437,79 @@ body {
   margin-top: 2px;
   font-size: 12px;
   color: #8f96a3;
+}
+
+.passos-hourly-card {
+  background: #fff;
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.passos-hourly-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #323842;
+}
+
+.passos-hourly-subtitle {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #8f96a3;
+  font-weight: 500;
+}
+
+.passos-hourly-canvas {
+  width: 100%;
+  border-radius: 10px;
+  display: block;
+  margin-top: 6px;
+}
+
+.passos-footer-note {
+  margin-top: 8px;
+  text-align: center;
+  color: #9aa1ad;
+  line-height: 1.25;
+}
+
+.passos-footer-hour {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8f96a3;
+  margin-bottom: 4px;
+}
+
+.passos-footer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #4f5561;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.passos-footer-meta span + span {
+  position: relative;
+  padding-left: 10px;
+}
+
+.passos-footer-meta span + span::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1px;
+  height: 14px;
+  background: #e3e5e8;
+  transform: translateY(-50%);
+}
+
+.passos-footer-empty {
+  font-size: 11px;
+  color: #9aa1ad;
 }
 
 .vital-pressao-sis-dia {
