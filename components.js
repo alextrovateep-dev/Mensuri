@@ -83,6 +83,40 @@ function createVitalCard(vital) {
   const tipoSafe = String(vital.tipo).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   const tipoAttr = String(vital.tipo).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
+  if (vital.tipo === 'Pressão Arterial') {
+    const parsed =
+      vital.valor && typeof vital.valor === 'object'
+        ? vital.valor
+        : typeof parsePressureValue === 'function'
+          ? parsePressureValue(vital.valor)
+          : null;
+    const sAtual = parsed && Number.isFinite(Number(parsed.sistolica)) ? Math.round(Number(parsed.sistolica)) : null;
+    const dAtual = parsed && Number.isFinite(Number(parsed.diastolica)) ? Math.round(Number(parsed.diastolica)) : null;
+    const atualTxt = sAtual != null && dAtual != null ? `${sAtual}/${dAtual}` : '—';
+
+    const pressureSvg = `<svg class="vital-pressao-heart" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M4 14a8 8 0 1 1 16 0"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 14l3.8-3.2"/><circle cx="12" cy="14" r="1.25" fill="currentColor" stroke="none"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 18h10"/></svg>`;
+
+    // Valores separados SIS / DIA para exibição
+    const sisVal = sAtual != null ? sAtual : '—';
+    const diaVal = dAtual != null ? dAtual : '—';
+
+    return `
+    <div class="card card-saude vital-card vital-card--pressao" role="article" aria-label="${tipoAttr}" style="cursor: pointer;" onclick="openVitalDetailModal('${tipoSafe}', ${vital.id})">
+      <div class="vital-pressao-stack">
+        <div class="vital-pressao-top">
+          <div class="vital-pressao-top-left">
+            <span class="vital-icon vital-icon--pressao" aria-hidden="true">${pressureSvg}</span>
+            <span class="vital-pressao-title">Pressão</span>
+          </div>
+        </div>
+        <div class="vital-pressao-value-row">
+          <span class="vital-pressao-num">${sisVal}/${diaVal}</span><span class="vital-pressao-unit">mmHg</span>
+        </div>
+      </div>
+    </div>
+  `;
+  }
+
   if (vital.tipo === 'Batimento Cardíaco') {
     const toneClass =
       typeof getBatimentoCardTone === 'function' ? getBatimentoCardTone(vital) : 'vital-batimento-tone--none';
@@ -112,6 +146,38 @@ function createVitalCard(vital) {
         <div class="vital-batimento-value-row">
           <span class="vital-batimento-num">${numHtml}</span><span class="vital-batimento-unit">bpm</span>
         </div>
+      </div>
+    </div>
+  `;
+  }
+
+  if (vital.tipo === 'Passos') {
+    const lastEntry = Array.isArray(vital.historico) && vital.historico.length > 0 ? vital.historico[0] : null;
+    const raw = lastEntry && lastEntry.valor != null ? Number(lastEntry.valor) : Number(vital.valor);
+    const currentSteps = Number.isFinite(raw) ? Math.max(0, Math.round(raw)) : 0;
+    const idealTxt = String(vital.ideal || '');
+    const idealMatch = idealTxt.match(/(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)/);
+    const minGoal = idealMatch ? Number(String(idealMatch[1]).replace(',', '.')) : NaN;
+    const maxGoal = idealMatch ? Number(String(idealMatch[2]).replace(',', '.')) : NaN;
+    const dailyGoal = Number.isFinite(minGoal) && Number.isFinite(maxGoal) ? Math.round((minGoal + maxGoal) / 2) : 10000;
+    const pct = dailyGoal > 0 ? Math.max(0, Math.min(999, Math.round((currentSteps / dailyGoal) * 100))) : 0;
+    const numHtml = currentSteps.toLocaleString('pt-BR');
+    const goalHtml = dailyGoal.toLocaleString('pt-BR');
+    const stepsIcon = String(vital.icon || '👣');
+    return `
+    <div class="card card-saude vital-card vital-card--passos" role="article" aria-label="${tipoAttr}" style="cursor: pointer;" onclick="openVitalDetailModal('${tipoSafe}', ${vital.id})">
+      <div class="vital-passos-stack">
+        <div class="vital-passos-top">
+          <div class="vital-passos-top-left">
+            <span class="vital-icon vital-icon--passos" aria-hidden="true">${stepsIcon}</span>
+            <span class="vital-passos-title">Passos</span>
+          </div>
+          <span class="vital-passos-badge">${pct}%</span>
+        </div>
+        <div class="vital-passos-value-row">
+          <span class="vital-passos-num">${numHtml}</span>
+        </div>
+        <div class="vital-passos-goal-row">/${goalHtml} passos</div>
       </div>
     </div>
   `;

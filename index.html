@@ -173,28 +173,9 @@
 
             <!-- Batimento cardíaco: vista período (barras por dia) OU vista dia (padrão wearable: min–máx por hora) -->
             <div id="vitalDetailBatimentoChrome" class="vital-batimento-chrome" style="display: none;">
-                <div class="vital-batimento-quick-summary" id="vitalBatimentoQuickSummary">
-                    <div class="vital-batimento-kpis">
-                        <div class="vital-batimento-kpi">
-                            <span class="vital-batimento-kpi-label">Média</span>
-                            <span class="vital-batimento-kpi-value" id="vitalBatimentoKpiMedia">—</span>
-                        </div>
-                        <div class="vital-batimento-kpi">
-                            <span class="vital-batimento-kpi-label">% ideal</span>
-                            <span class="vital-batimento-kpi-value" id="vitalBatimentoKpiIdealPct">—</span>
-                        </div>
-                        <div class="vital-batimento-kpi">
-                            <span class="vital-batimento-kpi-label">Pico</span>
-                            <span class="vital-batimento-kpi-value" id="vitalBatimentoKpiPico">—</span>
-                        </div>
-                    </div>
-                    <p class="vital-batimento-quick-insight" id="vitalBatimentoQuickInsight">Sem dados suficientes para análise.</p>
-                    <button type="button" class="vital-batimento-more-btn" id="vitalBatimentoQuickMoreBtn" onclick="toggleBatimentoQuickAnalysis()">Ver análise completa</button>
-                    <div class="vital-batimento-extra" id="vitalBatimentoQuickExtra" style="display:none;">
-                        <div class="vital-batimento-extra-row"><span>Mediana</span><strong id="vitalBatimentoKpiMediana">—</strong></div>
-                        <div class="vital-batimento-extra-row"><span>P95</span><strong id="vitalBatimentoKpiP95">—</strong></div>
-                        <div class="vital-batimento-extra-row"><span>Cobertura</span><strong id="vitalBatimentoKpiCobertura">—</strong></div>
-                    </div>
+                <div class="vital-batimento-context-row vital-batimento-context-row--top">
+                    <button type="button" class="vital-period-chip vital-batimento-context-chip" data-batimento-context-mode="all" onclick="setVitalBatimentoContextMode('all')" aria-pressed="true">Todos</button>
+                    <button type="button" class="vital-period-chip vital-batimento-context-chip" data-batimento-context-mode="sono_repouso" onclick="setVitalBatimentoContextMode('sono_repouso')" aria-pressed="false">Sono + Repouso</button>
                 </div>
                 <div id="vitalBatimentoPeriodScope">
                     <div class="vital-period-chips" role="tablist" aria-label="Período do gráfico">
@@ -203,10 +184,6 @@
                         <button type="button" class="vital-period-chip" data-period="30d" onclick="setVitalBatimentoPeriod('30d')">30 dias</button>
                         <button type="button" class="vital-period-chip" data-period="year" onclick="setVitalBatimentoPeriod('year')">Ano</button>
                         <button type="button" class="vital-period-chip" data-period="livre" onclick="setVitalBatimentoPeriod('livre')">Livre</button>
-                    </div>
-                    <div class="vital-batimento-context-row">
-                        <button type="button" class="vital-period-chip vital-batimento-context-chip" data-batimento-context-mode="all" onclick="setVitalBatimentoContextMode('all')" aria-pressed="true">Todos</button>
-                        <button type="button" class="vital-period-chip vital-batimento-context-chip" data-batimento-context-mode="sono_repouso" onclick="setVitalBatimentoContextMode('sono_repouso')" aria-pressed="false">Sono + Repouso</button>
                     </div>
                     <p id="vitalDetailPeriodSummary" class="vital-period-summary vital-period-summary--compact" aria-live="polite"></p>
                     <canvas id="vitalBatimentoDailyCanvas" class="vital-batimento-canvas" width="720" height="200" role="img" aria-label="Gráfico: uma barra por dia com mínimo e máximo desse dia. Toque numa coluna para ver o detalhe do dia."></canvas>
@@ -229,10 +206,6 @@
                     <div class="vital-batimento-day-head">
                         <div id="vitalBatimentoDayDate" class="vital-batimento-day-date"></div>
                         <div id="vitalBatimentoDayRangeBig" class="vital-batimento-day-range-big"></div>
-                    </div>
-                    <div class="vital-batimento-context-row">
-                        <button type="button" class="vital-period-chip vital-batimento-context-chip" data-batimento-context-mode="all" onclick="setVitalBatimentoContextMode('all')" aria-pressed="true">Todos</button>
-                        <button type="button" class="vital-period-chip vital-batimento-context-chip" data-batimento-context-mode="sono_repouso" onclick="setVitalBatimentoContextMode('sono_repouso')" aria-pressed="false">Sono + Repouso</button>
                     </div>
                     <div class="vital-batimento-dist-wrap" aria-hidden="true">
                         <div class="vital-batimento-dist-labels"><span id="vitalBatimentoDistLabelLo">60</span><span id="vitalBatimentoDistLabelHi">100</span></div>
@@ -257,13 +230,35 @@
 
             <!-- Demais sinais: sparkline + filtro por data -->
             <div id="vitalDetailDefaultChrome" class="vital-detail-default-chrome">
-                <canvas id="sparklineChart" width="720" height="220" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 16px;"></canvas>
-                <div class="form-group">
+
+                <!-- Filtros ACIMA do gráfico -->
+                <div id="vitalDefaultPeriodControls" style="display: none;">
+                    <div class="vital-period-chips" role="tablist" aria-label="Período do gráfico">
+                        <button type="button" class="vital-period-chip" data-default-period="7d" onclick="setVitalDefaultPeriod('7d')">7 dias</button>
+                        <button type="button" class="vital-period-chip" data-default-period="15d" onclick="setVitalDefaultPeriod('15d')">15 dias</button>
+                        <button type="button" class="vital-period-chip" data-default-period="30d" onclick="setVitalDefaultPeriod('30d')">30 dias</button>
+                        <button type="button" class="vital-period-chip" data-default-period="year" onclick="setVitalDefaultPeriod('year')">Ano</button>
+                        <button type="button" class="vital-period-chip" data-default-period="livre" onclick="setVitalDefaultPeriod('livre')">Livre</button>
+                    </div>
+                    <div id="vitalDefaultLivreRow" class="form-group vital-batimento-livre" style="display: none;">
+                        <label class="form-label">Período livre</label>
+                        <div class="vital-livre-inputs">
+                            <input type="date" class="form-input" id="filterVitalLivreInicio" onchange="onVitalDefaultLivreRangeChange()">
+                            <input type="date" class="form-input" id="filterVitalLivreFim" onchange="onVitalDefaultLivreRangeChange()">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group" id="vitalDefaultDateFilterRow">
                     <label class="form-label">Filtrar por Data</label>
                     <div style="display: flex; gap: 8px;">
                         <input type="date" class="form-input" id="filterVitalDataInicio" style="flex: 1;" onchange="filterVitalDetail()">
                         <input type="date" class="form-input" id="filterVitalDataFim" style="flex: 1;" onchange="filterVitalDetail()">
                     </div>
+                </div>
+
+                <!-- Gráfico abaixo dos filtros -->
+                <div id="pressaoHistoricoView">
+                    <canvas id="sparklineChart" width="720" height="220" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 8px;"></canvas>
                 </div>
             </div>
 

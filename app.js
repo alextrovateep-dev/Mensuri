@@ -11,8 +11,8 @@ let vitalBatimentoPeriod = '7d';
 let vitalBatimentoChartSelection = null;
 /** Contexto exibido no modal de Batimento: all | sono_repouso */
 let vitalBatimentoContextMode = 'all';
-/** Painel "Ver análise completa" (Batimento) */
-let vitalBatimentoQuickExpanded = false;
+/** Período no modal padrão (usado em Pressão Arterial): 7d | 15d | 30d | year | livre */
+let vitalDefaultPeriod = '7d';
 let lastMedicationAlertKey = null;
 let lastVitalAlertKey = null;
 let currentAlarmMedicationId = null;
@@ -50,12 +50,137 @@ function getCurrentHHMM() {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 }
 
+function getStepsDailyGoalValue(vital) {
+  if (!vital) return 10000;
+  if (Number.isFinite(Number(vital.metaDiaria))) return Math.max(1, Math.round(Number(vital.metaDiaria)));
+  const idealTxt = String(vital.ideal || '');
+  const m = idealTxt.match(/(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)/);
+  if (m) {
+    const minV = Number(String(m[1]).replace(',', '.'));
+    const maxV = Number(String(m[2]).replace(',', '.'));
+    if (Number.isFinite(minV) && Number.isFinite(maxV)) return Math.max(1, Math.round((minV + maxV) / 2));
+  }
+  return 10000;
+}
+
+function updateVitalDefaultPeriodChipActive() {
+  document.querySelectorAll('[data-default-period]').forEach((btn) => {
+    btn.classList.toggle('is-active', btn.getAttribute('data-default-period') === vitalDefaultPeriod);
+  });
+}
+
+function getVitalDefaultPeriodRange() {
+  const endToday = getTodayISODate();
+  const endDate = localNoonFromISODate(endToday);
+  if (Number.isNaN(endDate.getTime())) {
+    return { start: endToday, end: endToday };
+  }
+
+  if (vitalDefaultPeriod === 'livre') {
+    const di = document.getElementById('filterVitalLivreInicio');
+    const df = document.getElementById('filterVitalLivreFim');
+    const vi = di && di.value;
+    const vf = df && df.value;
+    if (vi && vf) return vi <= vf ? { start: vi, end: vf } : { start: vf, end: vi };
+    if (vi && !vf) return { start: vi, end: endToday };
+    if (!vi && vf) return { start: vf, end: vf };
+    const s = new Date(endDate.getTime());
+    s.setDate(s.getDate() - 6);
+    return { start: dateToLocalISODate(s), end: endToday };
+  }
+
+  if (vitalDefaultPeriod === 'year') {
+    const y = new Date().getFullYear();
+    return { start: `${y}-01-01`, end: endToday };
+  }
+
+  const daysBack = vitalDefaultPeriod === '7d' ? 6 : vitalDefaultPeriod === '15d' ? 14 : 29;
+  const startD = new Date(endDate.getTime());
+  startD.setDate(startD.getDate() - daysBack);
+  return { start: dateToLocalISODate(startD), end: endToday };
+}
+
+function applyVitalDefaultPeriodView() {
+  if (!currentVitalDetail || (currentVitalDetail.tipo !== 'Pressão Arterial' && currentVitalDetail.tipo !== 'Passos')) return;
+  const { start, end } = getVitalDefaultPeriodRange();
+  const filtrado = filterHistoricoByInclusiveDate(currentVitalDetail.historico, start, end);
+  renderVitalDetailContent(filtrado);
+  renderSparklineChart(filtrado);
+}
+
+function onVitalDefaultLivreRangeChange() {
+  applyVitalDefaultPeriodView();
+}
+
+function setVitalDefaultPeriod(period) {
+  vitalDefaultPeriod = period;
+  const livreRow = document.getElementById('vitalDefaultLivreRow');
+  if (livreRow) livreRow.style.display = period === 'livre' ? 'block' : 'none';
+  if (period === 'livre') {
+    const di = document.getElementById('filterVitalLivreInicio');
+    const df = document.getElementById('filterVitalLivreFim');
+    const end = getTodayISODate();
+    if (di && df && !di.value && !df.value) {
+      const s = localNoonFromISODate(end);
+      s.setDate(s.getDate() - 6);
+      di.value = dateToLocalISODate(s);
+      df.value = end;
+    }
+  }
+  updateVitalDefaultPeriodChipActive();
+  applyVitalDefaultPeriodView();
+}
+
 function formatDateForUI(isoDate) {
   return typeof formatISODateBR === 'function' ? formatISODateBR(isoDate) : isoDate;
 }
 
 function formatDateTimeForUI(isoDateTime) {
   return typeof formatISODateTimeBR === 'function' ? formatISODateTimeBR(isoDateTime) : isoDateTime;
+}
+
+function getHeartRateForPressureEntry(pressureEntry) {
+  if (!pressureEntry) return null;
+  if (pressureEntry.heartRate != null && Number.isFinite(Number(pressureEntry.heartRate))) {
+    return Number(pressureEntry.heartRate);
+  }
+  const batimento = mockData?.sinaisVitais?.find((v) => v.tipo === 'Batimento Cardíaco');
+  const hist = Array.isArray(batimento?.historico) ? batimento.historico : [];
+  if (!hist.length) return null;
+
+  const pDate = String(pressureEntry.data || '');
+  const pHora = pressureEntry.hora ? String(pressureEntry.hora).slice(0, 5) : '';
+
+  // Prioriza correspondência exata de data/hora.
+  const exact = hist.find((h) => String(h.data || '') === pDate && String(h.hora || '').slice(0, 5) === pHora);
+  if (exact && Number.isFinite(Number(exact.valor))) return Number(exact.valor);
+
+  // Fallback: leitura mais próxima no mesmo dia (até 2h).
+  const pMs = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(pressureEntry) : NaN;
+  if (!Number.isFinite(pMs)) return null;
+  let best = null;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  hist.forEach((h) => {
+    if (String(h.data || '') !== pDate) return;
+    const hMs = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(h) : NaN;
+    const v = Number(h?.valor);
+    if (!Number.isFinite(hMs) || !Number.isFinite(v)) return;
+    const delta = Math.abs(hMs - pMs);
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      best = v;
+    }
+  });
+  return bestDelta <= 2 * 60 * 60 * 1000 ? best : null;
+}
+
+function togglePressaoDiaColetas(dayKey) {
+  const el = document.getElementById(`pressaoColetas-${dayKey}`);
+  const btn = document.getElementById(`pressaoColetasBtn-${dayKey}`);
+  if (!el || !btn) return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'block';
+  btn.classList.toggle('is-open', !isOpen);
 }
 
 function isBatimentoSonoOuRepouso(h) {
@@ -114,110 +239,6 @@ function toggleVitalBatimentoContextMode() {
   setVitalBatimentoContextMode(next);
 }
 
-function percentileFromSorted(valuesAsc, p) {
-  if (!Array.isArray(valuesAsc) || valuesAsc.length === 0) return null;
-  const q = Math.max(0, Math.min(1, p));
-  const pos = q * (valuesAsc.length - 1);
-  const lo = Math.floor(pos);
-  const hi = Math.ceil(pos);
-  if (lo === hi) return valuesAsc[lo];
-  const w = pos - lo;
-  return valuesAsc[lo] + (valuesAsc[hi] - valuesAsc[lo]) * w;
-}
-
-function getBatimentoSummaryScope(startISO, endISO) {
-  const sel = vitalBatimentoChartSelection;
-  if (sel && sel.kind === 'day') return { start: sel.iso, end: sel.iso };
-  if (sel && sel.kind === 'range') return { start: sel.start, end: sel.end };
-  return { start: startISO, end: endISO };
-}
-
-function updateBatimentoQuickAnalysisVisibility() {
-  const extra = document.getElementById('vitalBatimentoQuickExtra');
-  const btn = document.getElementById('vitalBatimentoQuickMoreBtn');
-  if (!extra || !btn) return;
-  extra.style.display = vitalBatimentoQuickExpanded ? 'block' : 'none';
-  btn.textContent = vitalBatimentoQuickExpanded ? 'Ocultar análise completa' : 'Ver análise completa';
-}
-
-function toggleBatimentoQuickAnalysis() {
-  vitalBatimentoQuickExpanded = !vitalBatimentoQuickExpanded;
-  updateBatimentoQuickAnalysisVisibility();
-}
-
-function updateBatimentoQuickSummary(entries, startISO, endISO) {
-  const elMedia = document.getElementById('vitalBatimentoKpiMedia');
-  const elIdeal = document.getElementById('vitalBatimentoKpiIdealPct');
-  const elPico = document.getElementById('vitalBatimentoKpiPico');
-  const elInsight = document.getElementById('vitalBatimentoQuickInsight');
-  const elMediana = document.getElementById('vitalBatimentoKpiMediana');
-  const elP95 = document.getElementById('vitalBatimentoKpiP95');
-  const elCobertura = document.getElementById('vitalBatimentoKpiCobertura');
-  if (!elMedia || !elIdeal || !elPico || !elInsight || !elMediana || !elP95 || !elCobertura) return;
-
-  const vals = (entries || []).map(parseBatimentoHistoricoValor).filter(Number.isFinite);
-  const band = getBatimentoChartIdealBand();
-  if (vals.length === 0) {
-    elMedia.textContent = '—';
-    elIdeal.textContent = '—';
-    elPico.textContent = '—';
-    elInsight.textContent = 'Sem dados suficientes para análise no filtro atual.';
-    elMediana.textContent = '—';
-    elP95.textContent = '—';
-    elCobertura.textContent = '—';
-    updateBatimentoQuickAnalysisVisibility();
-    return;
-  }
-
-  const sum = vals.reduce((acc, v) => acc + v, 0);
-  const avg = Math.round(sum / vals.length);
-  const peak = Math.round(Math.max(...vals));
-  const inIdeal = vals.filter((v) => v >= band.min && v <= band.max).length;
-  const idealPct = Math.round((inIdeal / vals.length) * 100);
-  const sorted = [...vals].sort((a, b) => a - b);
-  const med = percentileFromSorted(sorted, 0.5);
-  const p95 = percentileFromSorted(sorted, 0.95);
-
-  const scope = getBatimentoSummaryScope(startISO, endISO);
-  const uniqueHours = new Set(
-    (entries || [])
-      .map((h) => {
-        const ms = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(h) : null;
-        if (ms == null) return '';
-        const d = new Date(ms);
-        return `${dateToLocalISODate(d)}-${String(d.getHours()).padStart(2, '0')}`;
-      })
-      .filter(Boolean)
-  ).size;
-  const daysInScope = countInclusiveDaysBetween(scope.start, scope.end);
-  const expectedHours = Math.max(1, daysInScope * 24);
-  const coveragePct = Math.round((uniqueHours / expectedHours) * 100);
-
-  let insight = '';
-  if (vals.length < 4) {
-    insight = 'Poucas leituras no recorte; use com cautela para decisão.';
-  } else if (idealPct >= 80) {
-    insight = 'Padrão estável: maioria das leituras está na faixa ideal.';
-  } else if (peak > band.max + 15) {
-    insight = 'Há picos relevantes acima do ideal; vale investigar contexto.';
-  } else if (idealPct < 50) {
-    insight = 'Menos da metade na faixa ideal no período selecionado.';
-  } else {
-    insight = 'Perfil intermediário, com variação moderada no período.';
-  }
-  if (vitalBatimentoContextMode === 'sono_repouso') {
-    insight += ' (filtro Sono + Repouso ativo)';
-  }
-
-  elMedia.textContent = `${avg} bpm`;
-  elIdeal.textContent = `${idealPct}%`;
-  elPico.textContent = `${peak} bpm`;
-  elInsight.textContent = insight;
-  elMediana.textContent = `${Math.round(med)} bpm`;
-  elP95.textContent = `${Math.round(p95)} bpm`;
-  elCobertura.textContent = `${uniqueHours}/${expectedHours} h (${coveragePct}%)`;
-  updateBatimentoQuickAnalysisVisibility();
-}
 
 function getIdealLabel(value) {
   return typeof formatIdealLabel === 'function' ? formatIdealLabel(value) : value;
@@ -1980,6 +2001,17 @@ document.addEventListener('DOMContentLoaded', () => {
         vitalDetailModal.classList.remove('active');
       }
     });
+    // Tooltip do gráfico por hora não deve ficar "grudado" durante navegação/rolagem.
+    vitalDetailModal.addEventListener('click', (e) => {
+      const insideHourlyWrap = !!(e.target && e.target.closest && e.target.closest('.vital-batimento-hourly-wrap'));
+      if (!insideHourlyWrap) hideBatimentoHourlyTooltip();
+    });
+    vitalDetailModal.addEventListener('touchmove', () => hideBatimentoHourlyTooltip(), { passive: true });
+  }
+
+  const vitalDetailContent = document.getElementById('vitalDetailContent');
+  if (vitalDetailContent) {
+    vitalDetailContent.addEventListener('scroll', () => hideBatimentoHourlyTooltip(), { passive: true });
   }
 
   const exercicioDetalheModal = document.getElementById('exercicioDetalheModal');
@@ -4493,7 +4525,6 @@ function updateVitalBatimentoModalView() {
   const inPeriod = filterHistoricoByInclusiveDate(currentVitalDetail.historico, start, end);
   const filtrado = filterBatimentoByContext(inPeriod);
   const forList = historicoForBatimentoSelection(filtrado);
-  updateBatimentoQuickSummary(forList, start, end);
   currentVitalHistoricoView = sortHistoricoBatimentoDesc(forList);
   renderVitalDetailContent(currentVitalHistoricoView);
   renderBatimentoChromeCharts(filtrado, start, end);
@@ -5252,9 +5283,13 @@ function syncBatimentoChromePanels() {
   const periodScope = document.getElementById('vitalBatimentoPeriodScope');
   const dayScope = document.getElementById('vitalBatimentoDayScope');
   const backBtn = document.getElementById('vitalBatimentoHeaderBackBtn');
+  const listEl = document.getElementById('vitalDetailContent');
+  const modalContent = document.querySelector('#vitalDetailModal .modal-content');
   if (!periodScope || !dayScope) return;
   const iso = vitalBatimentoChartSelection && vitalBatimentoChartSelection.kind === 'day' ? vitalBatimentoChartSelection.iso : null;
   if (backBtn) backBtn.hidden = !iso;
+  if (listEl) listEl.classList.toggle('vital-detail-content--batimento-day', !!iso);
+  if (modalContent) modalContent.classList.toggle('vital-detail-modal-content--batimento-day', !!iso);
   if (iso) {
     periodScope.style.display = 'none';
     dayScope.style.display = 'block';
@@ -5566,18 +5601,28 @@ function openVitalDetailModal(tipoVital, vitalId) {
   document.getElementById('filterVitalDataFim').value = '';
 
   const bc = tipoVital === 'Batimento Cardíaco';
+  const isPressao = tipoVital === 'Pressão Arterial';
+  const isPassos = tipoVital === 'Passos';
   const bcChrome = document.getElementById('vitalDetailBatimentoChrome');
   const defChrome = document.getElementById('vitalDetailDefaultChrome');
   const batimentoBackBtn = document.getElementById('vitalBatimentoHeaderBackBtn');
+  const defaultPeriodControls = document.getElementById('vitalDefaultPeriodControls');
+  const defaultDateFilterRow = document.getElementById('vitalDefaultDateFilterRow');
+  const defaultLivreRow = document.getElementById('vitalDefaultLivreRow');
+  const pressaoHistoricoView = document.getElementById('pressaoHistoricoView');
+
   if (bcChrome) bcChrome.style.display = bc ? 'block' : 'none';
   if (defChrome) defChrome.style.display = bc ? 'none' : 'block';
   if (batimentoBackBtn && !bc) batimentoBackBtn.hidden = true;
+  if (defaultPeriodControls) defaultPeriodControls.style.display = !bc && (isPressao || isPassos) ? 'block' : 'none';
+  if (defaultDateFilterRow) defaultDateFilterRow.style.display = !bc && !isPressao && !isPassos ? 'block' : 'none';
+
+  if (pressaoHistoricoView) pressaoHistoricoView.style.display = 'block';
 
   if (bc) {
     vitalBatimentoChartSelection = null;
     vitalBatimentoPeriod = '7d';
     vitalBatimentoContextMode = 'all';
-    vitalBatimentoQuickExpanded = false;
     const livreRow = document.getElementById('vitalBatimentoLivreRow');
     if (livreRow) livreRow.style.display = 'none';
     const di = document.getElementById('filterBatimentoLivreInicio');
@@ -5597,8 +5642,21 @@ function openVitalDetailModal(tipoVital, vitalId) {
       summaryEl.style.cursor = '';
       summaryEl.removeAttribute('title');
     }
-    renderVitalDetailContent(currentVitalDetail.historico);
-    renderSparklineChart(currentVitalDetail.historico);
+    if (isPressao || isPassos) {
+      vitalDefaultPeriod = '7d';
+      if (defaultLivreRow) defaultLivreRow.style.display = 'none';
+      const di = document.getElementById('filterVitalLivreInicio');
+      const df = document.getElementById('filterVitalLivreFim');
+      if (di && df) {
+        di.value = '';
+        df.value = '';
+      }
+      updateVitalDefaultPeriodChipActive();
+      applyVitalDefaultPeriodView();
+    } else {
+      renderVitalDetailContent(currentVitalDetail.historico);
+      renderSparklineChart(currentVitalDetail.historico);
+    }
   }
 
   document.getElementById('vitalDetailModal').classList.add('active');
@@ -5627,6 +5685,186 @@ function renderSparklineChart(historico) {
   const width = canvas.width;
   const height = canvas.height;
   ctx.clearRect(0, 0, width, height);
+
+  if (currentVitalDetail && currentVitalDetail.tipo === 'Pressão Arterial') {
+    const pressureRows = historico
+      .slice(0, 10)
+      .reverse()
+      .map((h) => ({ h, pair: typeof parseHistoricoPressurePair === 'function' ? parseHistoricoPressurePair(h) : null }))
+      .filter((row) => !!row.pair);
+    if (pressureRows.length === 0) return;
+    const pares = pressureRows.map((row) => row.pair);
+
+    let idealSys = 120;
+    let idealDia = 80;
+    let idealObj = currentVitalDetail.ideal;
+    if (typeof idealObj === 'string' && typeof parseIdealObject === 'function') {
+      idealObj = parseIdealObject(idealObj);
+    }
+    if (idealObj && idealObj.type === 'pressure' && idealObj.systolic != null && idealObj.diastolic != null) {
+      idealSys = Number(idealObj.systolic);
+      idealDia = Number(idealObj.diastolic);
+    }
+
+    const minData = Math.min(...pares.map((p) => p.d));
+    const maxData = Math.max(...pares.map((p) => p.s));
+    let yLow = Math.floor((Math.min(minData, idealDia) - 6) / 5) * 5;
+    let yHigh = Math.ceil((Math.max(maxData, idealSys) + 6) / 5) * 5;
+    if (yHigh - yLow < 20) {
+      yLow -= 10;
+      yHigh += 10;
+    }
+    yLow = Math.max(40, yLow);
+    yHigh = Math.min(220, yHigh);
+    const span = yHigh - yLow || 1;
+
+    const padL = 26;
+    const padR = 8;
+    const padT = 8;
+    const padB = 20;
+    const gw = width - padL - padR;
+    const gh = height - padT - padB;
+    const toY = (v) => padT + ((yHigh - v) / span) * gh;
+
+    ctx.fillStyle = '#F8F9FA';
+    ctx.fillRect(0, 0, width, height);
+    drawBatimentoChartIdealBackground(ctx, padL, gw, toY, yLow, yHigh, idealDia, idealSys);
+
+    const n = pressureRows.length;
+    const slot = gw / Math.max(1, n);
+    const barW = Math.min(16, Math.max(5, slot * 0.66));
+    const barR = Math.min(6, barW / 2 - 0.5);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(padL, padT, gw, gh);
+    ctx.clip();
+    pressureRows.forEach((row, i) => {
+      const p = row.pair;
+      const cx = padL + slot * i + slot / 2;
+      const x0 = cx - barW / 2;
+      drawBatimentoIdealSegmentedRangeBar(
+        ctx,
+        x0,
+        barW,
+        p.d,
+        p.s,
+        idealDia,
+        idealSys,
+        toY,
+        barR,
+        false
+      );
+    });
+    ctx.restore();
+
+    ctx.fillStyle = '#8e8e8e';
+    ctx.font = '8px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(Math.round(yHigh)), padL - 4, toY(yHigh));
+    ctx.fillText(String(Math.round(yLow)), padL - 4, toY(yLow));
+    ctx.textBaseline = 'alphabetic';
+
+    const labelEvery = Math.max(1, Math.ceil(n / 5));
+    ctx.fillStyle = '#666';
+    ctx.textAlign = 'center';
+    pressureRows.forEach((row, i) => {
+        if (i % labelEvery !== 0 && i !== n - 1) return;
+        const cx = padL + slot * i + slot / 2;
+        const h = row.h;
+        const d = String(h.data || '');
+        const parts = d.split('-');
+        const short = parts.length === 3 ? String(Number(parts[2])) : '';
+        ctx.fillText(short, cx, height - 4);
+      });
+    return;
+  }
+
+  if (currentVitalDetail && currentVitalDetail.tipo === 'Passos') {
+    const rows = (Array.isArray(historico) ? historico : [])
+      .slice(0, 10)
+      .reverse()
+      .map((h) => ({
+        h,
+        v: Number(h && h.valor)
+      }))
+      .filter((r) => Number.isFinite(r.v));
+    if (rows.length === 0) return;
+
+    const goal = getStepsDailyGoalValue(currentVitalDetail);
+    const maxData = Math.max(...rows.map((r) => r.v), goal);
+    const yLow = 0;
+    const yHigh = Math.max(goal * 1.15, maxData * 1.1, 1);
+    const span = yHigh - yLow;
+
+    const padL = 28;
+    const padR = 8;
+    const padT = 8;
+    const padB = 20;
+    const gw = width - padL - padR;
+    const gh = height - padT - padB;
+    const toY = (v) => padT + ((yHigh - v) / span) * gh;
+
+    ctx.fillStyle = '#F8F9FA';
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = 'rgba(34, 197, 94, 0.08)';
+    ctx.fillRect(padL, toY(goal), gw, gh - (toY(goal) - padT));
+
+    ctx.strokeStyle = 'rgba(34, 197, 94, 0.55)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(padL, toY(goal));
+    ctx.lineTo(padL + gw, toY(goal));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const n = rows.length;
+    const slot = gw / Math.max(1, n);
+    const barW = Math.min(18, Math.max(7, slot * 0.58));
+    const barR = Math.min(5, barW / 2 - 0.5);
+    rows.forEach((row, i) => {
+      const cx = padL + slot * i + slot / 2;
+      const x0 = cx - barW / 2;
+      const yTop = toY(row.v);
+      const yBot = toY(0);
+      const g = ctx.createLinearGradient(0, yTop, 0, yBot);
+      g.addColorStop(0, '#6ee7a0');
+      g.addColorStop(1, '#22c55e');
+      ctx.fillStyle = g;
+      const hBar = Math.max(1, yBot - yTop);
+      if (typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(x0, yTop, barW, hBar, [barR, barR, 2, 2]);
+        ctx.fill();
+      } else {
+        ctx.fillRect(x0, yTop, barW, hBar);
+      }
+    });
+
+    ctx.fillStyle = '#8e8e8e';
+    ctx.font = '8px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('0', padL - 4, toY(0));
+    ctx.fillText(String(Math.round(goal)), padL - 4, toY(goal));
+
+    const labelEvery = Math.max(1, Math.ceil(n / 5));
+    ctx.fillStyle = '#666';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    rows.forEach((row, i) => {
+      if (i % labelEvery !== 0 && i !== n - 1) return;
+      const cx = padL + slot * i + slot / 2;
+      const d = String(row.h.data || '');
+      const parts = d.split('-');
+      const short = parts.length === 3 ? String(Number(parts[2])) : '';
+      ctx.fillText(short, cx, height - 4);
+    });
+    return;
+  }
 
   const values = historico.slice(0, 10).reverse().map(h => {
     if (typeof h.valor === 'object' && h.valor.sistolica != null) return parseInt(h.valor.sistolica, 10);
@@ -5750,6 +5988,24 @@ function htmlVitalBatimentoListRow(opts) {
       </div>`;
 }
 
+function bindBatimentoHourRows() {
+  const host = document.getElementById('vitalDetailContent');
+  if (!host) return;
+  host.querySelectorAll('.vital-list-item--hora-clicavel[data-batimento-hour]').forEach((row) => {
+    const hour = Number.parseInt(row.getAttribute('data-batimento-hour') || '', 10);
+    if (!Number.isInteger(hour)) return;
+    const ctxRaw = row.getAttribute('data-batimento-context');
+    const contexto = ctxRaw === 'exercicio' || ctxRaw === 'sono' || ctxRaw === 'repouso' ? ctxRaw : null;
+    row.onclick = () => openBatimentoMinutoDetalhe(hour, contexto);
+    row.onkeydown = (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        openBatimentoMinutoDetalhe(hour, contexto);
+      }
+    };
+  });
+}
+
 function renderVitalDetailContent(historico) {
   const raw = Array.isArray(historico) ? historico : [];
   const bcDaySelected =
@@ -5796,12 +6052,12 @@ function renderVitalDetailContent(historico) {
           trailHtml = '<span class="vital-list-chevron" aria-hidden="true">&#8250;</span>';
           if (ex) {
             rowClass += ' vital-list-item--exercicio';
-            clickAttr = ` role="button" tabindex="0" onclick="openBatimentoMinutoDetalhe(${h}, 'exercicio')"`;
+            clickAttr = ` role="button" tabindex="0" data-batimento-hour="${h}" data-batimento-context="exercicio" onclick="openBatimentoMinutoDetalhe(${h}, 'exercicio')"`;
           } else if (sn) {
             rowClass += ' vital-list-item--sono';
-            clickAttr = ` role="button" tabindex="0" onclick="openBatimentoMinutoDetalhe(${h}, 'sono')"`;
+            clickAttr = ` role="button" tabindex="0" data-batimento-hour="${h}" data-batimento-context="sono" onclick="openBatimentoMinutoDetalhe(${h}, 'sono')"`;
           } else {
-            clickAttr = ` role="button" tabindex="0" onclick="openBatimentoMinutoDetalhe(${h}, null)"`;
+            clickAttr = ` role="button" tabindex="0" data-batimento-hour="${h}" data-batimento-context="" onclick="openBatimentoMinutoDetalhe(${h}, null)"`;
           }
         }
         return htmlVitalBatimentoListRow({
@@ -5831,6 +6087,7 @@ function renderVitalDetailContent(historico) {
         ">Ver mais (${hiddenFr.length})</button>`;
       }
       document.getElementById('vitalDetailContent').innerHTML = htmlDay;
+      bindBatimentoHourRows();
       return;
     }
 
@@ -5847,14 +6104,13 @@ function renderVitalDetailContent(historico) {
       const clickAttr = ` role="button" tabindex="0" onclick="selectBatimentoDayFromList('${row.day}')"`;
       const trailHtml = '<span class="vital-list-chevron" aria-hidden="true">›</span>';
       const dateTxt = formatDateForUI(row.day);
-      const timeTxt = row.lastTime ? `${dateTxt} · ${row.lastTime}` : `${dateTxt} · dia completo`;
       return htmlVitalBatimentoListRow({
         rowClass,
         clickAttr,
         badgeHtml,
         hourDetail: {
           measureLine: valStr,
-          timeLine: timeTxt,
+          timeLine: dateTxt,
           trailHtml
         }
       });
@@ -5874,6 +6130,119 @@ function renderVitalDetailContent(historico) {
         ">Ver mais (${hiddenRows.length})</button>`;
     }
     document.getElementById('vitalDetailContent').innerHTML = htmlBc;
+    return;
+  }
+
+  if (currentVitalDetail?.tipo === 'Pressão Arterial') {
+    const byDay = new Map();
+    currentVitalHistoricoView.forEach((h) => {
+      const dayIso = (typeof historicoEntryDayISO === 'function') ? historicoEntryDayISO(h) : String(h.data || '').slice(0, 10);
+      if (!dayIso) return;
+      if (!byDay.has(dayIso)) byDay.set(dayIso, []);
+      byDay.get(dayIso).push(h);
+    });
+    const dayRows = Array.from(byDay.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+    const htmlPressao = dayRows.map(([dayIso, entries], idx) => {
+      const dayKey = String(dayIso).replace(/[^0-9]/g, '');
+      const openByDefault = idx === 0;
+      const pares = entries
+        .map((h) => (typeof parseHistoricoPressurePair === 'function' ? parseHistoricoPressurePair(h) : null))
+        .filter(Boolean);
+      const sisMax = pares.length ? Math.max(...pares.map((p) => p.s)) : null;
+      const diaMin = pares.length ? Math.min(...pares.map((p) => p.d)) : null;
+      const resumo = (sisMax != null && diaMin != null) ? `${sisMax}/${diaMin}` : '—';
+      const dateTxt = formatDateForUI(dayIso);
+      const coletasHtml = entries
+        .slice()
+        .sort((a, b) => {
+          const ta = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(a) : 0;
+          const tb = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(b) : 0;
+          return tb - ta;
+        })
+        .map((h) => {
+          const hora = h.hora ? String(h.hora).trim().slice(0, 5) : '--:--';
+          const valorFormatado = typeof formatHistoricValue === 'function'
+            ? formatHistoricValue(currentVitalDetail?.tipo, h)
+            : h.valor;
+          const ctxLabel = typeof getLabelContextoColetaHistorico === 'function' ? getLabelContextoColetaHistorico(h) : '';
+          const medLabel =
+            h.medicamentoPressao && h.medicamentoPressao !== 'nenhum'
+              ? (h.medicamentoPressao === 'tomados' ? 'Medicação tomada' : 'Medicação não tomada')
+              : '';
+          const hr = getHeartRateForPressureEntry(h);
+          const hrLabel = Number.isFinite(hr) ? `FC ${Math.round(hr)} bpm` : '';
+          const extra = [ctxLabel, medLabel].filter(Boolean).join(' · ');
+          const coletaTimeLine = `${dateTxt} · ${hora}`;
+          return `
+            <div class="pressao-coleta-item">
+              <div class="pressao-coleta-valor">${valorFormatado} mmHg</div>
+              ${hrLabel ? `<div class="pressao-coleta-fc">${hrLabel}</div>` : ''}
+              <div class="pressao-coleta-hora">${coletaTimeLine}</div>
+              ${extra ? `<div class="pressao-coleta-extra">${extra}</div>` : ''}
+            </div>`;
+        })
+        .join('');
+
+      return `
+        <div class="pressao-dia-card">
+          <button type="button" class="pressao-dia-resumo ${openByDefault ? 'is-open' : ''}" id="pressaoColetasBtn-${dayKey}" onclick="togglePressaoDiaColetas('${dayKey}')">
+            <div class="pressao-dia-main">
+              <div class="pressao-dia-medida">${resumo} <span class="pressao-dia-unit">mmHg</span></div>
+              <div class="pressao-dia-data">${dateTxt}</div>
+            </div>
+            <span class="pressao-dia-chevron" aria-hidden="true">›</span>
+          </button>
+          <div class="pressao-dia-coletas" id="pressaoColetas-${dayKey}" style="display:${openByDefault ? 'block' : 'none'};">${coletasHtml}</div>
+        </div>`;
+    }).join('');
+    document.getElementById('vitalDetailContent').innerHTML = htmlPressao;
+    return;
+  }
+
+  if (currentVitalDetail?.tipo === 'Passos') {
+    const goal = getStepsDailyGoalValue(currentVitalDetail);
+    const rows = currentVitalHistoricoView
+      .slice()
+      .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+    const latest = rows[0] || null;
+    const latestValRaw = Number(latest?.valor);
+    const latestVal = Number.isFinite(latestValRaw) ? Math.max(0, Math.round(latestValRaw)) : 0;
+    const pct = goal > 0 ? Math.max(0, Math.min(999, Math.round((latestVal / goal) * 100))) : 0;
+    const distKm = (latestVal * 0.00075).toFixed(2).replace('.', ',');
+    const kcal = Math.round(latestVal * 0.04);
+    const floors = Math.max(0, Math.round(latestVal / 1200));
+
+    const listHtml = rows.map((h) => {
+      const dateTxt = formatDateForUI(h.data);
+      const v = Number(h.valor);
+      const value = Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0;
+      const rowPct = goal > 0 ? Math.max(0, Math.min(100, Math.round((value / goal) * 100))) : 0;
+      return `
+        <div class="passos-historico-row">
+          <div class="passos-historico-top">
+            <span class="passos-historico-valor">${value.toLocaleString('pt-BR')} passos</span>
+            <span class="passos-historico-pct">${rowPct}%</span>
+          </div>
+          <div class="passos-historico-data">${dateTxt}</div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('vitalDetailContent').innerHTML = `
+      <div class="passos-resumo-card">
+        <div class="passos-resumo-head">
+          <div class="passos-resumo-num">${latestVal.toLocaleString('pt-BR')} passos</div>
+          <div class="passos-resumo-pct">${pct}%</div>
+        </div>
+        <div class="passos-resumo-goal">/${goal.toLocaleString('pt-BR')} passos</div>
+        <div class="passos-resumo-bar"><span style="width:${Math.max(0, Math.min(100, pct))}%;"></span></div>
+        <div class="passos-resumo-meta">
+          <span>${distKm} km</span>
+          <span>${kcal} kcal</span>
+          <span>${floors} andares</span>
+        </div>
+      </div>
+      <div class="passos-historico-list">${listHtml}</div>
+    `;
     return;
   }
 
@@ -5937,7 +6306,7 @@ function renderVitalDetailContent(historico) {
 
 function filterVitalDetail() {
   if (!currentVitalDetail) return;
-  if (currentVitalDetail.tipo === 'Batimento Cardíaco') return;
+  if (currentVitalDetail.tipo === 'Batimento Cardíaco' || currentVitalDetail.tipo === 'Pressão Arterial') return;
 
   const dataInicio = document.getElementById('filterVitalDataInicio').value;
   const dataFim = document.getElementById('filterVitalDataFim').value;
@@ -6210,6 +6579,17 @@ function executePendingHeartRateSave() {
       status: 'normal'
     });
     checkVitalAlert(vital);
+  }
+
+  // Se a pressão foi registrada imediatamente antes, vincula o BPM àquela leitura.
+  const pressureVital = mockData.sinaisVitais.find((v) => v.tipo === 'Pressão Arterial');
+  if (pressureVital && Array.isArray(pressureVital.historico) && lastManualMeasurementMeta) {
+    const dateISO = lastManualMeasurementMeta.dateISO;
+    const timeHHMM = String(lastManualMeasurementMeta.timeHHMM || '').slice(0, 5);
+    const entry = pressureVital.historico.find(
+      (h) => String(h.data || '') === String(dateISO || '') && String(h.hora || '').slice(0, 5) === timeHHMM
+    );
+    if (entry) entry.heartRate = Number(bpm);
   }
 
   closeVitalConfirmModal();

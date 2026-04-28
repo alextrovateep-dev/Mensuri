@@ -2093,8 +2093,8 @@ body {
 
 .vital-batimento-num {
   font-size: 34px;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 650;
+  color: #4F4F4F;
   letter-spacing: -0.03em;
 }
 
@@ -2136,6 +2136,93 @@ body {
 }
 
 .vital-batimento-badge.vital-batimento-tone--none {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+/* Pressão arterial: mesmo padrão visual do card de batimento */
+.vital-card--pressao {
+  padding: 12px 14px 12px 12px !important;
+  margin-bottom: 8px !important;
+}
+
+.vital-pressao-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vital-pressao-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vital-pressao-top-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vital-icon--pressao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #35589d;
+  line-height: 0;
+}
+
+.vital-pressao-heart {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+.vital-pressao-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+  letter-spacing: -0.01em;
+}
+
+.vital-pressao-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  line-height: 1;
+}
+
+.vital-pressao-num {
+  font-size: 34px;
+  font-weight: 650;
+  color: #4F4F4F;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.vital-pressao-unit {
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.vital-pressao-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.2;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #2f5fc2;
+  font-variant-numeric: tabular-nums;
+}
+
+.vital-pressao-badge--empty {
   background: #e5e7eb;
   color: #6b7280;
 }
@@ -2317,9 +2404,21 @@ body {
 
 #vitalDetailModal #vitalDetailContent {
   flex: 1 1 auto;
-  min-height: 140px;
+  min-height: 0;
   max-height: none !important;
   overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* No drill-down "Detalhado por hora", reserva altura para a lista não sumir. */
+#vitalDetailModal #vitalDetailContent.vital-detail-content--batimento-day {
+  min-height: 170px;
+}
+
+/* No "Detalhado por hora", o scroll deve ser do modal inteiro (mobile). */
+#vitalDetailModal .modal-content.vital-detail-modal-content--batimento-day {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 #vitalDetailModal > .modal-content > .form-group {
@@ -2446,6 +2545,40 @@ body {
   margin-right: auto;
   gap: 6px;
   margin-bottom: 4px;
+}
+
+.vital-batimento-context-row--top {
+  margin-top: 2px;
+  margin-bottom: 8px;
+}
+
+.vital-batimento-context-chip {
+  border-width: 1px;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.vital-batimento-context-chip[data-batimento-context-mode='all'] {
+  background: #f3f7ff;
+  border-color: #cdddfd;
+  color: #254a9f;
+}
+
+.vital-batimento-context-chip[data-batimento-context-mode='all'].is-active {
+  background: #2f5fc2;
+  border-color: #2f5fc2;
+  color: #ffffff;
+}
+
+.vital-batimento-context-chip[data-batimento-context-mode='sono_repouso'] {
+  background: #f1fdf8;
+  border-color: #bee9d5;
+  color: #1b7b56;
+}
+
+.vital-batimento-context-chip[data-batimento-context-mode='sono_repouso'].is-active {
+  background: #1f9f6a;
+  border-color: #1f9f6a;
+  color: #ffffff;
 }
 
 .vital-period-summary {
@@ -4966,6 +5099,14 @@ body {
   padding-top: 2px;
 }
 
+.vital-list-trail:empty {
+  display: none;
+}
+
+.vital-list-item--left-stack {
+  justify-content: flex-start;
+}
+
 .vital-list-date {
   color: #666666;
   font-weight: 500;
@@ -5796,4 +5937,538 @@ body {
   text-align: center;
   font-size: 15px;
   padding: 10px 8px;
+}
+
+/* ===== ABAS PRESSÃO DIÁRIA ===== */
+.pressao-tab-nav {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.pressao-tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.pressao-tab-btn.is-active {
+  background: #fff;
+  color: var(--color-primary, #e87829);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+}
+
+/* ===== PRESSÃO DIÁRIA — lista por dia ===== */
+.pressao-diaria-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.pressao-diaria-row {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card, #fff);
+  border-radius: 12px;
+  padding: 12px 14px;
+  gap: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  border: 1px solid var(--border-color, #ebebeb);
+}
+
+.pressao-diaria-date {
+  min-width: 56px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted, #888);
+  line-height: 1.3;
+  text-align: right;
+}
+
+.pressao-diaria-vals {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.pressao-diaria-main {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  justify-content: flex-start;
+}
+
+.pressao-diaria-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.pressao-diaria-row {
+  justify-content: flex-start;
+}
+
+.pressao-diaria-date {
+  text-align: left;
+}
+
+.pressao-diaria-num {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary, #222);
+  letter-spacing: -0.5px;
+}
+
+.pressao-diaria-unit {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  font-weight: 500;
+}
+
+.pressao-diaria-range {
+  font-size: 11px;
+  color: var(--text-muted, #aaa);
+  font-weight: 500;
+}
+
+.pressao-diaria-count {
+  font-size: 11px;
+  color: var(--text-muted, #bbb);
+  text-align: right;
+  min-width: 28px;
+}
+
+.pressao-diaria-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pressao-diaria-status--ok   { background: #22c55e; }
+.pressao-diaria-status--warn { background: #f59e0b; }
+.pressao-diaria-status--alert { background: #ef4444; }
+
+.pressao-dia-card {
+  background: #fff;
+  border: 1px solid #f0f1f3;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.pressao-dia-resumo {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+
+.pressao-dia-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.pressao-dia-medida {
+  font-size: 32px;
+  font-weight: 700;
+  color: #4c5564;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.pressao-dia-unit {
+  font-size: 14px;
+  font-weight: 600;
+  color: #7f8794;
+}
+
+.pressao-dia-data {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7f8794;
+}
+
+.pressao-dia-chevron {
+  font-size: 22px;
+  line-height: 1;
+  color: #9ca3af;
+  transform: rotate(90deg);
+  transition: transform 0.18s ease;
+}
+
+.pressao-dia-resumo.is-open .pressao-dia-chevron {
+  transform: rotate(-90deg);
+}
+
+.pressao-dia-coletas {
+  margin-top: 10px;
+  border-top: 1px solid #f1f1f1;
+}
+
+.pressao-coleta-item {
+  padding: 9px 0;
+  border-bottom: 1px solid #f3f3f3;
+  text-align: left;
+}
+
+.pressao-coleta-item:last-child {
+  border-bottom: none;
+}
+
+.pressao-coleta-hora {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #7f8794;
+}
+
+.pressao-coleta-valor {
+  font-size: 15px;
+  font-weight: 600;
+  color: #4c5564;
+  line-height: 1.25;
+}
+
+.pressao-coleta-fc {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.pressao-coleta-extra {
+  margin-top: 3px;
+  font-size: 11px;
+  color: #9aa1ad;
+  text-align: left;
+}
+
+/* ===== CARD PRESSÃO — revisão visual ===== */
+.vital-card--pressao {
+  padding: 12px 14px 12px 12px !important;
+}
+
+.vital-pressao-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vital-pressao-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vital-pressao-top-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.vital-pressao-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+  letter-spacing: -0.01em;
+}
+
+.vital-pressao-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.vital-pressao-num {
+  font-size: 34px;
+  font-weight: 650;
+  color: #4F4F4F;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.vital-pressao-unit {
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.vital-pressao-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4f5f75;
+  background: #eef2f7;
+  border-radius: 999px;
+  padding: 6px 12px;
+  white-space: nowrap;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.vital-pressao-badge--empty {
+  color: #9aa3b2;
+  background: #eef2f7;
+}
+
+.vital-card--passos {
+  padding: 12px 14px 12px 12px !important;
+  margin-bottom: 8px !important;
+}
+
+.vital-passos-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vital-passos-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vital-passos-top-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vital-icon--passos {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.vital-passos-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+  letter-spacing: -0.01em;
+}
+
+.vital-passos-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  line-height: 1;
+}
+
+.vital-passos-num {
+  font-size: 34px;
+  font-weight: 650;
+  color: #4F4F4F;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.vital-passos-goal-row {
+  margin-top: -4px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #8f96a3;
+  line-height: 1.2;
+}
+
+.vital-passos-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #16a34a;
+  background: #bbf7d0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.passos-resumo-card {
+  background: #fff;
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  padding: 14px 14px 12px;
+  margin-bottom: 10px;
+}
+
+.passos-resumo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.passos-resumo-num {
+  font-size: 31px;
+  font-weight: 700;
+  color: #4F4F4F;
+  line-height: 1.05;
+}
+
+.passos-resumo-pct {
+  font-size: 14px;
+  font-weight: 700;
+  color: #16a34a;
+  background: #bbf7d0;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.passos-resumo-goal {
+  margin-top: 2px;
+  font-size: 14px;
+  color: #8f96a3;
+  font-weight: 500;
+}
+
+.passos-resumo-bar {
+  margin-top: 10px;
+  height: 12px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.passos-resumo-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #74df9a 0%, #22c55e 100%);
+}
+
+.passos-resumo-meta {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #4f5561;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.passos-resumo-meta span + span {
+  position: relative;
+  padding-left: 10px;
+}
+
+.passos-resumo-meta span + span::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1px;
+  height: 14px;
+  background: #e3e5e8;
+  transform: translateY(-50%);
+}
+
+.passos-historico-list {
+  background: #fff;
+  border: 1px solid #eceff3;
+  border-radius: 14px;
+  padding: 2px 12px;
+}
+
+.passos-historico-row {
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f2f4;
+}
+
+.passos-historico-row:last-child {
+  border-bottom: none;
+}
+
+.passos-historico-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.passos-historico-valor {
+  font-size: 15px;
+  font-weight: 600;
+  color: #4f5561;
+}
+
+.passos-historico-pct {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 700;
+}
+
+.passos-historico-data {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #8f96a3;
+}
+
+.vital-pressao-sis-dia {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.vital-pressao-label-pair {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.vital-pressao-abbr {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted, #aaa);
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.vital-pressao-mini-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5f6b7a;
+}
+
+.vital-pressao-mini-sep {
+  color: #d8dce3;
+  font-size: 12px;
+}
+
+.vital-pressao-mini-unit {
+  font-size: 11px;
+  font-weight: 500;
+  color: #98a1af;
+}
+
+/* Pressão Histórico — valor à direita alinhado */
+.vital-list-value--pressao {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary, #1a1a1a);
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  text-align: right;
 }
