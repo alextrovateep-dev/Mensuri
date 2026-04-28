@@ -2430,6 +2430,30 @@ body {
   font-size: 14px;
 }
 
+#vitalDetailModal .vital-detail-add-row {
+  margin-top: 8px;
+  margin-bottom: 2px;
+}
+
+#vitalDetailModal #addVitalMedicaoBtn {
+  margin-top: 0;
+  min-height: 46px;
+  border-radius: 12px;
+  background: #eef0f3;
+  color: #4f5561;
+  border: 1px solid #dde2e8;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  box-shadow: none;
+}
+
+#vitalDetailModal #addVitalMedicaoBtn:hover {
+  background: #e6e9ee;
+  border-color: #d2d9e1;
+  color: #464d59;
+}
+
 /* Modal histórico — Batimento: período + barras diárias */
 .vital-batimento-chrome {
   margin-bottom: 8px;
