@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -7,14 +7,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="vendor/framework7/framework7.bundle.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div id="root">
-        <div class="mobile-container">
+        <div id="app" class="mobile-container framework7-root safe-areas">
             <!-- Header: avatar em cima + nome embaixo (estilo perfil); ações à direita -->
-            <div class="header" id="header">
-                <div class="header-top-row">
+            <div class="navbar header" id="header">
+                <div class="navbar-bg"></div>
+                <div class="navbar-inner header-top-row">
                     <div class="header-profile">
                         <div class="header-avatar" id="headerAvatar" role="img" aria-label="Avatar do usuário">👤</div>
                         <div class="header-user-text">
@@ -28,6 +30,7 @@
                     <div class="header-screen-actions" id="headerScreenActions"></div>
                 </div>
             </div>
+            <div class="navbar-spacer"></div>
 
             <!-- Screens -->
             <div class="app-content">
@@ -60,8 +63,289 @@
 
                 <!-- Composição Corporal Screen -->
                 <div class="screen" id="composicaoScreen">
-                    <div class="page-subtitle page-context-sub">Indicadores de composição corporal</div>
-                    <div id="composicaoContent"></div>
+                    <div class="page-subtitle page-context-sub" id="composicaoSubtitle">Antropometria</div>
+                    <div id="composicaoContent">
+                        <div id="corpoAvaliacoesListView" class="corpo-av-list-view">
+                            <div class="corpo-av-head">
+                                <div class="corpo-av-head-icon" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                                        <circle cx="12" cy="8.5" r="1.5" fill="currentColor" stroke="none" opacity="0.6"/>
+                                        <circle cx="8" cy="10.5" r="1" fill="currentColor" stroke="none" opacity="0.35"/>
+                                        <circle cx="16" cy="10.5" r="1" fill="currentColor" stroke="none" opacity="0.35"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="corpo-av-title">Antropometria</div>
+                                    <div class="corpo-av-sub">Histórico de composição e medidas corporais</div>
+                                </div>
+                            </div>
+                            <div id="corpoAvaliacoesList" class="corpo-av-list"></div>
+                            <div class="corpo-av-sticky-cta">
+                                <button type="button" class="corpo-av-new-btn corpo-av-new-btn--sticky" onclick="openCorpoNovaAvaliacaoWizard()">+ Nova avaliação</button>
+                            </div>
+                        </div>
+
+                        <div id="corpoAvaliacaoDetailView" class="corpo-av-detail-view" style="display:none;">
+                            <div class="corpo-detail-header">
+                                <button type="button" class="corpo-detail-back-btn" onclick="closeCorpoAvaliacaoDetail()" aria-label="Voltar">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                                </button>
+                                <div class="corpo-detail-head-copy">
+                                    <div id="corpoAvaliacaoDetailTitle" class="corpo-detail-title">Avaliação Física</div>
+                                    <div id="corpoAvaliacaoDetailDate" class="corpo-detail-subtitle">--/--/----</div>
+                                </div>
+                            </div>
+
+                            <div class="corpo-av-kpi-grid">
+                                <div id="corpoKpiMassaGordaCard" class="corpo-av-kpi corpo-av-kpi--gorda">
+                                    <div class="corpo-av-kpi-label">Massa Gorda</div>
+                                    <div id="corpoKpiMassaGorda" class="corpo-av-kpi-value">—%</div>
+                                    <div class="corpo-av-kpi-bar-wrap"><div id="corpoKpiMassaGordaBar" class="corpo-av-kpi-bar" style="width:0%"></div></div>
+                                    <div id="corpoKpiMassaGordaStatus" class="corpo-av-kpi-status">Sem dado</div>
+                                </div>
+                                <div id="corpoKpiMassaMagraCard" class="corpo-av-kpi corpo-av-kpi--magra">
+                                    <div class="corpo-av-kpi-label">Massa Magra</div>
+                                    <div id="corpoKpiMassaMagra" class="corpo-av-kpi-value">—%</div>
+                                    <div class="corpo-av-kpi-bar-wrap"><div id="corpoKpiMassaMagraBar" class="corpo-av-kpi-bar" style="width:0%"></div></div>
+                                    <div id="corpoKpiMassaMagraStatus" class="corpo-av-kpi-status">Sem dado</div>
+                                </div>
+                            </div>
+
+                            <div class="corpo-av-section corpo-av-section--geral">
+                                <div class="corpo-av-section-title">Medidas gerais</div>
+                                <div id="corpoAvaliacaoGeralRows" class="corpo-av-rows"></div>
+                            </div>
+
+                            <div class="corpo-av-section corpo-av-section--circ">
+                                <div class="corpo-av-section-title">Circunferências</div>
+                                <div id="corpoAvaliacaoCircRows" class="corpo-av-rows"></div>
+                            </div>
+
+                            <div class="corpo-av-section corpo-av-section--dobras">
+                                <div class="corpo-av-section-title">Dobras cutâneas</div>
+                                <div id="corpoAvaliacaoDobrasRows" class="corpo-av-rows"></div>
+                            </div>
+                        </div>
+
+                        <div id="corpoAvaliacaoWizardView" class="corpo-av-form" style="display:none;">
+                            <div class="corpo-ins-screen-head">
+                                <button type="button" class="corpo-ins-screen-back" onclick="closeCorpoNovaAvaliacaoWizard()" aria-label="Voltar">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                                </button>
+                                <div class="corpo-ins-screen-title-wrap">
+                                    <div class="corpo-ins-screen-title">Nova Avaliação</div>
+                                    <div class="corpo-ins-screen-subtitle">Preencha os campos e salve</div>
+                                </div>
+                            </div>
+
+                            <div class="corpo-form-section">
+                                <label class="corpo-form-date-label">Data da avaliação</label>
+                                <div class="corpo-form-date-row">
+                                    <div class="corpo-form-date-field">
+                                        <input type="text" id="corpoFormData" class="corpo-form-input corpo-form-input--date" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" enterkeyhint="next" />
+                                        <button type="button" class="corpo-form-date-btn" onclick="openCorpoWizardNativeDatePicker()" aria-label="Selecionar data">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                        </button>
+                                        <input type="date" id="corpoFormDataNative" class="corpo-av-date-native" tabindex="-1" aria-hidden="true" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="corpo-form-divider"><span>Essenciais</span></div>
+
+                            <div class="corpo-form-grid corpo-form-grid--4">
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Peso <span class="corpo-form-req">*</span></div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormPeso" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">kg</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Altura <span class="corpo-form-req">*</span></div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormAltura" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">m</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">% Gordura <span class="corpo-form-req">*</span></div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormPercGorda" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">%</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">% Magra <span class="corpo-form-req">*</span></div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormPercMagra" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="corpo-form-calc-bar" id="corpoFormCalcBar">
+                                <span class="corpo-form-calc-icon">📊</span>
+                                <span class="corpo-form-calc-text">Preencha peso e altura para ver o IMC</span>
+                            </div>
+
+                            <div class="corpo-form-divider"><span>Circunferências</span><span class="corpo-form-divider-opt">opcional</span></div>
+
+                            <div class="corpo-form-grid corpo-form-grid--2">
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Ombro</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircOmbro" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Peitoral</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircPeitoral" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Cintura</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircCintura" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Abdômen</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircAbdomen" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Quadril</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircQuadril" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Braço E relaxado</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircBracoEsqRelax" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Braço D relaxado</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircBracoDirRelax" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Braço E contraído</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircBracoEsqContr" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Braço D contraído</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircBracoDirContr" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Panturrilha E</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircPantuEsq" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Panturrilha D</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircPantuDir" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Coxa E</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircCoxaEsq" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Coxa D</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormCircCoxaDir" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">cm</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="corpo-form-divider"><span>Dobras cutâneas</span><span class="corpo-form-divider-opt">opcional</span></div>
+
+                            <div class="corpo-form-grid corpo-form-grid--2">
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Abdominal</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormDobraAbdominal" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">mm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Tríceps</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormDobraTriceps" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">mm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Suprailíaca</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormDobraSuprailiaca" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">mm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Axilar média</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormDobraAxilarMedia" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">mm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Subescapular</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormDobraSubescapular" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">mm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Tórax</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormDobraTorax" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="next" />
+                                        <span class="corpo-form-card-unit">mm</span>
+                                    </div>
+                                </div>
+                                <div class="corpo-form-card">
+                                    <div class="corpo-form-card-label">Coxa</div>
+                                    <div class="corpo-form-card-input-wrap">
+                                        <input type="text" id="corpoFormDobraCoxa" class="corpo-form-input corpo-form-input--card" inputmode="decimal" placeholder="—" autocomplete="off" enterkeyhint="done" />
+                                        <span class="corpo-form-card-unit">mm</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="button" class="corpo-form-save-btn" id="corpoFormSaveBtn" onclick="corpoFormSave()">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                Salvar avaliação
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Medicações Screen -->
@@ -70,7 +354,7 @@
 
                     <div class="med-calendar-unified">
                         <button type="button" class="med-cal-unified-seg med-cal-unified-seg--cal" onclick="openMedicationCalendarModal()">
-                            <span class="med-calendar-icon" aria-hidden="true">🗓️</span>
+                            <span class="med-calendar-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
                             <span class="med-cal-unified-texts">
                                 <span class="med-calendar-title">Calendário</span>
                                 <span class="med-calendar-subtitle" id="medCalendarTodayLabel">Hoje</span>
@@ -109,32 +393,34 @@
                 </div>
             </div>
 
-            <!-- Bottom Navigation -->
-            <div class="bottom-nav">
-                <button class="nav-item active" data-screen="homeScreen">
-                    <div class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
-                    <div>Início</div>
-                </button>
-                <button class="nav-item" data-screen="saudeScreen">
-                    <div class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
-                    <div>Saúde</div>
-                </button>
-                <button class="nav-item" data-screen="composicaoScreen">
-                    <div class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.5"/><path d="M8.5 10.5h7l1.5 5h-3l-1 4.5h-2l-1-4.5h-3z"/></svg></div>
-                    <div>Corpo</div>
-                </button>
-                <button class="nav-item" data-screen="medicacoesScreen">
-                    <div class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 20.5l10-10a4.95 4.95 0 0 0-7-7l-10 10a4.95 4.95 0 0 0 7 7z"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg></div>
-                    <div>Remédios</div>
-                </button>
-                <button class="nav-item" data-screen="agendaScreen">
-                    <div class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
-                    <div>Agenda</div>
-                </button>
-                <button class="nav-item" data-screen="perfilScreen">
-                    <div class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
-                    <div>Perfil</div>
-                </button>
+            <!-- Bottom Navigation (Framework7 Tabbar) -->
+            <div class="toolbar tabbar tabbar-labels toolbar-bottom" id="mainTabbar">
+                <div class="toolbar-inner">
+                    <a class="tab-link tab-link-active" data-screen="homeScreen">
+                        <i class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></i>
+                        <span class="tabbar-label">Início</span>
+                    </a>
+                    <a class="tab-link" data-screen="saudeScreen">
+                        <i class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></i>
+                        <span class="tabbar-label">Saúde</span>
+                    </a>
+                    <a class="tab-link" data-screen="composicaoScreen">
+                        <i class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.5"/><path d="M8.5 10.5h7l1.5 5h-3l-1 4.5h-2l-1-4.5h-3z"/></svg></i>
+                        <span class="tabbar-label">Corpo</span>
+                    </a>
+                    <a class="tab-link" data-screen="medicacoesScreen">
+                        <i class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 20.5l10-10a4.95 4.95 0 0 0-7-7l-10 10a4.95 4.95 0 0 0 7 7z"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg></i>
+                        <span class="tabbar-label">Remédios</span>
+                    </a>
+                    <a class="tab-link" data-screen="agendaScreen">
+                        <i class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></i>
+                        <span class="tabbar-label">Agenda</span>
+                    </a>
+                    <a class="tab-link" data-screen="perfilScreen">
+                        <i class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></i>
+                        <span class="tabbar-label">Perfil</span>
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -148,11 +434,11 @@
             </div>
             <div class="schedule-filters">
                 <button class="filter-btn active" onclick="filterScheduleByStatus('todos', this)">Todos</button>
-                <button class="filter-btn" onclick="filterScheduleByStatus('tomado', this)">✅ Tomadas</button>
-                <button class="filter-btn" onclick="filterScheduleByStatus('pendente', this)">⏳ Pendentes</button>
-                <button class="filter-btn" onclick="filterScheduleByStatus('atrasado', this)">🔴 Atrasadas</button>
+                <button class="filter-btn" onclick="filterScheduleByStatus('tomado', this)">Tomadas</button>
+                <button class="filter-btn" onclick="filterScheduleByStatus('pendente', this)">Pendentes</button>
+                <button class="filter-btn" onclick="filterScheduleByStatus('atrasado', this)">Atrasadas</button>
             </div>
-            <div id="dailyScheduleContent" style="max-height: 500px; overflow-y: auto;"></div>
+            <div id="dailyScheduleContent" class="modal-scroll-body modal-scroll-body--lg"></div>
         </div>
     </div>
 
@@ -168,7 +454,7 @@
                 <input type="date" class="form-input" id="medicationCalendarDateInput" onchange="renderMedicationCalendarDay()">
             </div>
             <div class="calendar-day-summary" id="medicationCalendarSummary"></div>
-            <div id="medicationCalendarContent" style="max-height: 430px; overflow-y: auto;"></div>
+            <div id="medicationCalendarContent" class="modal-scroll-body modal-scroll-body--md"></div>
         </div>
     </div>
 
@@ -184,7 +470,10 @@
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
-                <span id="vitalDetailTitle" class="vital-detail-modal-title">Histórico de Sinal Vital</span>
+                <div class="vital-detail-modal-title-wrap">
+                  <span id="vitalDetailTitle" class="vital-detail-modal-title">Histórico de Sinal Vital</span>
+                  <span id="vitalDetailSubtitle" class="vital-detail-modal-subtitle"></span>
+                </div>
                 <button type="button" class="bat-share-btn" id="batShareBtn" aria-label="Compartilhar" style="display:none;" onclick="shareBatimentoCard()">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                 </button>
@@ -199,6 +488,7 @@
                 <div id="batDayPickerCard" class="bat-day-picker-card"></div>
                 <div id="batMinMaxCard" class="bat-minmax-card"></div>
                 <div id="batHourlyChart" class="bat-hourly-chart-card"></div>
+                <div id="batHourlyDateLabel" class="bat-hourly-date-label"></div>
                 <div id="batHourlyTable" class="bat-hourly-section"></div>
                 <div id="batRestingTrend" class="bat-resting-section" onclick="openBatRestingDetail()"></div>
 
@@ -270,15 +560,15 @@
                 </div>
                 <div class="form-group" id="vitalDefaultDateFilterRow">
                     <label class="form-label">Filtrar por Data</label>
-                    <div style="display: flex; gap: 8px;">
-                        <input type="date" class="form-input" id="filterVitalDataInicio" style="flex: 1;" onchange="filterVitalDetail()">
-                        <input type="date" class="form-input" id="filterVitalDataFim" style="flex: 1;" onchange="filterVitalDetail()">
+                    <div class="vital-filter-date-row">
+                        <input type="date" class="form-input vital-filter-date-input" id="filterVitalDataInicio" onchange="filterVitalDetail()">
+                        <input type="date" class="form-input vital-filter-date-input" id="filterVitalDataFim" onchange="filterVitalDetail()">
                     </div>
                 </div>
 
                 <!-- Gráfico abaixo dos filtros -->
                 <div id="pressaoHistoricoView">
-                    <canvas id="sparklineChart" width="720" height="220" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 8px;"></canvas>
+                    <canvas id="sparklineChart" class="sparkline-chart--tight" width="720" height="220"></canvas>
                 </div>
 
                 <!-- Detalhe de um dia específico de pressão arterial -->
@@ -307,152 +597,496 @@
                   <div id="pressaoColetaDetailContent"></div>
                 </div>
 
-                <!-- Formulário passo a passo: inserir apontamento de pressão -->
-                <div id="pressaoInsertView" style="display:none;">
-                  <div class="pressao-ins-header">
-                    <button type="button" class="pressao-dia-det-back-btn" id="piBackBtn">
+                <!-- Detalhe de um dia específico de passos -->
+                <div id="passosDiaDetailView" style="display:none;">
+                  <div class="pressao-dia-det-header">
+                    <button type="button" class="pressao-dia-det-back-btn" onclick="closePassosDiaDetail()">
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                     </button>
-                    <div class="pressao-ins-dots">
-                      <span class="pressao-ins-dot pressao-ins-dot--active" data-pidot="1"></span>
-                      <span class="pressao-ins-dot" data-pidot="2"></span>
-                      <span class="pressao-ins-dot" data-pidot="3"></span>
-                      <span class="pressao-ins-dot" data-pidot="4"></span>
-                      <span class="pressao-ins-dot" data-pidot="5"></span>
-                    </div>
-                    <div class="pressao-ins-header-spacer"></div>
+                    <span id="passosDiaDetailLabel" class="pressao-dia-det-label"></span>
+                  </div>
+                  <div id="passosDiaDetailContent"></div>
+                </div>
+
+                <!-- Wizard passo a passo: inserir glicemia -->
+                <div id="glicemiaInsertView" style="display:none;">
+
+                  <!-- Progresso: 7 etapas -->
+                  <div class="pi-progress">
+                    <div class="pi-progress-dot pi-progress-dot--active glic-dot" data-glicdot="1"></div>
+                    <div class="pi-progress-dot glic-dot" data-glicdot="2"></div>
+                    <div class="pi-progress-dot glic-dot" data-glicdot="3"></div>
+                    <div class="pi-progress-dot glic-dot" data-glicdot="4"></div>
+                    <div class="pi-progress-dot glic-dot" data-glicdot="5"></div>
+                    <div class="pi-progress-dot glic-dot" data-glicdot="6"></div>
+                    <div class="pi-progress-dot glic-dot" data-glicdot="7"></div>
                   </div>
 
-                  <!-- Passo 1 – Pressão -->
-                  <div id="piStep1" class="pressao-ins-step">
-                    <div class="pressao-ins-step-icon pressao-ins-step-icon--amber">
-                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  <!-- STEP 1: Valor — drum scroll -->
+                  <div class="pi-step" id="glicStep1">
+                    <div class="pi-step-head">
+                      <div class="pi-step-label">Glicose no Sangue</div>
                     </div>
-                    <div class="pressao-ins-title">Pressão Arterial</div>
-                    <div class="pressao-ins-sub">Use +/− ou arraste o número para ajustar</div>
-                    <div class="pressao-ins-duo">
-                      <div class="pressao-ins-col">
-                        <div class="pressao-ins-col-label pressao-ins-col-label--sis">SIS.</div>
-                        <button class="pressao-ins-circle-btn" onpointerdown="startStepPA('sis',-1)" onpointerup="stopStepPA()" onpointerleave="stopStepPA()">−</button>
-                        <div class="pi-drum-wrap" data-field="sis" ontouchstart="piDrumTouchStart(event,this)" ontouchmove="piDrumTouchMove(event,this)" ontouchend="piDrumTouchEnd(event,this)" onwheel="piDrumWheel(event,this)">
+                    <div class="pi-bp-drums" style="justify-content: center;">
+                      <div class="pi-drum-col">
+                        <div class="pi-drum-lbl pi-drum-lbl--accent" style="text-transform: none;">mg/dL</div>
+                        <div class="pi-drum" data-field="glicemia"
+                             ontouchstart="piDrumTouchStart(event,this)"
+                             ontouchmove="piDrumTouchMove(event,this)"
+                             ontouchend="piDrumTouchEnd(event,this)"
+                             onwheel="piDrumWheel(event,this)">
+                          <div class="pi-drum-track" id="piDrumTrack-glicemia"></div>
+                          <div class="pi-drum-sel"></div>
+                          <div class="pi-drum-fade pi-drum-fade--top"></div>
+                          <div class="pi-drum-fade pi-drum-fade--bot"></div>
+                          <input class="pi-drum-inp" id="piDcInput-glicemia" type="number" inputmode="numeric" min="20" max="600"
+                                 onblur="piDcInputBlur('glicemia',this)" />
+                        </div>
+                      </div>
+                    </div>
+                    <button id="glicValorNextBtn" class="pi-next-btn glic-next-btn" onclick="glicemiaWizardNext()">Próximo ›</button>
+                  </div>
+
+                  <!-- STEP 2: Contexto — quando foi medido? -->
+                  <div class="pi-step" id="glicStep2" style="display:none;">
+                    <div class="pi-step-head">
+                      <div class="pi-step-icon-glic">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25c0 0-6.75 7.313-6.75 11.25a6.75 6.75 0 0 0 13.5 0C18.75 9.563 12 2.25 12 2.25Z"/></svg>
+                      </div>
+                      <div class="pi-step-label">Quando mediu?</div>
+                      <div class="pi-step-hint">Toque para selecionar o momento</div>
+                    </div>
+                    <div class="glic-ctx-grid" id="glicemiaContextoBtns">
+                      <button type="button" class="pi-med-card glic-ctx-card" data-ctx="Jejum" onclick="selectGlicemiaContexto(this)">
+                        <span class="pi-med-card-icon-wrap pi-med-card-icon-wrap--yellow">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2M12 8v4m0 0 3 3m-3-3-3 3M5 20h14"/></svg>
+                        </span>
+                        <span class="pi-med-card-lbl">Em jejum</span>
+                        <svg class="pi-med-card-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                      </button>
+                      <button type="button" class="pi-med-card glic-ctx-card" data-ctx="Pré-refeição" onclick="selectGlicemiaContexto(this)">
+                        <span class="pi-med-card-icon-wrap pi-med-card-icon-wrap--gray">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-1.5 7h13"/></svg>
+                        </span>
+                        <span class="pi-med-card-lbl">Antes de comer</span>
+                        <svg class="pi-med-card-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                      </button>
+                      <button type="button" class="pi-med-card glic-ctx-card" data-ctx="Antes de dormir" onclick="selectGlicemiaContexto(this)">
+                        <span class="pi-med-card-icon-wrap pi-med-card-icon-wrap--gray">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                        </span>
+                        <span class="pi-med-card-lbl">Antes de dormir</span>
+                        <svg class="pi-med-card-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                      </button>
+                      <button type="button" class="pi-med-card glic-ctx-card" data-ctx="Aleatório" onclick="selectGlicemiaContexto(this)">
+                        <span class="pi-med-card-icon-wrap pi-med-card-icon-wrap--gray">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                        </span>
+                        <span class="pi-med-card-lbl">Outro momento</span>
+                        <svg class="pi-med-card-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                      </button>
+                    </div>
+                    <input type="hidden" id="glicemiaContextoInput" value="">
+                    <button id="glicConfirmCtxBtn" class="pi-next-btn glic-next-btn" style="opacity:0.35;pointer-events:none;" onclick="glicemiaConfirmContexto()">Confirmar &#8250;</button>
+                  </div>
+
+                  <!-- STEP 3: Confirmar data/hora -->
+                  <div class="pi-step" id="glicStep3" style="display:none;">
+                    <div class="glic-s3-header">
+                      <div class="glic-step3-badge" id="glicStep3ValorBadge">— mg/dL</div>
+                      <div class="pi-step-label">Quando foi medido?</div>
+                    </div>
+
+                    <!-- Painel A: duas opções -->
+                    <div id="glicS3Options">
+                      <button type="button" class="glic-s3-opt-btn glic-s3-agora" id="glicAgoraBtn" onclick="glicSelectAgora()">
+                        <span class="glic-s3-opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+                        <span class="glic-s3-opt-text">
+                          <span class="glic-s3-opt-main">Medido agora</span>
+                          <span class="glic-s3-opt-sub" id="glicAgoraLabel">—</span>
+                        </span>
+                      </button>
+                      <button type="button" class="glic-s3-opt-btn glic-s3-outro" onclick="glicShowOutroHorario()">
+                        <span class="glic-s3-opt-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg></span>
+                        <span class="glic-s3-opt-text">
+                          <span class="glic-s3-opt-main">Outro horário</span>
+                          <span class="glic-s3-opt-sub">Alterar data e hora</span>
+                        </span>
+                      </button>
+                    </div>
+
+                    <!-- Painel B: data/hora manual -->
+                    <div id="glicEditTimePanel" style="display:none;">
+                      <div class="glic-datetime-fields">
+                        <div class="form-group">
+                          <label class="form-label glic-field-lbl" for="glicemiaDataInput">Data</label>
+                          <div class="glic-date-wrap">
+                            <input type="text" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" class="form-input glic-field-inp" id="glicemiaDataInput" oninput="glicDataInputMask(this)" required>
+                            <button type="button" class="glic-cal-btn" onclick="glicOpenDatePicker()" aria-label="Abrir calendário">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            </button>
+                            <input type="date" id="glicemiaDataPicker" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;" onchange="glicDatePickerChange(this)">
+                          </div>
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label glic-field-lbl" for="glicemiaHoraInput">Hora</label>
+                          <input type="time" class="form-input glic-field-inp" id="glicemiaHoraInput" required lang="pt-BR" data-time-format="24">
+                        </div>
+                      </div>
+                      <button type="button" class="glic-s3-back-link" onclick="glicHideOutroHorario()">← Voltar</button>
+                    </div>
+
+                    <!-- Botão de confirmação único -->
+                    <button id="glicS3ConfirmBtn" class="pi-next-btn glic-next-btn" style="display:none;" onclick="glicS3Confirm()">Próximo ›</button>
+                  </div>
+
+                  <!-- STEP 4: Remédios -->
+                  <div class="pi-step" id="glicStep4" style="display:none;">
+                    <div class="pi-step-head">
+                      <div class="pi-step-label">Remédios?</div>
+                      <div class="pi-step-hint">Selecione uma opção</div>
+                    </div>
+                    <div class="pi-med-grid">
+                      <button class="pi-med-card" id="glicMed-tomados" onclick="glicSelectMed('tomados')">
+                        <span class="pi-med-card-icon-wrap pi-med-card-icon-wrap--green">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7.07-7.07l-10 10a4.95 4.95 0 1 0 7.07 7.07Z"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg>
+                        </span>
+                        <span class="pi-med-card-lbl">Tomei meus remédios</span>
+                        <svg class="pi-med-card-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                      </button>
+                      <button class="pi-med-card" id="glicMed-nao_tomados" onclick="glicSelectMed('nao_tomados')">
+                        <span class="pi-med-card-icon-wrap pi-med-card-icon-wrap--red">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </span>
+                        <span class="pi-med-card-lbl">Não tomei hoje</span>
+                        <svg class="pi-med-card-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                      </button>
+                      <button class="pi-med-card" id="glicMed-nenhum" onclick="glicSelectMed('nenhum')">
+                        <span class="pi-med-card-icon-wrap pi-med-card-icon-wrap--gray">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                        </span>
+                        <span class="pi-med-card-lbl">Não tomo remédios</span>
+                        <svg class="pi-med-card-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                      </button>
+                    </div>
+                    <div class="pi-step-footer">
+                      <button id="glicMedNextBtn" class="pi-next-btn glic-next-btn" style="opacity:0.35;pointer-events:none;" onclick="glicemiaWizardGoStep(5)">Próximo ›</button>
+                      <button type="button" class="glic-s3-back-link" onclick="glicemiaWizardGoStep(5)">Pular</button>
+                    </div>
+                  </div>
+
+                  <!-- STEP 5: Insulina -->
+                  <div class="pi-step" id="glicStep5" style="display:none;">
+                    <div class="pi-step-head">
+                      <div class="pi-step-label">Insulina</div>
+                    </div>
+                    <div class="pi-bp-drums" style="justify-content: center;">
+                      <div class="pi-drum-col">
+                        <div class="pi-drum-lbl pi-drum-lbl--accent" style="text-transform: none;">Unidades</div>
+                        <div class="pi-drum" data-field="insulina"
+                             ontouchstart="piDrumTouchStart(event,this)"
+                             ontouchmove="piDrumTouchMove(event,this)"
+                             ontouchend="piDrumTouchEnd(event,this)"
+                             onwheel="piDrumWheel(event,this)">
+                          <div class="pi-drum-track" id="piDrumTrack-insulina"></div>
+                          <div class="pi-drum-sel"></div>
+                          <div class="pi-drum-fade pi-drum-fade--top"></div>
+                          <div class="pi-drum-fade pi-drum-fade--bot"></div>
+                          <input class="pi-drum-inp" id="piDcInput-insulina" type="number" inputmode="numeric" min="0" max="200"
+                                 onblur="piDcInputBlur('insulina',this)" />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="pi-step-footer">
+                      <button class="pi-next-btn glic-next-btn" onclick="glicemiaWizardGoStep(6)">Próximo ›</button>
+                      <button type="button" class="glic-s3-back-link" onclick="glicemiaWizardGoStep(6)">Pular</button>
+                    </div>
+                  </div>
+
+                  <!-- STEP 6: Notas -->
+                  <div class="pi-step" id="glicStep6" style="display:none;">
+                    <div class="pi-step-head">
+                      <div class="pi-step-label">Alguma observação?</div>
+                      <div class="pi-step-hint">Opcional &mdash; sintomas, atividade, contexto...</div>
+                    </div>
+                    <textarea class="pi-nota-area" id="glicNotaInput"
+                              placeholder="Ex: senti tontura, após refeição..." maxlength="500"></textarea>
+                    <button class="pi-next-btn glic-next-btn" onclick="glicGoToResumo()">Revisar ›</button>
+                  </div>
+
+                  <!-- STEP 7: Resumo -->
+                  <div class="pi-step" id="glicStep7" style="display:none;">
+                    <div class="pi-step-head">
+                      <div class="pi-step-label">Resumo da Medição</div>
+                      <div class="pi-step-hint">Revise antes de confirmar</div>
+                    </div>
+                    <div id="glicStep7Content"></div>
+                  </div>
+
+                </div><!-- /glicemiaInsertView -->
+
+                <!-- Formulário passo a passo: inserir apontamento de pressão -->
+                <div id="pressaoInsertView" style="display:none;">
+
+                  <!-- Progresso -->
+                  <div class="pi-progress">
+                    <div class="pi-progress-dot pi-progress-dot--active" data-pidot="1"></div>
+                    <div class="pi-progress-dot" data-pidot="2"></div>
+                    <div class="pi-progress-dot" data-pidot="3"></div>
+                    <div class="pi-progress-dot" data-pidot="4"></div>
+                    <div class="pi-progress-dot" data-pidot="5"></div>
+                  </div>
+
+                  <!-- STEP 1: Pressão Arterial (SIS/DIA) -->
+                  <div class="pi-step" id="piStep1">
+                    <div class="pi-step-head">
+                      <div class="pi-step-icon-bp">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true"><polyline stroke-linecap="round" stroke-linejoin="round" points="2 12 6 12 8 5 11 19 13 12 15 9 17 15 19 12 22 12"/></svg>
+                      </div>
+                      <div class="pi-step-label">Pressão Arterial</div>
+                      <div class="pi-step-hint">Arraste para ajustar &middot; Toque no número para digitar</div>
+                    </div>
+                    <div class="pi-bp-drums">
+                      <div class="pi-drum-col">
+                        <div class="pi-drum-lbl pi-drum-lbl--sis">SIS.</div>
+                        <div class="pi-drum" data-field="sis"
+                             ontouchstart="piDrumTouchStart(event,this)"
+                             ontouchmove="piDrumTouchMove(event,this)"
+                             ontouchend="piDrumTouchEnd(event,this)"
+                             onwheel="piDrumWheel(event,this)">
                           <div class="pi-drum-track" id="piDrumTrack-sis"></div>
-                          <div class="pi-drum-center-sel"></div>
+                          <div class="pi-drum-sel"></div>
                           <div class="pi-drum-fade pi-drum-fade--top"></div>
                           <div class="pi-drum-fade pi-drum-fade--bot"></div>
+                          <input class="pi-drum-inp" id="piDcInput-sis" type="number" inputmode="numeric" min="60" max="250"
+                                 onblur="piDcInputBlur('sis',this)" />
                         </div>
-                        <button class="pressao-ins-circle-btn" onpointerdown="startStepPA('sis',1)" onpointerup="stopStepPA()" onpointerleave="stopStepPA()">+</button>
                       </div>
-                      <div class="pressao-ins-slash">/</div>
-                      <div class="pressao-ins-col">
-                        <div class="pressao-ins-col-label pressao-ins-col-label--dia">DIA.</div>
-                        <button class="pressao-ins-circle-btn" onpointerdown="startStepPA('dia',-1)" onpointerup="stopStepPA()" onpointerleave="stopStepPA()">−</button>
-                        <div class="pi-drum-wrap" data-field="dia" ontouchstart="piDrumTouchStart(event,this)" ontouchmove="piDrumTouchMove(event,this)" ontouchend="piDrumTouchEnd(event,this)" onwheel="piDrumWheel(event,this)">
+                      <div class="pi-bp-slash">/</div>
+                      <div class="pi-drum-col">
+                        <div class="pi-drum-lbl pi-drum-lbl--dia">DIA.</div>
+                        <div class="pi-drum" data-field="dia"
+                             ontouchstart="piDrumTouchStart(event,this)"
+                             ontouchmove="piDrumTouchMove(event,this)"
+                             ontouchend="piDrumTouchEnd(event,this)"
+                             onwheel="piDrumWheel(event,this)">
                           <div class="pi-drum-track" id="piDrumTrack-dia"></div>
-                          <div class="pi-drum-center-sel"></div>
+                          <div class="pi-drum-sel"></div>
                           <div class="pi-drum-fade pi-drum-fade--top"></div>
                           <div class="pi-drum-fade pi-drum-fade--bot"></div>
+                          <input class="pi-drum-inp" id="piDcInput-dia" type="number" inputmode="numeric" min="30" max="160"
+                                 onblur="piDcInputBlur('dia',this)" />
                         </div>
-                        <button class="pressao-ins-circle-btn" onpointerdown="startStepPA('dia',1)" onpointerup="stopStepPA()" onpointerleave="stopStepPA()">+</button>
                       </div>
                     </div>
-                    <div class="pressao-ins-unit-row">mmHg</div>
+                    <div class="pi-unit-lbl">mmHg</div>
+                    <button class="pi-next-btn" onclick="pressaoInsGo(2)">Próximo &#8250;</button>
                   </div>
 
-                  <!-- Passo 2 – Batimentos -->
-                  <div id="piStep2" class="pressao-ins-step" style="display:none;">
-                    <div class="pressao-ins-step-icon pressao-ins-step-icon--red">
-                      <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                  <!-- STEP 2: Frequência Cardíaca (drum igual SIS/DIA) -->
+                  <div class="pi-step" id="piStep2" style="display:none;">
+                    <div class="pi-step-head">
+                      <div class="pi-step-icon-heart">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z"/></svg>
+                      </div>
+                      <div class="pi-step-label">Frequência Cardíaca</div>
+                      <div class="pi-step-hint">Arraste para ajustar &middot; Toque no número para digitar</div>
                     </div>
-                    <div class="pressao-ins-title">Batimentos</div>
-                    <div class="pressao-ins-sub">Use +/− ou arraste o número para ajustar</div>
-                    <div class="pressao-ins-single">
-                      <button class="pressao-ins-circle-btn pressao-ins-circle-btn--lg" onpointerdown="startStepPA('hr',-1)" onpointerup="stopStepPA()" onpointerleave="stopStepPA()">−</button>
-                      <div class="pi-drum-wrap pi-drum-wrap--lg" data-field="hr" ontouchstart="piDrumTouchStart(event,this)" ontouchmove="piDrumTouchMove(event,this)" ontouchend="piDrumTouchEnd(event,this)" onwheel="piDrumWheel(event,this)">
+                    <div class="pi-hr-drum-wrap">
+                      <div class="pi-drum" data-field="hr"
+                           ontouchstart="piDrumTouchStart(event,this)"
+                           ontouchmove="piDrumTouchMove(event,this)"
+                           ontouchend="piDrumTouchEnd(event,this)"
+                           onwheel="piDrumWheel(event,this)">
                         <div class="pi-drum-track" id="piDrumTrack-hr"></div>
-                        <div class="pi-drum-center-sel"></div>
+                        <div class="pi-drum-sel"></div>
                         <div class="pi-drum-fade pi-drum-fade--top"></div>
                         <div class="pi-drum-fade pi-drum-fade--bot"></div>
+                        <input class="pi-drum-inp" id="piDcInput-hr" type="number" inputmode="numeric" min="30" max="250"
+                               onblur="piDcInputBlur('hr',this)" />
                       </div>
-                      <button class="pressao-ins-circle-btn pressao-ins-circle-btn--lg" onpointerdown="startStepPA('hr',1)" onpointerup="stopStepPA()" onpointerleave="stopStepPA()">+</button>
                     </div>
-                    <div class="pressao-ins-unit-row">bpm</div>
+                    <div class="pi-unit-lbl">bpm</div>
+                    <button class="pi-next-btn" onclick="pressaoInsGo(3)">Próximo &#8250;</button>
                   </div>
 
-                  <!-- Passo 3 – Medicação -->
-                  <div id="piStep3" class="pressao-ins-step" style="display:none;">
-                    <div class="pressao-ins-step-icon pressao-ins-step-icon--blue">
-                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg>
+                  <!-- STEP 3: Remédios -->
+                  <div class="pi-step" id="piStep3" style="display:none;">
+                    <div class="pi-step-head">
+                      <div class="pi-step-label">Remédios?</div>
+                      <div class="pi-step-hint">Selecione uma opção</div>
                     </div>
-                    <div class="pressao-ins-title">Medicamentos</div>
-                    <div class="pressao-ins-sub">Tomou os medicamentos hoje?</div>
-                    <div class="pressao-ins-med-list">
-                      <button class="pressao-ins-med-card" id="piMed-tomados" onclick="pressaoInsSelectMed('tomados')">
-                        <span class="pressao-ins-med-icon">💊</span>
-                        <span class="pressao-ins-med-label">Tomados</span>
+                    <div class="pi-med-grid">
+                      <button class="pi-med-card" id="piMed-tomados"
+                              onclick="pressaoInsSelectMed('tomados')">
+                        <span class="pi-med-card-icon-wrap pi-med-card-icon-wrap--green">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7.07-7.07l-10 10a4.95 4.95 0 1 0 7.07 7.07Z"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg>
+                        </span>
+                        <span class="pi-med-card-lbl">Tomei meus remédios</span>
+                        <svg class="pi-med-card-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                       </button>
-                      <button class="pressao-ins-med-card" id="piMed-nao_tomados" onclick="pressaoInsSelectMed('nao_tomados')">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        <span class="pressao-ins-med-label">Não tomados</span>
+                      <button class="pi-med-card" id="piMed-nao_tomados"
+                              onclick="pressaoInsSelectMed('nao_tomados')">
+                        <span class="pi-med-card-icon-wrap pi-med-card-icon-wrap--red">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </span>
+                        <span class="pi-med-card-lbl">Não tomei hoje</span>
+                        <svg class="pi-med-card-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                       </button>
-                      <button class="pressao-ins-med-card pressao-ins-med-card--active" id="piMed-nenhum" onclick="pressaoInsSelectMed('nenhum')">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        <span class="pressao-ins-med-label">Não se aplica</span>
+                      <button class="pi-med-card" id="piMed-nenhum"
+                              onclick="pressaoInsSelectMed('nenhum')">
+                        <span class="pi-med-card-icon-wrap pi-med-card-icon-wrap--gray">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                        </span>
+                        <span class="pi-med-card-lbl">Não tomo remédios</span>
+                        <svg class="pi-med-card-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                       </button>
                     </div>
+                    <button id="piMedNextBtn" class="pi-next-btn" style="opacity:0.35;pointer-events:none;" onclick="pressaoInsGo(4)">Próximo &#8250;</button>
                   </div>
 
-                  <!-- Passo 4 – Notas -->
-                  <div id="piStep4" class="pressao-ins-step" style="display:none;">
-                    <div class="pressao-ins-step-icon pressao-ins-step-icon--green">
-                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  <!-- STEP 4: Nota -->
+                  <div class="pi-step" id="piStep4" style="display:none;">
+                    <div class="pi-step-head">
+                      <div class="pi-step-label">Alguma observação?</div>
+                      <div class="pi-step-hint">Opcional &mdash; sintomas, atividade, contexto...</div>
                     </div>
-                    <div class="pressao-ins-title">Notas</div>
-                    <div class="pressao-ins-sub">Como você está se sentindo?</div>
-                    <textarea class="pressao-ins-textarea" id="piNotaInput" placeholder="Escreva aqui como está se sentindo..."></textarea>
+                    <textarea class="pi-nota-area" id="piNotaInput"
+                              placeholder="Ex: senti tontura, após caminhada..." maxlength="500"></textarea>
+                    <button class="pi-next-btn" onclick="pressaoInsGo(5)">Revisar &#8250;</button>
                   </div>
 
-                  <!-- Passo 5 – Resumo -->
-                  <div id="piStep5" class="pressao-ins-step" style="display:none;">
-                    <div class="pressao-ins-step-icon" style="background:#6366f1;">
-                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <!-- STEP 5: Resumo -->
+                  <div class="pi-step" id="piStep5" style="display:none;">
+                    <div class="pi-step-head">
+                      <div class="pi-step-label">Confirmar</div>
+                      <div class="pi-step-hint">Toque em um campo para corrigir</div>
                     </div>
-                    <div class="pressao-ins-title">Resumo</div>
-                    <div class="pressao-ins-sub">Confirme ou toque para corrigir</div>
-                    <div class="pi-summary-list">
-                      <div class="pi-summary-row" onclick="pressaoInsGo(1)">
-                        <div class="pi-summary-left">
-                          <span class="pi-summary-lbl">Pressão</span>
-                          <span class="pi-summary-val" id="piSumPressao"></span>
-                        </div>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                      </div>
-                      <div class="pi-summary-row" onclick="pressaoInsGo(2)">
-                        <div class="pi-summary-left">
-                          <span class="pi-summary-lbl">Batimentos</span>
-                          <span class="pi-summary-val" id="piSumHr"></span>
-                        </div>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                      </div>
-                      <div class="pi-summary-row" onclick="pressaoInsGo(3)">
-                        <div class="pi-summary-left">
-                          <span class="pi-summary-lbl">Medicamentos</span>
-                          <span class="pi-summary-val" id="piSumMed"></span>
-                        </div>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                      </div>
-                      <div class="pi-summary-row" onclick="pressaoInsGo(4)">
-                        <div class="pi-summary-left">
-                          <span class="pi-summary-lbl">Nota</span>
-                          <span class="pi-summary-val" id="piSumNota"></span>
-                        </div>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                      </div>
-                    </div>
+                    <div class="pi-summary" id="piSummaryContent"></div>
+                    <button class="pi-save-btn" id="piConfirmBtn" onclick="pressaoInsSave()">Salvar Medição</button>
                   </div>
 
-                  <!-- Botão de confirmação fixo no rodapé -->
-                  <div class="pressao-ins-confirm-wrap">
-                    <button id="piConfirmBtn" class="pressao-ins-confirm-btn" onclick="pressaoInsConfirmStep()">Confirmar</button>
+                </div>
+
+                <!-- Inserção de hidratação — estilo wizard -->
+                <div id="hidraInsertView" style="display:none;">
+                  <div class="pi-step">
+
+                    <!-- Cabeçalho -->
+                    <div class="pi-step-head">
+                      <div class="hi-step-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25C12 2.25 4.5 10.5 4.5 15a7.5 7.5 0 0 0 15 0c0-4.5-7.5-12.75-7.5-12.75z"/>
+                        </svg>
+                      </div>
+                      <div class="pi-step-label">Quanto você bebeu?</div>
+                    </div>
+
+                    <!-- Campo de valor editável -->
+                    <div class="hi-value-block">
+                      <div class="hi-value-row">
+                        <input type="number" id="hidraNumInput" class="hi-value-input"
+                               inputmode="numeric" min="1" max="9999" value="250"
+                               oninput="onHidraNumInput(this)"/>
+                        <span class="hi-value-unit">ml</span>
+                      </div>
+                      <!-- Botões de passo rápido -->
+                      <div class="hi-steppers">
+                        <button class="hi-stepper" type="button" onclick="stepHidra(-100)">−100</button>
+                        <button class="hi-stepper" type="button" onclick="stepHidra(-50)">−50</button>
+                        <button class="hi-stepper hi-stepper--pos" type="button" onclick="stepHidra(50)">+50</button>
+                        <button class="hi-stepper hi-stepper--pos" type="button" onclick="stepHidra(100)">+100</button>
+                      </div>
+                    </div>
+
+                    <!-- Atalhos rápidos (adiciona direto) -->
+                    <div class="hi-preset-rows">
+                      <button class="hi-preset-row" type="button" onclick="hidraQuickAdd(150)">
+                        <span class="hi-preset-row-icon">
+                          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h12l-2 16H7L5 3z"/></svg>
+                        </span>
+                        <span class="hi-preset-row-info">
+                          <span class="hi-preset-row-name">Copo</span>
+                          <span class="hi-preset-row-ml">150 ml</span>
+                        </span>
+                        <svg class="hi-preset-row-chev" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>
+                      </button>
+                      <button class="hi-preset-row" type="button" onclick="hidraQuickAdd(350)">
+                        <span class="hi-preset-row-icon">
+                          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="10" height="16" rx="3"/><path d="M6 7h10M6 16h10"/></svg>
+                        </span>
+                        <span class="hi-preset-row-info">
+                          <span class="hi-preset-row-name">Latinha</span>
+                          <span class="hi-preset-row-ml">350 ml</span>
+                        </span>
+                        <svg class="hi-preset-row-chev" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>
+                      </button>
+                      <button class="hi-preset-row" type="button" onclick="hidraQuickAdd(600)">
+                        <span class="hi-preset-row-icon">
+                          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h4v3l2 3v11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V8l2-3V2z"/><path d="M8.5 13h5"/></svg>
+                        </span>
+                        <span class="hi-preset-row-info">
+                          <span class="hi-preset-row-name">Garrafa</span>
+                          <span class="hi-preset-row-ml">600 ml</span>
+                        </span>
+                        <svg class="hi-preset-row-chev" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>
+                      </button>
+                      <button class="hi-preset-row" type="button" onclick="hidraQuickAdd(1000)">
+                        <span class="hi-preset-row-icon hi-preset-row-icon--blue">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.25C12 2.25 4.5 10.5 4.5 15a7.5 7.5 0 0 0 15 0c0-4.5-7.5-12.75-7.5-12.75z"/></svg>
+                        </span>
+                        <span class="hi-preset-row-info">
+                          <span class="hi-preset-row-name">1 Litro</span>
+                          <span class="hi-preset-row-ml">1000 ml</span>
+                        </span>
+                        <svg class="hi-preset-row-chev" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>
+                      </button>
+                    </div>
+
+                    <!-- Confirmar valor digitado -->
+                    <button class="hi-confirm-btn" onclick="hidraDrumConfirm()">+ Adicionar</button>
+                    <button type="button" class="hi-cancel-link" onclick="closeHidraInsertView()">Cancelar</button>
+
+                  </div>
+                </div>
+
+                <!-- Inserção de oxigenação — grade de toque rápido -->
+                <div id="oxigInsertView" style="display:none;">
+                  <div class="pi-step">
+
+                    <div class="pi-step-head">
+                      <div class="oxi-step-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5M3.75 12l4-4m-4 4 4 4"/>
+                          <circle cx="17" cy="12" r="3"/>
+                        </svg>
+                      </div>
+                      <div class="pi-step-label">Qual a sua saturação?</div>
+                    </div>
+
+                    <!-- Grade de valores 95–100 (toque rápido) -->
+                    <div class="oxi-grid" id="oxigGrid">
+                      <button class="oxi-cell" data-val="95" type="button" onclick="oxigSelectValue(95)">95<span>%</span></button>
+                      <button class="oxi-cell" data-val="96" type="button" onclick="oxigSelectValue(96)">96<span>%</span></button>
+                      <button class="oxi-cell" data-val="97" type="button" onclick="oxigSelectValue(97)">97<span>%</span></button>
+                      <button class="oxi-cell" data-val="98" type="button" onclick="oxigSelectValue(98)">98<span>%</span></button>
+                      <button class="oxi-cell" data-val="99" type="button" onclick="oxigSelectValue(99)">99<span>%</span></button>
+                      <button class="oxi-cell" data-val="100" type="button" onclick="oxigSelectValue(100)">100<span>%</span></button>
+                    </div>
+
+                    <!-- Badge de status em tempo real -->
+                    <div id="oxigBadge" class="oxi-badge oxi-badge--normal">Normal ✓</div>
+
+                    <!-- Valor grande + steppers ±1 para valores fora da grade -->
+                    <div class="oxi-stepper-row">
+                      <button class="oxi-step-btn" type="button" onclick="stepOxig(-1)">−1</button>
+                      <div class="oxi-current-val" id="oxigCurrentVal">98<span class="oxi-unit">%</span></div>
+                      <button class="oxi-step-btn oxi-step-btn--pos" type="button" onclick="stepOxig(1)">+1</button>
+                    </div>
+
+                    <button class="hi-confirm-btn" onclick="oxigConfirm()">+ Registrar</button>
+                    <button type="button" class="hi-cancel-link" onclick="closeOxigInsertView()">Cancelar</button>
+
                   </div>
                 </div>
             </div>
@@ -460,7 +1094,7 @@
             <div id="vitalDetailContent" class="vital-detail-content"></div>
 
             <div class="form-group vital-detail-add-row">
-                <button class="button button-confirm" id="addVitalMedicaoBtn" style="width: 100%;">+ Adicionar Medição</button>
+                <button class="button button-confirm" id="addVitalMedicaoBtn">+ Inserir dados</button>
             </div>
         </div>
     </div>
@@ -527,13 +1161,13 @@
     <!-- Modal de Despertador -->
     <div class="alarm-modal" id="alarmModal">
         <div class="alarm-content">
-            <div class="alarm-icon">🔔</div>
+            <div class="alarm-icon"><svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"/><path d="M9 17a3 3 0 0 0 6 0"/></svg></div>
             <div class="alarm-title">Hora do Remédio!</div>
             <div class="alarm-med" id="alarmMedName">Dipirona 500mg</div>
             <div class="alarm-time" id="alarmTime">14:30</div>
             <div class="alarm-buttons">
                 <button class="alarm-btn alarm-btn-dismiss" id="dismissAlarmBtn">Ver atrasadas</button>
-                <button class="alarm-btn alarm-btn-take" id="takeAlarmBtn">✅ Já Tomei</button>
+                <button class="alarm-btn alarm-btn-take" id="takeAlarmBtn">Já Tomei</button>
             </div>
         </div>
     </div>
@@ -541,10 +1175,10 @@
     <!-- Modal de Alerta de Sinal Vital -->
     <div class="alarm-modal" id="vitalAlarmModal">
         <div class="alarm-content">
-            <div class="alarm-icon">⚠️</div>
+            <div class="alarm-icon"><svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.72 3h16.92a2 2 0 0 0 1.72-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
             <div class="alarm-title" id="vitalAlarmTitle">Alerta de Sinal Vital</div>
             <div class="alarm-med" id="vitalAlarmValue">--</div>
-            <div class="alarm-time" id="vitalAlarmDescription" style="font-size: 13px;">Valor fora do limite configurado.</div>
+            <div class="alarm-time" id="vitalAlarmDescription">Valor fora do limite configurado.</div>
             <div class="alarm-buttons">
                 <button class="alarm-btn alarm-btn-dismiss" id="closeVitalAlarmBtn">Fechar</button>
                 <button class="alarm-btn alarm-btn-take" id="ackVitalAlarmBtn">Entendi</button>
@@ -573,13 +1207,13 @@
                     <div id="medSearchRow" class="med-search-row">
                         <label class="form-label med-wizard-label" for="searchMedInput">Buscar no catálogo</label>
                         <input type="text" class="form-input med-wizard-input" id="searchMedInput" placeholder="Ex.: Losartana, vitamina D…" oninput="searchMedicamentos(this.value); updateMedManualRegisterBtn();" autocomplete="off" aria-label="Buscar medicamento no catálogo">
-                        <div id="searchResults" class="med-search-results" style="display: none;"></div>
+                        <div id="searchResults" class="med-search-results is-hidden"></div>
                         <p class="med-manual-lead">Não achou o nome? Digite como está na embalagem e use <strong>Cadastrar com este nome</strong>.</p>
                         <button type="button" class="med-register-manual-btn" id="medRegisterManualBtn" onclick="registerCustomMedicamentoFromSearch()" disabled>Cadastrar com este nome (fora da lista)</button>
                     </div>
-                    <div id="medSelectedRow" class="med-selected-row" style="display: none;">
+                    <div id="medSelectedRow" class="med-selected-row is-hidden">
                         <div class="med-selected-chip" role="status">
-                            <span class="med-selected-emoji" aria-hidden="true">💊</span>
+                            <span class="med-selected-emoji" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 20.5l10-10a4.95 4.95 0 0 0-7-7l-10 10a4.95 4.95 0 0 0 7 7z"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg></span>
                             <span class="med-selected-name" id="medSelectedDisplayName"></span>
                         </div>
                         <button type="button" class="med-change-btn" onclick="trocarMedicamentoSelecionado()">Trocar</button>
@@ -604,7 +1238,7 @@
                     </div>
                 </div>
 
-                <div class="add-med-step" data-step="2" id="addMedStep2" style="display:none;">
+                <div class="add-med-step is-hidden" data-step="2" id="addMedStep2">
                     <p class="add-med-step-hint">Toque na opção que melhor descreve como você usa o medicamento.</p>
                     <select class="form-select visually-hidden" id="frequenciaMedInput" required onchange="updateHorariosFields(); syncAddMedFreqButtons();" aria-label="Frequência">
                         <option value="">Selecione</option>
@@ -624,7 +1258,7 @@
                     </div>
                 </div>
 
-                <div class="add-med-step" data-step="3" id="addMedStep3" style="display:none;">
+                <div class="add-med-step is-hidden" data-step="3" id="addMedStep3">
                     <p class="add-med-step-hint">Defina os horários dos lembretes e o início do tratamento.</p>
                     <div id="horariosContainer"></div>
                     <div class="form-group">
@@ -633,10 +1267,10 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Foto do medicamento (opcional)</label>
-                        <input type="file" class="form-input" id="fotoMedInput" accept="image/*" style="display:none;">
+                        <input type="file" class="form-input hidden-file-input" id="fotoMedInput" accept="image/*">
                         <div class="photo-upload-area" id="photoUploadArea" onclick="document.getElementById('fotoMedInput').click()">
-                            <div class="photo-upload-placeholder">📷 Toque para adicionar foto do remédio</div>
-                            <div class="photo-preview" id="photoPreview" style="display:none;">
+                            <div class="photo-upload-placeholder">Toque para adicionar foto do remédio</div>
+                            <div class="photo-preview is-hidden" id="photoPreview">
                                 <img id="photoPreviewImg" alt="Pré-visualização do medicamento">
                                 <button type="button" class="photo-remove-btn" onclick="event.stopPropagation(); removerFoto()">×</button>
                             </div>
@@ -644,7 +1278,7 @@
                     </div>
                 </div>
 
-                <div class="add-med-step" data-step="4" id="addMedStep4" style="display:none;">
+                <div class="add-med-step is-hidden" data-step="4" id="addMedStep4">
                     <p class="add-med-step-hint">Informe o estoque e como deseja ser avisado.</p>
                     <div class="form-group">
                         <label class="form-label">Estoque atual (quantidade)</label>
@@ -661,7 +1295,7 @@
                             <button type="button" class="toggle active" id="toggleDashboardMed" onclick="this.classList.toggle('active')"></button>
                         </div>
                     </div>
-                    <div class="add-med-alerts-heading">🔔 Alertas</div>
+                    <div class="add-med-alerts-heading">Alertas</div>
                     <div class="toggle-row add-med-toggle-row">
                         <span class="toggle-label">Lembrete antes do horário</span>
                         <button type="button" class="toggle active" id="toggleLembreteMed" onclick="this.classList.toggle('active')"></button>
@@ -690,9 +1324,9 @@
                 <div class="add-med-wizard-footer">
                     <button type="button" class="button-cancel" id="cancelAddBtn">Cancelar</button>
                     <div class="add-med-wizard-footer-right">
-                        <button type="button" class="button-secondary" id="addMedWizardBack" style="display:none;">Voltar</button>
+                        <button type="button" class="button-secondary is-hidden" id="addMedWizardBack">Voltar</button>
                         <button type="button" class="button-submit" id="addMedWizardNext">Próximo</button>
-                        <button type="submit" class="button-submit" id="addMedWizardSave" style="display:none;">Salvar</button>
+                        <button type="submit" class="button-submit is-hidden" id="addMedWizardSave">Salvar</button>
                     </div>
                 </div>
             </form>
@@ -736,16 +1370,16 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Foto do medicamento (opcional)</label>
-                    <input type="file" class="form-input" id="editFotoMedInput" accept="image/*" style="display:none;">
+                    <input type="file" class="form-input hidden-file-input" id="editFotoMedInput" accept="image/*">
                     <div class="photo-upload-area" id="editPhotoUploadArea" onclick="document.getElementById('editFotoMedInput').click()">
-                        <div class="photo-upload-placeholder">📷 Toque para alterar foto do remédio</div>
-                        <div class="photo-preview" id="editPhotoPreview" style="display:none;">
+                        <div class="photo-upload-placeholder">Toque para alterar foto do remédio</div>
+                        <div class="photo-preview is-hidden" id="editPhotoPreview">
                             <img id="editPhotoPreviewImg" alt="Pré-visualização do medicamento">
                             <button type="button" class="photo-remove-btn" onclick="event.stopPropagation(); removerFotoEdit()">×</button>
                         </div>
                     </div>
                 </div>
-                <div class="toggle-row" style="margin-bottom:8px;">
+                <div class="toggle-row add-med-toggle-row">
                     <span class="toggle-label">Uso contínuo (sem período previsto)</span>
                     <button type="button" class="toggle" id="toggleSemDataFimMedEdit" onclick="toggleSemDataFimMedicacao('edit')"></button>
                 </div>
@@ -825,8 +1459,8 @@
                     <input type="text" class="form-input" id="motivoAgendaInput" placeholder="Ex: Acompanhamento cardíaco">
                 </div>
                 <!-- Lembrete -->
-                <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:8px;">🔔 Lembrete</div>
-                <div class="toggle-row" style="margin-bottom:8px;">
+                <div class="agenda-reminder-title">Lembrete</div>
+                <div class="toggle-row add-med-toggle-row">
                     <span class="toggle-label">Ativar lembrete</span>
                     <button type="button" class="toggle active" id="toggleLembreteAgenda" onclick="this.classList.toggle('active')"></button>
                 </div>
@@ -998,45 +1632,6 @@
         </div>
     </div>
 
-    <!-- Modal de Composição Corporal -->
-    <div class="modal" id="composicaoModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span id="composicaoModalTitle">Adicionar Dados</span>
-            </div>
-            <form id="composicaoForm">
-                <div class="form-group">
-                    <label class="form-label">Valor</label>
-                    <input type="number" class="form-input" id="composicaoValorInput" placeholder="Digite o valor" step="0.1" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Fonte de Dados</label>
-                    <select class="form-select" id="composicaoFonteInput" required>
-                        <option value="">Selecione</option>
-                        <option value="Manual">Manual</option>
-                        <option value="Balança Inteligente">Balança Inteligente</option>
-                        <option value="Google Fit">Google Fit</option>
-                        <option value="Apple Health">Apple Health</option>
-                        <option value="Fitbit">Fitbit</option>
-                        <option value="Calculado">Calculado</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Data</label>
-                    <input type="date" class="form-input" id="composicaoDataInput" required>
-                </div>
-                <div class="button-group">
-                    <button type="button" class="button-cancel" id="cancelComposicaoBtn">Cancelar</button>
-                    <button type="submit" class="button-submit">Salvar</button>
-                </div>
-            </form>
-            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
-                <div class="section-title">Histórico</div>
-                <div id="composicaoHistoricoContent" style="max-height: 300px; overflow-y: auto;"></div>
-            </div>
-        </div>
-    </div>
-
     <!-- Modal de Filtro de Período -->
     <div class="modal" id="periodFilterModal">
         <div class="modal-content">
@@ -1071,7 +1666,7 @@
 
     <!-- Modal de Relatório de Aderência -->
     <div class="modal" id="adherenceReportModal">
-        <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
+        <div class="modal-content modal-content--scroll-90">
             <div class="modal-header">
                 <span>Relatório de Aderência</span>
                 <button class="modal-ok" id="closeAdherenceReportModal">OK</button>
@@ -1079,7 +1674,7 @@
             
             <div class="adherence-header">
                 <div class="adherence-period" id="adherencePeriodText">Últimos 7 dias</div>
-                <button class="period-filter-btn" onclick="openPeriodFilterModal()">📅 Alterar Período</button>
+                <button class="period-filter-btn" onclick="openPeriodFilterModal()">Alterar Período</button>
             </div>
             
             <div class="adherence-summary">
@@ -1097,10 +1692,10 @@
                 </div>
             </div>
             
-            <div class="section-title" style="margin-top: 20px;">Aderência por Medicação</div>
+            <div class="section-title section-title--mt20">Aderência por Medicação</div>
             <div id="adherenceByMedicationContent"></div>
             
-            <div class="section-title" style="margin-top: 20px;">Histórico Diário</div>
+            <div class="section-title section-title--mt20">Histórico Diário</div>
             <div id="dailyAdherenceContent"></div>
         </div>
     </div>
@@ -1111,31 +1706,31 @@
             <div class="modal-header">
                 <span>Registrar Medicação</span>
             </div>
-            <div style="text-align: center; margin-bottom: 20px;">
-                <div id="takeMedName" style="font-size: 18px; font-weight: 700; color: #333333; margin-bottom: 8px;"></div>
-                <div style="font-size: 14px; color: #999999;">Horário agendado: <span id="takeMedScheduledTime" style="font-weight: 600;"></span></div>
+            <div class="take-med-header">
+                <div id="takeMedName" class="take-med-name"></div>
+                <div class="take-med-scheduled">Horário agendado: <span id="takeMedScheduledTime" class="take-med-time-strong"></span></div>
             </div>
             
             <div class="form-group">
                 <label class="form-label">Tomou agora?</label>
-                <div style="display: flex; gap: 12px;">
-                    <button type="button" class="button-submit" style="flex: 1;" onclick="confirmTakeMedication(true)">
-                        ✅ Sim, agora
-                        <div style="font-size: 12px; margin-top: 4px;" id="takeMedCurrentTime"></div>
+                <div class="inline-actions-row">
+                    <button type="button" class="button-submit btn-flex" onclick="confirmTakeMedication(true)">
+                        Sim, agora
+                        <div class="take-med-now-time" id="takeMedCurrentTime"></div>
                     </button>
-                    <button type="button" class="button-cancel" style="flex: 1;" onclick="document.getElementById('takeMedicationModal').classList.remove('active')">
+                    <button type="button" class="button-cancel btn-flex" onclick="document.getElementById('takeMedicationModal').classList.remove('active')">
                         Cancelar
                     </button>
                 </div>
             </div>
             
-            <div style="text-align: center; margin: 16px 0; color: #999999; font-size: 12px;">OU</div>
+            <div class="take-med-divider">OU</div>
             
             <div class="form-group">
                 <label class="form-label">Outro horário</label>
                 <input type="time" class="form-input" id="takeMedTimeInput">
-                <button type="button" class="button-submit" style="width: 100%; margin-top: 8px;" onclick="confirmTakeMedication(false)">
-                    ✅ Registrar neste horário
+                <button type="button" class="button-submit btn-full-top" onclick="confirmTakeMedication(false)">
+                    Registrar neste horário
                 </button>
             </div>
         </div>
@@ -1143,16 +1738,16 @@
 
     <!-- Modal de Pressão Arterial - Seguimento Batimento Cardíaco -->
     <div class="modal" id="heartRateFollowupModal">
-        <div class="modal-content" style="max-width: 350px; text-align: center;">
-            <div style="font-size: 48px; margin-bottom: 16px;">🫀</div>
-            <div style="font-size: 18px; font-weight: 700; color: #333; margin-bottom: 8px;">Para um registro completo</div>
-            <div style="font-size: 14px; color: #666; margin-bottom: 20px;">Informe seu batimento cardíaco agora:</div>
+        <div class="modal-content modal-content--followup">
+            <div class="followup-icon-wrap"><svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+            <div class="followup-title">Para um registro completo</div>
+            <div class="followup-subtitle">Informe seu batimento cardíaco agora:</div>
             <div class="form-group">
-                <input type="number" class="form-input" id="heartRateInput" placeholder="Ex: 72" min="30" max="200" style="text-align: center; font-size: 18px; font-weight: 600;">
+                <input type="number" class="form-input" id="heartRateInput" placeholder="Ex: 72" min="30" max="200">
             </div>
-            <div style="display: flex; gap: 12px;">
-                <button type="button" class="button-cancel" style="flex: 1;" onclick="skipHeartRateFollowup()">Pular</button>
-                <button type="button" class="button-submit" style="flex: 1;" onclick="confirmHeartRateFollowup()">✅ Confirmar</button>
+            <div class="inline-actions-row">
+                <button type="button" class="button-cancel btn-flex" onclick="skipHeartRateFollowup()">Pular</button>
+                <button type="button" class="button-submit btn-flex" onclick="confirmHeartRateFollowup()">Confirmar</button>
             </div>
         </div>
     </div>
@@ -1232,7 +1827,7 @@
                 <label class="form-label">Quando será a próxima medição?</label>
                 <input type="datetime-local" class="form-input" id="nextMeasurementDateTimeInput">
             </div>
-            <div class="toggle-row" style="margin-bottom: 14px;">
+            <div class="toggle-row toggle-row--mb14">
                 <span class="toggle-label">Deseja receber aviso por notificação?</span>
                 <button type="button" class="toggle active" id="notifyNextMeasurementToggle" onclick="this.classList.toggle('active')"></button>
             </div>
@@ -1263,89 +1858,11 @@
                 <span>⚙️ Personalizar Sinais Vitais</span>
                 <button class="modal-ok" id="closeVitaisConfigModal">OK</button>
             </div>
-            <p style="font-size: 13px; color: #999; margin-bottom: 16px;">Escolha o que aparece em cada tela. Em <strong>Todos</strong> pode desligar ou ligar todos de uma vez e depois ajustar só o que precisa.</p>
+            <p class="config-helper-text">Escolha o que aparece em cada tela. Em <strong>Todos</strong> pode desligar ou ligar todos de uma vez e depois ajustar só o que precisa.</p>
             <div id="vitaisConfigContent"></div>
         </div>
     </div>
 
-    <!-- Modal Configuração Composição Corporal -->
-    <div class="modal" id="composicaoConfigModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span>⚙️ Personalizar Corpo</span>
-                <button class="modal-ok" id="closeComposicaoConfigModal">OK</button>
-            </div>
-            <p style="font-size:13px;color:#999;margin-bottom:16px;">Escolha o que aparece em cada tela.</p>
-            <div id="composicaoConfigContent"></div>
-        </div>
-    </div>
-
-    <!-- Modal Minha Composição Corporal -->
-    <div class="modal" id="minhaComposicaoModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span>📊 Minha Composição</span>
-                <button class="add-button" onclick="openNovoIndicadorCorpoModal()" style="width:32px;height:32px;font-size:18px;">+</button>
-                <button class="modal-ok" id="closeMinhaComposicaoModal">OK</button>
-            </div>
-            <div id="minhaComposicaoContent"></div>
-        </div>
-    </div>
-
-    <!-- Modal Novo Indicador Corporal -->
-    <div class="modal" id="novoIndicadorCorpoModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span>Novo Indicador</span>
-            </div>
-            <form id="novoIndicadorCorpoForm">
-                <div class="form-group">
-                    <label class="form-label">Nome</label>
-                    <input type="text" class="form-input" id="novoCorpoNome" placeholder="Ex: Circunferência Quadril" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Unidade</label>
-                    <input type="text" class="form-input" id="novoCorpoUnidade" placeholder="Ex: cm" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Valor Ideal</label>
-                    <input type="text" class="form-input" id="novoCorpoIdeal" placeholder="Ex: &lt; 100">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Ícone</label>
-                    <input type="text" class="form-input" id="novoCorpoIcon" placeholder="Ex: 📌" maxlength="4">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Fonte Padrão</label>
-                    <select class="form-select" id="novoCorpoFonte">
-                        <option value="Manual">Manual</option>
-                        <option value="Balança Inteligente">Balança Inteligente</option>
-                        <option value="Calculado">Calculado</option>
-                        <option value="Google Fit">Google Fit</option>
-                        <option value="Apple Health">Apple Health</option>
-                    </select>
-                </div>
-                <div class="button-group">
-                    <button type="button" class="button-cancel" id="cancelNovoCorpoBtn">Cancelar</button>
-                    <button type="submit" class="button-submit">Adicionar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal Meus Sinais Vitais -->
-    <div class="modal" id="meusSinaisModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span>🩺 Meus Sinais Vitais</span>
-                <button class="add-button" onclick="openNovoSinalModal()" style="width:32px;height:32px;font-size:18px;">+</button>
-                <button class="modal-ok" id="closeMeusSinaisModal">OK</button>
-            </div>
-            <div id="meusSinaisContent"></div>
-        </div>
-    </div>
-
-    <!-- Modal Novo Sinal Vital -->
     <div class="modal" id="novoSinalModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1406,7 +1923,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <span>📋 Meus Indicadores</span>
-                <button class="add-button" id="addIndicadorBtn" onclick="openNovoIndicadorModal()" style="width:32px;height:32px;font-size:18px;">+</button>
+                <button class="add-button add-button--mini" id="addIndicadorBtn" onclick="openNovoIndicadorModal()">+</button>
                 <button class="modal-ok" id="closeMeusIndicadoresModal">OK</button>
             </div>
             <div class="tab-bar">
@@ -1455,25 +1972,25 @@
                     </select>
                 </div>
                 <!-- Alertas de sinal vital (só aparece ao editar) -->
-                <div id="alertaVitalContainer" style="display:none;">
-                    <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:8px;margin-top:4px;">🔔 Alertas</div>
-                    <div class="toggle-row" style="margin-bottom:8px;">
+                <div id="alertaVitalContainer" class="is-hidden">
+                    <div class="alert-section-heading">Alertas</div>
+                    <div class="toggle-row add-med-toggle-row">
                         <span class="toggle-label">Ativar alertas para este sinal</span>
                         <button type="button" class="toggle" id="toggleAlertaVital" onclick="this.classList.toggle('active');toggleAlertaVitalFields()"></button>
                     </div>
-                    <div id="alertaVitalFields" style="display:none;">
+                    <div id="alertaVitalFields" class="is-hidden">
                         <div class="form-group">
                             <label class="form-label">Alertar se acima de</label>
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                <input type="number" class="form-input" id="alertaAcimaInput" placeholder="Ex: 140" step="any" style="flex:1;">
-                                <span id="alertaUnidadeLabel" style="font-size:13px;color:#454545;font-weight:600;"></span>
+                            <div class="alerta-vital-input-row">
+                                <input type="number" class="form-input alerta-vital-input-grow" id="alertaAcimaInput" placeholder="Ex: 140" step="any">
+                                <span id="alertaUnidadeLabel" class="alerta-vital-unit"></span>
                             </div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Alertar se abaixo de</label>
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                <input type="number" class="form-input" id="alertaAbaixoInput" placeholder="Ex: 60" step="any" style="flex:1;">
-                                <span style="font-size:13px;color:#454545;font-weight:600;" id="alertaUnidadeLabel2"></span>
+                            <div class="alerta-vital-input-row">
+                                <input type="number" class="form-input alerta-vital-input-grow" id="alertaAbaixoInput" placeholder="Ex: 60" step="any">
+                                <span class="alerta-vital-unit" id="alertaUnidadeLabel2"></span>
                             </div>
                         </div>
                     </div>
@@ -1520,9 +2037,9 @@
 
     <!-- Modal Central de Alertas -->
     <div class="modal" id="alertasModal">
-        <div class="modal-content" style="max-height:85vh;overflow-y:auto;">
+        <div class="modal-content modal-content--alertas">
             <div class="modal-header">
-                <span>🔔 Alertas</span>
+                <span>Alertas</span>
                 <button class="modal-ok" id="closeAlertasModal">OK</button>
             </div>
             <div class="tab-bar">
@@ -1551,7 +2068,7 @@
     <!-- Modal de Feedback do Sistema -->
     <div class="modal" id="feedbackModal">
         <div class="modal-content feedback-modal-content">
-            <div class="feedback-modal-icon" id="feedbackModalIcon">✅</div>
+            <div class="feedback-modal-icon" id="feedbackModalIcon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="12" y1="7" x2="12.01" y2="7"/></svg></div>
             <div class="feedback-modal-title" id="feedbackModalTitle">Concluído</div>
             <div class="feedback-modal-message" id="feedbackModalMessage">Operação realizada com sucesso.</div>
             <div class="button-group">
@@ -1562,6 +2079,7 @@
 
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="vendor/framework7/framework7.bundle.min.js"></script>
     <script src="data.js"></script>
     <script src="components.js"></script>
     <script src="app.js"></script>

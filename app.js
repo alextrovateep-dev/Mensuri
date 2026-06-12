@@ -3,37 +3,41 @@ let fotoAtualMedicacao = null;
 let fotoAtualMedicacaoEdit = null;
 let currentVitalType = '';
 let currentVitalDetail = null;
-/** Índice alinhado à lista renderizada em `renderVitalDetailContent` (respeita filtro de datas). */
+/** �ndice alinhado � lista renderizada em `renderVitalDetailContent` (respeita filtro de datas). */
 let currentVitalHistoricoView = [];
-/** Período do gráfico no modal de Batimento Cardíaco: 7d | 15d | 30d | year | livre */
+/** Per�odo do gr�fico no modal de Batimento Card�aco: 7d | 15d | 30d | year | livre */
 let vitalBatimentoPeriod = '7d';
 /** Filtro por toque na barra: null | { kind: 'day', iso } | { kind: 'range', start, end } */
 let vitalBatimentoChartSelection = null;
 /** Contexto exibido no modal de Batimento: all | sono_repouso */
 let vitalBatimentoContextMode = 'all';
-/** Período no modal padrão (usado em Pressão Arterial): 7d | 15d | 30d | year | livre */
+/** Per�odo no modal padr�o (usado em Press�o Arterial): 7d | 15d | 30d | year | livre */
 let vitalDefaultPeriod = '7d';
 let lastMedicationAlertKey = null;
 let lastVitalAlertKey = null;
 let currentAlarmMedicationId = null;
 let currentAlarmScheduledTime = '';
-/** Dados validados antes de salvar (modal de confirmação) */
+/** Dados validados antes de salvar (modal de confirma��o) */
 let pendingVitalSavePayload = null;
-/** BPM pendente após informar batimento (mesmo modal de confirmação) */
+/** BPM pendente ap�s informar batimento (mesmo modal de confirma��o) */
 let pendingHeartRateBpm = null;
 let lastRescheduleAlertKey = null;
 let pendingConfirmAction = null;
 let currentDailyScheduleFilter = 'todos';
 let passosSelectedDayIso = null;
 let passosSelectedHour = null;
+let glicemiaSelectedDayIso = null;
 let pressaoSelectedDay = null; // ISO date of selected day in the pressure sparkline
 let pressaoColetaEntries = []; // sorted entries of the currently open day detail
 let pressaoColetaDayIso = null; // ISO date of the currently open day detail
 let pressaoDiaShowAll = false; // whether the reading list is fully expanded
-/** Dia selecionado no day-picker de Batimento Cardíaco (ISO YYYY-MM-DD). null = hoje */
+/** Dia selecionado no day-picker de Batimento Card�aco (ISO YYYY-MM-DD). null = hoje */
 let batimentoSelectedDayISO = null;
+let corpoAvaliacaoViewMode = 'list';
+let corpoAvaliacaoSelectedId = null;
+let corpoAvaliacaoDraft = null;
 
-/** YYYY-MM-DD no calendário local. Evita `toISOString()` (UTC), que desloca o dia e quebra filtros 7d/15d e o gráfico. */
+/** YYYY-MM-DD no calend�rio local. Evita `toISOString()` (UTC), que desloca o dia e quebra filtros 7d/15d e o gr�fico. */
 function dateToLocalISODate(d) {
   if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
   const y = d.getFullYear();
@@ -46,7 +50,7 @@ function getTodayISODate() {
   return dateToLocalISODate(new Date());
 }
 
-/** Meio-dia local (Date) a partir de YYYY-MM-DD — evita `new Date('...T12:00:00')` (comportamento varia por motor e pode deslocar o dia). */
+/** Meio-dia local (Date) a partir de YYYY-MM-DD � evita `new Date('...T12:00:00')` (comportamento varia por motor e pode deslocar o dia). */
 function localNoonFromISODate(iso) {
   const m = typeof iso === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!m) return new Date(NaN);
@@ -83,6 +87,44 @@ function aggregatePassosByDay(entries) {
     g.entries.push(h);
   });
   return Array.from(byDay.values()).sort((a, b) => b.day.localeCompare(a.day));
+}
+
+function aggregateGlicemiaByDay(entries) {
+  const byDay = new Map();
+  (Array.isArray(entries) ? entries : []).forEach((h) => {
+    const dayIso = (typeof historicoEntryDayISO === 'function') ? historicoEntryDayISO(h) : String(h?.data || '').slice(0, 10);
+    const v = Number(h?.valor);
+    if (!dayIso || !Number.isFinite(v)) return;
+    if (!byDay.has(dayIso)) byDay.set(dayIso, { day: dayIso, readings: [], sum: 0, count: 0, min: v, max: v });
+    const g = byDay.get(dayIso);
+    g.readings.push(h);
+    g.sum += v;
+    g.count++;
+    if (v < g.min) g.min = v;
+    if (v > g.max) g.max = v;
+  });
+  return Array.from(byDay.values())
+    .sort((a, b) => a.day.localeCompare(b.day))
+    .map((d) => ({ ...d, avg: Math.round(d.sum / d.count) }));
+}
+
+function aggregateGlicemiaByMonth(entries) {
+  const byMonth = new Map();
+  (Array.isArray(entries) ? entries : []).forEach((h) => {
+    const dayIso = (typeof historicoEntryDayISO === 'function') ? historicoEntryDayISO(h) : String(h?.data || '').slice(0, 10);
+    const v = Number(h?.valor);
+    if (!dayIso || !Number.isFinite(v)) return;
+    const monthKey = dayIso.slice(0, 7); // 'YYYY-MM'
+    if (!byMonth.has(monthKey)) byMonth.set(monthKey, { month: monthKey, sum: 0, count: 0, min: v, max: v });
+    const m = byMonth.get(monthKey);
+    m.sum += v;
+    m.count++;
+    if (v < m.min) m.min = v;
+    if (v > m.max) m.max = v;
+  });
+  return Array.from(byMonth.values())
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map((m) => ({ ...m, avg: Math.round(m.sum / m.count) }));
 }
 
 function buildPassosHourlyBucketsForDay(dayEntries) {
@@ -122,7 +164,7 @@ function renderPassosHourlyCanvas(dayIso, dayEntries, goal) {
   const subtitle = document.getElementById('passosHourlySubtitle');
   if (!canvas) return;
   const hhTxt = Number.isInteger(passosSelectedHour)
-    ? ` · ${String(passosSelectedHour).padStart(2, '0')}:00–${String(passosSelectedHour).padStart(2, '0')}:59`
+    ? ` � ${String(passosSelectedHour).padStart(2, '0')}:00�${String(passosSelectedHour).padStart(2, '0')}:59`
     : '';
   if (subtitle) subtitle.textContent = dayIso ? `${formatDateForUI(dayIso)}${hhTxt}` : '';
   const ctx = canvas.getContext('2d');
@@ -208,28 +250,578 @@ function renderPassosHourlyCanvas(dayIso, dayEntries, goal) {
     const hit = hourHits.find((b) => x >= b.x0 && x <= b.x1);
     if (!hit) return;
     passosSelectedHour = passosSelectedHour === hit.hour ? null : hit.hour;
-    renderVitalDetailContent(currentVitalHistoricoView);
+    renderPassosHourlyCanvas(dayIso, dayEntries, goal);
+    _updatePassosHourFooter(dayEntries, goal);
   };
 }
 
 function setPassosDayFromChart(dayIso) {
   if (!dayIso) return;
   if (!currentVitalDetail || currentVitalDetail.tipo !== 'Passos') return;
-  passosSelectedDayIso = dayIso;
-  passosSelectedHour = null;
-  batHourlySelectedHour = null;
-  renderVitalDetailContent(currentVitalHistoricoView);
+  openPassosDiaDetail(dayIso);
+}
+
+function selectGlicemiaDay(dayIso) {
+  if (!currentVitalDetail || currentVitalDetail.tipo !== 'Glicemia') return;
+  glicemiaSelectedDayIso = glicemiaSelectedDayIso === dayIso ? null : dayIso;
   renderSparklineChart(currentVitalHistoricoView);
+  renderVitalDetailContent(currentVitalHistoricoView);
+}
+
+function clearGlicemiaDaySelection() {
+  glicemiaSelectedDayIso = null;
+  renderSparklineChart(currentVitalHistoricoView);
+  renderVitalDetailContent(currentVitalHistoricoView);
+}
+
+// -- Wizard inline Glicemia ---------------------------------
+let _addGlicStep = 1;
+let _glicNumpadValue = '';
+var glicemiaInsertData = { glicemia: 96 };
+
+function openAddGlicemiaWizard() {
+  _addGlicStep = 1;
+  glicemiaInsertData = { glicemia: 96, insulina: 0, medicamentos: null, _useNow: true };
+
+  // Reset notas
+  var nota = document.getElementById('glicNotaInput');
+  if (nota) nota.value = '';
+  // Reset medicamentos
+  document.querySelectorAll('#glicStep4 .pi-med-card').forEach(function(b) { b.classList.remove('pi-med-card--active'); });
+  var glicMedBtn = document.getElementById('glicMedNextBtn');
+  if (glicMedBtn) { glicMedBtn.style.opacity = '0.35'; glicMedBtn.style.pointerEvents = 'none'; }
+
+  // Reset context
+  var ctx = document.getElementById('glicemiaContextoInput');
+  if (ctx) ctx.value = '';
+  document.querySelectorAll('#glicemiaContextoBtns .glic-ctx-card')
+    .forEach(function(b) { b.classList.remove('glic-ctx-active'); });
+
+  // Reset confirm button
+  var cfm = document.getElementById('glicConfirmCtxBtn');
+  if (cfm) { cfm.style.opacity = '0.35'; cfm.style.pointerEvents = 'none'; }
+
+  // Reset drum input overlay
+  var glicDrumInp = document.getElementById('piDcInput-glicemia');
+  if (glicDrumInp) { glicDrumInp.style.pointerEvents = 'none'; glicDrumInp.style.opacity = '0'; }
+
+  // Pre-fill date/time to now (for the optional panel in step 3)
+  var now = new Date();
+  var dat = document.getElementById('glicemiaDataInput');
+  var hor = document.getElementById('glicemiaHoraInput');
+  if (dat) dat.value = String(now.getDate()).padStart(2,'0') + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
+  if (hor) hor.value = now.toTimeString().slice(0, 5);
+
+  // Reset step-3: mostrar op��es, ocultar painel de data/hora
+  var glicOpts = document.getElementById('glicS3Options');
+  if (glicOpts) glicOpts.style.display = '';
+  var etp = document.getElementById('glicEditTimePanel');
+  if (etp) etp.style.display = 'none';
+  _glicS3Mode = null;
+  var cfm = document.getElementById('glicS3ConfirmBtn');
+  if (cfm) cfm.style.display = 'none';
+  document.querySelectorAll('.glic-s3-opt-btn').forEach(function(b) { b.classList.remove('glic-s3-selected'); });
+
+  // Hide chart/list views
+  var chart = document.getElementById('pressaoHistoricoView');
+  if (chart) chart.style.display = 'none';
+  var filters = document.getElementById('vitalDefaultPeriodControls');
+  if (filters) filters.style.display = 'none';
+  var content = document.getElementById('vitalDetailContent');
+  if (content) content.style.display = 'none';
+  var addRow = document.querySelector('#vitalDetailModal .vital-detail-add-row');
+  if (addRow) addRow.style.display = 'none';
+
+  // Show inline wizard
+  var insertView = document.getElementById('glicemiaInsertView');
+  if (insertView) insertView.style.display = 'flex';
+  window._glicemiaInsertActive = true;
+
+  var titleEl = document.getElementById('vitalDetailTitle');
+  if (titleEl) titleEl.style.display = 'none';
+  var _glicSubEl = document.getElementById('vitalDetailSubtitle');
+  if (_glicSubEl) {
+    var _dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'S�b'];
+    var _meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    _glicSubEl.textContent = _dias[now.getDay()] + ', ' + now.getDate() + ' de ' + _meses[now.getMonth()] + ' � ' + now.toTimeString().slice(0, 5);
+  }
+
+  glicemiaWizardGoStep(1);
+  _piDrumRender('glicemia');
+  _piDrumRender('insulina');
+  _glicDrumUpdateBadge();
+}
+
+function closeAddGlicemiaWizard() {
+  var insertView = document.getElementById('glicemiaInsertView');
+  if (insertView) insertView.style.display = 'none';
+  window._glicemiaInsertActive = false;
+
+  var chart = document.getElementById('pressaoHistoricoView');
+  if (chart) chart.style.display = '';
+  var filters = document.getElementById('vitalDefaultPeriodControls');
+  if (filters) filters.style.display = '';
+  var content = document.getElementById('vitalDetailContent');
+  if (content) content.style.display = '';
+  var addRow = document.querySelector('#vitalDetailModal .vital-detail-add-row');
+  if (addRow) addRow.style.display = '';
+
+  var titleEl = document.getElementById('vitalDetailTitle');
+  if (titleEl) {
+    titleEl.style.display = '';
+    if (currentVitalDetail) titleEl.textContent = currentVitalDetail.tipo === 'Glicemia' ? 'Glicose no Sangue' : ('Hist�rico de ' + currentVitalDetail.tipo);
+  }
+  var _closeSubEl = document.getElementById('vitalDetailSubtitle');
+  if (_closeSubEl) _closeSubEl.textContent = '';
+}
+
+function glicemiaWizardGoStep(step) {
+  _addGlicStep = step;
+  [1, 2, 3, 4, 5, 6, 7].forEach(function(s) {
+    var el = document.getElementById('glicStep' + s);
+    if (el) el.style.display = s === step ? '' : 'none';
+    var dot = document.querySelector('[data-glicdot="' + s + '"]');
+    if (dot) {
+      dot.classList.toggle('pi-progress-dot--active', s === step);
+      dot.classList.toggle('done', s < step);
+      if (s === step) dot.classList.remove('done');
+    }
+  });
+  // Render insulina drum when entering step 5
+  if (step === 5) {
+    _piDrumRender('insulina');
+  }
+  // Build resumo when entering step 7
+  if (step === 7) {
+    _glicRenderResumo();
+  }
+}
+
+// Teclado num�rico customizado
+function glicNumpadPress(key) {
+  if (key === 'back') {
+    _glicNumpadValue = _glicNumpadValue.slice(0, -1);
+  } else {
+    if (_glicNumpadValue.length >= 3) return; // max 3 d�gitos
+    _glicNumpadValue += key;
+  }
+  _glicemiaUpdateDisplay();
+  _glicemiaUpdateValorNextBtn();
+}
+
+function _glicemiaUpdateDisplay() {
+  var disp = document.getElementById('glicDisplay');
+  var badge = document.getElementById('glicRangeBadge');
+  if (!disp) return;
+  if (!_glicNumpadValue) {
+    disp.textContent = '�';
+    disp.className = 'glic-display';
+    if (badge) { badge.textContent = ''; badge.className = 'glic-range-badge'; }
+    return;
+  }
+  var val = parseInt(_glicNumpadValue, 10);
+  disp.textContent = _glicNumpadValue;
+  if (val < 20 || val > 600) {
+    disp.className = 'glic-display glic-display--alto';
+    if (badge) { badge.textContent = 'Valor fora do intervalo (20�600 mg/dL)'; badge.className = 'glic-range-badge glic-range-badge--alto'; }
+  } else if (val <= 99) {
+    disp.className = 'glic-display glic-display--normal';
+    if (badge) { badge.textContent = '? Normal (70�99)'; badge.className = 'glic-range-badge glic-range-badge--normal'; }
+  } else if (val <= 125) {
+    disp.className = 'glic-display glic-display--atencao';
+    if (badge) { badge.textContent = '? Aten��o (100�125)'; badge.className = 'glic-range-badge glic-range-badge--atencao'; }
+  } else {
+    disp.className = 'glic-display glic-display--alto';
+    if (badge) { badge.textContent = '? Alto (acima de 125)'; badge.className = 'glic-range-badge glic-range-badge--alto'; }
+  }
+}
+
+function _glicemiaUpdateValorNextBtn() {
+  var val = parseInt(_glicNumpadValue, 10);
+  var btn = document.getElementById('glicValorNextBtn');
+  if (!btn) return;
+  var ok = _glicNumpadValue.length > 0 && val >= 20 && val <= 600;
+  btn.style.opacity = ok ? '1' : '0.35';
+  btn.style.pointerEvents = ok ? '' : 'none';
+}
+
+function glicemiaWizardNext() {
+  // Reset context selection before showing step 2
+  var ctxInput = document.getElementById('glicemiaContextoInput');
+  if (ctxInput) ctxInput.value = '';
+  document.querySelectorAll('#glicemiaContextoBtns .glic-ctx-card')
+    .forEach(function(b) { b.classList.remove('glic-ctx-active'); });
+  var cfm = document.getElementById('glicConfirmCtxBtn');
+  if (cfm) { cfm.style.opacity = '0.35'; cfm.style.pointerEvents = 'none'; }
+  glicemiaWizardGoStep(2);
+}
+
+function selectGlicemiaContexto(btn) {
+  document.querySelectorAll('#glicemiaContextoBtns .glic-ctx-card')
+    .forEach(function(b) { b.classList.remove('glic-ctx-active'); });
+  btn.classList.add('glic-ctx-active');
+  document.getElementById('glicemiaContextoInput').value = btn.dataset.ctx;
+  // Ativa bot�o Confirmar
+  var cfm = document.getElementById('glicConfirmCtxBtn');
+  if (cfm) { cfm.style.opacity = '1'; cfm.style.pointerEvents = ''; }
+}
+
+function glicemiaConfirmContexto() {
+  var ctx = (document.getElementById('glicemiaContextoInput') || {}).value;
+  if (!ctx) return;
+  // Update step-3 summary badge
+  var badge = document.getElementById('glicStep3ValorBadge');
+  if (badge) badge.textContent = _glicNumpadValue + ' mg/dL � ' + ctx;
+  // Refresh datetime to now
+  var now = new Date();
+  var dat = document.getElementById('glicemiaDataInput');
+  var hor = document.getElementById('glicemiaHoraInput');
+  if (dat) dat.value = String(now.getDate()).padStart(2,'0') + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
+  if (hor) hor.value = now.toTimeString().slice(0, 5);
+  // Update "Medido agora" button subtitle with current time
+  var agoraLbl = document.getElementById('glicAgoraLabel');
+  if (agoraLbl) {
+    var dias = ['Dom','Seg','Ter','Qua','Qui','Sex','S�b'];
+    var meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    var h = String(now.getHours()).padStart(2,'0');
+    var m = String(now.getMinutes()).padStart(2,'0');
+    agoraLbl.textContent = dias[now.getDay()] + ', ' + now.getDate() + ' ' + meses[now.getMonth()] + ' � ' + h + ':' + m;
+  }
+  glicemiaWizardGoStep(3);
+}
+
+var _glicS3Mode = null;
+
+function glicSelectAgora() {
+  _glicS3Mode = 'agora';
+  document.querySelectorAll('.glic-s3-opt-btn').forEach(function(b) { b.classList.remove('glic-s3-selected'); });
+  var agoraBtn = document.getElementById('glicAgoraBtn');
+  if (agoraBtn) agoraBtn.classList.add('glic-s3-selected');
+  var cfm = document.getElementById('glicS3ConfirmBtn');
+  if (cfm) cfm.style.display = '';
+}
+
+function glicS3Confirm() {
+  if (_glicS3Mode === 'agora') { glicemiaInsertData._useNow = true; }
+  else if (_glicS3Mode === 'outro') { glicemiaInsertData._useNow = false; }
+  glicemiaWizardGoStep(4);
+}
+
+function glicShowOutroHorario() {
+  _glicS3Mode = 'outro';
+  var opts = document.getElementById('glicS3Options');
+  if (opts) opts.style.display = 'none';
+  var panel = document.getElementById('glicEditTimePanel');
+  if (panel) panel.style.display = '';
+  var cfm = document.getElementById('glicS3ConfirmBtn');
+  if (cfm) cfm.style.display = '';
+}
+
+function glicDataInputMask(inp) {
+  var v = inp.value.replace(/\D/g, '').slice(0, 8);
+  if (v.length > 4) v = v.slice(0,2) + '/' + v.slice(2,4) + '/' + v.slice(4);
+  else if (v.length > 2) v = v.slice(0,2) + '/' + v.slice(2);
+  inp.value = v;
+}
+
+function glicSelectMed(val) {
+  document.querySelectorAll('#glicStep4 .pi-med-card').forEach(function(b) { b.classList.remove('pi-med-card--active'); });
+  var btn = document.getElementById('glicMed-' + val);
+  if (btn) btn.classList.add('pi-med-card--active');
+  glicemiaInsertData.medicamentos = val;
+  var nxt = document.getElementById('glicMedNextBtn');
+  if (nxt) { nxt.style.opacity = '1'; nxt.style.pointerEvents = ''; }
+}
+
+function glicGoToResumo() {
+  var _ta = document.getElementById('glicNotaInput');
+  if (_ta) glicemiaInsertData.nota = _ta.value.trim();
+  glicemiaWizardGoStep(7);
+}
+
+function _glicResumoRow(label, value, editStep) {
+  var iconMap = {
+    'Glicose': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.25c0 0-6.75 7.313-6.75 11.25a6.75 6.75 0 0 0 13.5 0C18.75 9.563 12 2.25 12 2.25Z"></path></svg>',
+    'Contexto': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v6l4 2"></path><circle cx="12" cy="12" r="9"></circle></svg>',
+    'Hor�rio': '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l3 2M9 2h6"></path></svg>',
+    'Rem�dios': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7.07-7.07l-10 10a4.95 4.95 0 1 0 7.07 7.07Z"></path><path d="M8.5 8.5l7 7"></path></svg>',
+    'Insulina': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4l-3 3"></path><path d="M14 7l3 3"></path><path d="M3 21l8-8"></path><path d="M11 13l4-4 2 2-4 4"></path><path d="M2 22l2-1-1-1-1 2Z"></path></svg>',
+    'Observa��o': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>'
+  };
+  var iconClsMap = {
+    'Glicose': 'glic-sum-ico--glicose',
+    'Contexto': 'glic-sum-ico--contexto',
+    'Hor�rio': 'glic-sum-ico--horario',
+    'Rem�dios': 'glic-sum-ico--remedios',
+    'Insulina': 'glic-sum-ico--insulina',
+    'Observa��o': 'glic-sum-ico--obs'
+  };
+  var valCls = (label === 'Observa��o') ? 'pi-sum-val pi-sum-val--nota glic-sum-val' : 'pi-sum-val glic-sum-val';
+  return [
+    '<div class="pi-sum-row glic-sum-row">',
+      '<div class="pi-sum-ico glic-sum-ico ' + (iconClsMap[label] || '') + '">' + (iconMap[label] || '') + '</div>',
+      '<div class="pi-sum-body">',
+        '<div class="pi-sum-lbl">' + label + '</div>',
+        '<div class="' + valCls + '">' + value + '</div>',
+      '</div>',
+      '<button type="button" class="pi-sum-edit glic-sum-edit" onclick="glicemiaWizardGoStep(' + editStep + ')" aria-label="Editar ' + label + '">Editar</button>',
+    '</div>'
+  ].join('');
+}
+
+function _glicRenderResumo() {
+  var container = document.getElementById('glicStep7Content');
+  if (!container) return;
+  var val = glicemiaInsertData.glicemia || 0;
+  var ctx = (document.getElementById('glicemiaContextoInput') || {}).value || '�';
+  var useNow = glicemiaInsertData._useNow !== false;
+  var timeStr = '�';
+  if (useNow) {
+    var now = new Date();
+    var _dias = ['Dom','Seg','Ter','Qua','Qui','Sex','S�b'];
+    var _meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    timeStr = _dias[now.getDay()] + ', ' + now.getDate() + ' ' + _meses[now.getMonth()] + ' � ' + now.toTimeString().slice(0, 5);
+  } else {
+    var _d = (document.getElementById('glicemiaDataInput') || {}).value || '';
+    var _h = (document.getElementById('glicemiaHoraInput') || {}).value || '';
+    if (_d && _h) timeStr = _d + ' � ' + _h;
+  }
+  var valColor = val > 125 ? '#ef4444' : val > 99 ? '#f59e0b' : '#22c55e';
+  var medMap = { 'tomados': 'Tomei meus rem�dios', 'nao_tomados': 'N�o tomei hoje', 'nenhum': 'N�o tomo rem�dios' };
+  var medStr = medMap[glicemiaInsertData.medicamentos] || '�';
+  var insulinaVal = glicemiaInsertData.insulina;
+  var insulinaStr = (!insulinaVal || insulinaVal === 0) ? 'N�o registrado' : insulinaVal + ' unidades';
+  var notaStr = (glicemiaInsertData.nota || '').trim() || 'Sem observa��o';
+  container.innerHTML = [
+    '<div class="glic-resumo-list">',
+      _glicResumoRow('Glicose', '<span style="color:' + valColor + ';font-weight:700;">' + val + ' mg/dL</span>', 1),
+      _glicResumoRow('Contexto', ctx, 2),
+      _glicResumoRow('Hor�rio', timeStr, 3),
+      _glicResumoRow('Rem�dios', medStr, 4),
+      _glicResumoRow('Insulina', insulinaStr, 5),
+      _glicResumoRow('Observa��o', notaStr, 6),
+    '</div>',
+    '<p class="glic-resumo-note">Verifique os dados antes de salvar</p>',
+    '<button class="pi-next-btn glic-next-btn" onclick="saveGlicemiaEntry(null, null)">Confirmar e Salvar ?</button>'
+  ].join('');
+}
+
+function glicOpenDatePicker() {
+  var picker = document.getElementById('glicemiaDataPicker');
+  if (!picker) return;
+  // Sync current text value to picker before opening
+  var txt = document.getElementById('glicemiaDataInput').value;
+  if (txt && txt.length === 10) {
+    var p = txt.split('/');
+    picker.value = p[2] + '-' + p[1] + '-' + p[0];
+  }
+  if (picker.showPicker) { picker.showPicker(); } else { picker.click(); }
+}
+
+function glicDatePickerChange(picker) {
+  if (!picker.value) return;
+  var p = picker.value.split('-');
+  document.getElementById('glicemiaDataInput').value = p[2] + '/' + p[1] + '/' + p[0];
+}
+
+function glicHideOutroHorario() {
+  _glicS3Mode = null;
+  var panel = document.getElementById('glicEditTimePanel');
+  if (panel) panel.style.display = 'none';
+  var opts = document.getElementById('glicS3Options');
+  if (opts) opts.style.display = '';
+  document.querySelectorAll('.glic-s3-opt-btn').forEach(function(b) { b.classList.remove('glic-s3-selected'); });
+  var cfm = document.getElementById('glicS3ConfirmBtn');
+  if (cfm) cfm.style.display = 'none';
+}
+
+function glicToggleEditTime(btnEl) {
+  glicShowOutroHorario();
+}
+
+function saveGlicemiaEntry(ev, useNow) {
+  if (ev) ev.preventDefault();
+  var valorRaw = glicemiaInsertData.glicemia;
+  if (!valorRaw || valorRaw < 20 || valorRaw > 600) {
+    glicemiaWizardGoStep(1);
+    return;
+  }
+  var useNow = glicemiaInsertData._useNow !== false;
+  var dataVal, horaVal;
+  if (useNow) {
+    var now = new Date();
+    dataVal = now.toISOString().slice(0, 10);
+    horaVal = now.toTimeString().slice(0, 5);
+  } else {
+    var _rawData = document.getElementById('glicemiaDataInput').value;
+    horaVal = document.getElementById('glicemiaHoraInput').value;
+    if (!_rawData || _rawData.length < 10) return;
+    var _dp = _rawData.split('/');
+    dataVal = _dp[2] + '-' + _dp[1] + '-' + _dp[0];
+    if (!horaVal) {
+      horaVal = new Date().toTimeString().slice(0, 5);
+      document.getElementById('glicemiaHoraInput').value = horaVal;
+    }
+  }
+  var contexto = (document.getElementById('glicemiaContextoInput') || {}).value || '';
+  var nota = (document.getElementById('glicNotaInput') || {}).value || '';
+  var insulinaVal = glicemiaInsertData.insulina || null;
+  var medicamentosVal = glicemiaInsertData.medicamentos || null;
+  var status = valorRaw > 125 ? 'alto' : valorRaw > 99 ? 'atencao' : 'normal';
+  var entry = { data: dataVal, hora: horaVal, valor: valorRaw, status: status };
+  if (contexto) entry.contexto = contexto;
+  if (nota) entry.nota = nota;
+  if (insulinaVal) entry.insulina = insulinaVal;
+  if (medicamentosVal) entry.medicamentos = medicamentosVal;
+
+  var vital = mockData.sinaisVitais.find(function(v) { return v.tipo === 'Glicemia'; });
+  if (vital) {
+    vital.historico.unshift(entry);
+    var today = new Date().toISOString().slice(0, 10);
+    if (dataVal === today) {
+      vital.valor = valorRaw;
+      vital.tempo = 'Agora';
+      vital.dataHora = dataVal + 'T' + horaVal + ':00';
+    }
+    checkVitalAlert(vital);
+  }
+
+  closeAddGlicemiaWizard();
+
+  renderSaude();
+  if (currentVitalDetail && currentVitalDetail.tipo === 'Glicemia' && vital) {
+    currentVitalDetail = vital;
+    applyVitalDefaultPeriodView();
+  }
 }
 
 function setPassosDayFromList(dayIso) {
   if (!dayIso) return;
   if (!currentVitalDetail || currentVitalDetail.tipo !== 'Passos') return;
+  openPassosDiaDetail(dayIso);
+}
+
+function openPassosDiaDetail(dayIso) {
+  if (!currentVitalDetail || currentVitalDetail.tipo !== 'Passos') return;
   passosSelectedDayIso = dayIso;
   passosSelectedHour = null;
-  batHourlySelectedHour = null;
-  renderVitalDetailContent(currentVitalHistoricoView);
+
+  // Update chart selection
   renderSparklineChart(currentVitalHistoricoView);
+
+  // Hide chart + period controls + list
+  var _chartArea = document.getElementById('pressaoHistoricoView');
+  if (_chartArea) _chartArea.style.display = 'none';
+  var _periodCtrls = document.getElementById('vitalDefaultPeriodControls');
+  if (_periodCtrls) _periodCtrls.style.display = 'none';
+  var _contentEl = document.getElementById('vitalDetailContent');
+  if (_contentEl) _contentEl.style.display = 'none';
+  var _addRow = document.querySelector('#vitalDetailModal .vital-detail-add-row');
+  if (_addRow) _addRow.style.display = 'none';
+
+  // Show day detail panel
+  var _view = document.getElementById('passosDiaDetailView');
+  if (_view) _view.style.display = 'block';
+  window._passaosDiaActive = true;
+
+  // Date label
+  var _p = dayIso.split('-').map(Number);
+  var _dateObj2 = new Date(_p[0], _p[1] - 1, _p[2]);
+  var _dias2 = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'S�b'];
+  var _meses2 = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  var _dateLabel2 = _dias2[_dateObj2.getDay()] + ', ' + String(_p[2]).padStart(2, '0') + ' ' + _meses2[_p[1] - 1];
+  var _lblEl = document.getElementById('passosDiaDetailLabel');
+  if (_lblEl) _lblEl.textContent = _dateLabel2;
+
+  // Navbar title + subtitle
+  var _titleEl2 = document.getElementById('vitalDetailTitle');
+  if (_titleEl2) _titleEl2.textContent = 'Passos';
+  var _subEl2 = document.getElementById('vitalDetailSubtitle');
+  if (_subEl2) _subEl2.textContent = _dateLabel2;
+
+  // Render summary + hourly chart
+  var _goal2 = getStepsDailyGoalValue(currentVitalDetail);
+  var _dayRows2 = aggregatePassosByDay(currentVitalHistoricoView);
+  var _selRow2 = _dayRows2.find(function(r) { return r.day === dayIso; });
+  if (!_selRow2) return;
+
+  var _daySteps2 = Math.max(0, Math.round(Number(_selRow2.total || 0)));
+  var _dayPct2 = _goal2 > 0 ? Math.max(0, Math.min(100, Math.round((_daySteps2 / _goal2) * 100))) : 0;
+  var _dayDist2 = (_daySteps2 * 0.00075).toFixed(2).replace('.', ',');
+  var _dayKcal2 = Math.round(_daySteps2 * 0.04);
+  var _dayElev2 = Math.max(0, Math.round((_daySteps2 / 1200) * 3));
+
+  var _detContent = document.getElementById('passosDiaDetailContent');
+  if (_detContent) {
+    _detContent.innerHTML =
+      '<div class="passos-resumo-card">' +
+        '<div class="passos-resumo-head"><div class="passos-resumo-num">' + _daySteps2.toLocaleString('pt-BR') + ' passos</div></div>' +
+        '<div class="passos-resumo-bar"><span style="width:' + _dayPct2 + '%;"></span></div>' +
+        '<div class="passos-resumo-scale"><span>0</span><span>Meta: ' + _goal2.toLocaleString('pt-BR') + '</span></div>' +
+        '<div class="passos-resumo-meta">' +
+          '<span>' + _dayDist2 + ' km</span>' +
+          '<span>' + _dayKcal2 + ' kcal</span>' +
+          '<span>' + _dayElev2 + ' m eleva��o</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="passos-hourly-card">' +
+        '<div class="passos-hourly-title">Passos por hora</div>' +
+        '<div id="passosHourlySubtitle" class="passos-hourly-subtitle">' + _dateLabel2 + '</div>' +
+        '<canvas id="passosHourlyCanvas" class="passos-hourly-canvas" width="720" height="180"></canvas>' +
+      '</div>' +
+      '<div id="passosFooterNote" class="passos-footer-note">' +
+        '<div class="passos-footer-empty">Toque em uma barra para ver dist�ncia, calorias e eleva��o.</div>' +
+      '</div>';
+    renderPassosHourlyCanvas(dayIso, _selRow2.entries || [], _goal2);
+  }
+}
+
+function closePassosDiaDetail() {
+  window._passaosDiaActive = false;
+  passosSelectedHour = null;
+  // keep passosSelectedDayIso so the chart + list remain filtered
+
+  var _view = document.getElementById('passosDiaDetailView');
+  if (_view) _view.style.display = 'none';
+
+  var _chartArea = document.getElementById('pressaoHistoricoView');
+  if (_chartArea) _chartArea.style.display = 'block';
+  var _periodCtrls = document.getElementById('vitalDefaultPeriodControls');
+  if (_periodCtrls) _periodCtrls.style.display = 'block';
+  var _contentEl = document.getElementById('vitalDetailContent');
+  if (_contentEl) _contentEl.style.display = '';
+  var _addRow = document.querySelector('#vitalDetailModal .vital-detail-add-row');
+  if (_addRow) _addRow.style.display = 'none'; // Passos has no manual entry
+
+  var _subEl = document.getElementById('vitalDetailSubtitle');
+  if (_subEl) _subEl.textContent = '';
+  var _titleEl = document.getElementById('vitalDetailTitle');
+  if (_titleEl) _titleEl.textContent = 'Passos';
+
+  // Redraw chart without selection
+  renderSparklineChart(currentVitalHistoricoView);
+}
+
+function _updatePassosHourFooter(dayEntries, goal) {
+  var _footerEl = document.getElementById('passosFooterNote');
+  if (!_footerEl) return;
+  var _hValid = Number.isInteger(passosSelectedHour) && passosSelectedHour >= 0 && passosSelectedHour <= 23;
+  if (!_hValid) {
+    _footerEl.innerHTML = '<div class="passos-footer-empty">Toque em uma barra para ver dist�ncia, calorias e eleva��o.</div>';
+    return;
+  }
+  var _buckets = buildPassosHourlyBucketsForDay(dayEntries);
+  var _hSteps = Math.max(0, Math.round(Number(_buckets[passosSelectedHour] || 0)));
+  var _hDist = (_hSteps * 0.00075).toFixed(2).replace('.', ',');
+  var _hKcal = Math.round(_hSteps * 0.04);
+  var _hElev = Math.max(0, Math.round((_hSteps / 1200) * 3));
+  _footerEl.innerHTML =
+    '<div class="passos-footer-hour">' + String(passosSelectedHour).padStart(2, '0') + ':00\u2013' + String(passosSelectedHour).padStart(2, '0') + ':59</div>' +
+    '<div class="passos-footer-meta">' +
+      '<span>' + _hDist + ' km</span>' +
+      '<span>' + _hKcal + ' kcal</span>' +
+      '<span>' + _hElev + ' m eleva��o</span>' +
+    '</div>';
 }
 
 function updateVitalDefaultPeriodChipActive() {
@@ -270,7 +862,8 @@ function getVitalDefaultPeriodRange() {
 }
 
 function applyVitalDefaultPeriodView() {
-  if (!currentVitalDetail || (currentVitalDetail.tipo !== 'Pressão Arterial' && currentVitalDetail.tipo !== 'Passos')) return;
+  if (!currentVitalDetail || (currentVitalDetail.tipo !== 'Press�o Arterial' && currentVitalDetail.tipo !== 'Passos' && currentVitalDetail.tipo !== 'Glicemia' && currentVitalDetail.tipo !== 'Sono' && currentVitalDetail.tipo !== 'Oxigena��o' && currentVitalDetail.tipo !== 'Hidrata��o')) return;
+  if (currentVitalDetail.tipo === 'Glicemia') glicemiaSelectedDayIso = null;
   const { start, end } = getVitalDefaultPeriodRange();
   const filtrado = filterHistoricoByInclusiveDate(currentVitalDetail.historico, start, end);
   renderVitalDetailContent(filtrado);
@@ -313,18 +906,18 @@ function getHeartRateForPressureEntry(pressureEntry) {
   if (pressureEntry.heartRate != null && Number.isFinite(Number(pressureEntry.heartRate))) {
     return Number(pressureEntry.heartRate);
   }
-  const batimento = mockData?.sinaisVitais?.find((v) => v.tipo === 'Batimento Cardíaco');
+  const batimento = mockData?.sinaisVitais?.find((v) => v.tipo === 'Batimento Card�aco');
   const hist = Array.isArray(batimento?.historico) ? batimento.historico : [];
   if (!hist.length) return null;
 
   const pDate = String(pressureEntry.data || '');
   const pHora = pressureEntry.hora ? String(pressureEntry.hora).slice(0, 5) : '';
 
-  // Prioriza correspondência exata de data/hora.
+  // Prioriza correspond�ncia exata de data/hora.
   const exact = hist.find((h) => String(h.data || '') === pDate && String(h.hora || '').slice(0, 5) === pHora);
   if (exact && Number.isFinite(Number(exact.valor))) return Number(exact.valor);
 
-  // Fallback: leitura mais próxima no mesmo dia (até 2h).
+  // Fallback: leitura mais pr�xima no mesmo dia (at� 2h).
   const pMs = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(pressureEntry) : NaN;
   if (!Number.isFinite(pMs)) return null;
   let best = null;
@@ -395,7 +988,7 @@ function setVitalBatimentoContextMode(mode) {
   if (
     reopenHour != null &&
     currentVitalDetail &&
-    currentVitalDetail.tipo === 'Batimento Cardíaco' &&
+    currentVitalDetail.tipo === 'Batimento Card�aco' &&
     vitalBatimentoChartSelection &&
     vitalBatimentoChartSelection.kind === 'day'
   ) {
@@ -418,11 +1011,11 @@ function toIdealObjectFromInput(value) {
 }
 
 /**
- * Faixa ideal (BPM) definida em Meus Indicadores → valor ideal (ex.: 60-100).
- * Usada em todo o fluxo de batimento: gráficos, Baixo/Normal/Alto e listas que comparam ao ideal.
+ * Faixa ideal (BPM) definida em Meus Indicadores ? valor ideal (ex.: 60-100).
+ * Usada em todo o fluxo de batimento: gr�ficos, Baixo/Normal/Alto e listas que comparam ao ideal.
  */
 function getBatimentoIdealRangeForChart(vital) {
-  if (!vital || vital.tipo !== 'Batimento Cardíaco') return null;
+  if (!vital || vital.tipo !== 'Batimento Card�aco') return null;
   let ideal = vital.ideal;
   if (ideal == null) return null;
   if (typeof ideal === 'string') {
@@ -433,13 +1026,13 @@ function getBatimentoIdealRangeForChart(vital) {
   return { min: ideal.min, max: ideal.max };
 }
 
-/** Garante que o modal usa o mesmo objeto do indicador em mockData (ideal + histórico atualizados). */
+/** Garante que o modal usa o mesmo objeto do indicador em mockData (ideal + hist�rico atualizados). */
 function syncCurrentBatimentoVitalFromMockData() {
-  if (!currentVitalDetail || currentVitalDetail.tipo !== 'Batimento Cardíaco' || currentVitalDetail.id == null) {
+  if (!currentVitalDetail || currentVitalDetail.tipo !== 'Batimento Card�aco' || currentVitalDetail.id == null) {
     return;
   }
   const fresh = mockData.sinaisVitais.find((v) => v.id === currentVitalDetail.id);
-  if (!fresh || fresh.tipo !== 'Batimento Cardíaco') return;
+  if (!fresh || fresh.tipo !== 'Batimento Card�aco') return;
   currentVitalDetail = fresh;
   if (currentVitalDetail.ideal != null && typeof currentVitalDetail.ideal === 'string' && typeof parseIdealObject === 'function') {
     currentVitalDetail.ideal = parseIdealObject(currentVitalDetail.ideal);
@@ -478,10 +1071,22 @@ function showFeedbackModal(message, type = 'info', title = '') {
   }
 
   const config = {
-    success: { icon: '✅', title: 'Concluido' },
-    warning: { icon: '⚠️', title: 'Aviso' },
-    error: { icon: '❌', title: 'Erro' },
-    info: { icon: 'ℹ️', title: 'Informacao' }
+    success: {
+      icon: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+      title: 'Concluido'
+    },
+    warning: {
+      icon: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.72 3h16.92a2 2 0 0 0 1.72-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+      title: 'Aviso'
+    },
+    error: {
+      icon: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+      title: 'Erro'
+    },
+    info: {
+      icon: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="12" y1="7" x2="12.01" y2="7"/></svg>',
+      title: 'Informacao'
+    }
   };
   const current = config[type] || config.info;
 
@@ -490,7 +1095,7 @@ function showFeedbackModal(message, type = 'info', title = '') {
   if (type === 'warning') contentEl.classList.add('type-warning');
   if (type === 'error') contentEl.classList.add('type-error');
 
-  iconEl.textContent = current.icon;
+  iconEl.innerHTML = current.icon;
   titleEl.textContent = title || current.title;
   messageEl.textContent = message;
   modal.classList.add('active');
@@ -625,16 +1230,16 @@ function applyBottomNavVisibility() {
   const controlledScreens = ['saudeScreen', 'composicaoScreen', 'medicacoesScreen', 'agendaScreen'];
 
   controlledScreens.forEach((screenId) => {
-    const navItem = document.querySelector(`.nav-item[data-screen="${screenId}"]`);
+    const navItem = document.querySelector(`.tab-link[data-screen="${screenId}"]`);
     if (!navItem) return;
     navItem.style.display = config[screenId] ? '' : 'none';
   });
 
   if (currentScreen && controlledScreens.includes(currentScreen) && !config[currentScreen]) {
     switchScreen('homeScreen');
-    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-    const homeNavItem = document.querySelector('.nav-item[data-screen="homeScreen"]');
-    if (homeNavItem) homeNavItem.classList.add('active');
+    document.querySelectorAll('.tab-link').forEach(i => i.classList.remove('tab-link-active'));
+    const homeNavItem = document.querySelector('.tab-link[data-screen="homeScreen"]');
+    if (homeNavItem) homeNavItem.classList.add('tab-link-active');
   }
 }
 
@@ -649,6 +1254,16 @@ function toggleBottomNavItem(screenId, toggleEl) {
 
   applyBottomNavVisibility();
 }
+
+// Framework7 initialization (UI shell only ??" no router)
+var f7app = new Framework7({
+  el: '#app',
+  name: 'Teep Saúde',
+  theme: 'ios',
+  autoDarkTheme: false,
+  // Disable router ??" we handle navigation manually
+  routes: [],
+});
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
@@ -713,7 +1328,7 @@ function applyHeaderAvatar() {
   el.classList.remove('header-avatar--photo');
   el.style.color = '#2563eb';
   const initials = getIniciaisNome(u.nome);
-  if (initials && initials !== '?' && /^[A-Z]{1,3}$/.test(initials)) {
+  if (initials && initials !== '?' && /^[íZ]{1,3}$/.test(initials)) {
     el.textContent = initials;
     return;
   }
@@ -750,6 +1365,12 @@ function updateHeaderForScreen(screenId) {
   if (actionsEl) actionsEl.innerHTML = meta.actions || '';
 }
 
+function setGlobalHeaderVisible(visible) {
+  var headerEl = document.getElementById('header');
+  if (!headerEl) return;
+  headerEl.style.display = visible ? '' : 'none';
+}
+
 /** Nome e avatar no cabeçalho. */
 function refreshHeaderUser() {
   updateHeaderUserName();
@@ -764,18 +1385,18 @@ function renderHome() {
   const atrasadas = dayEntries.filter(e => e.status === 'atrasado');
 
   const nowHtml = atrasadas.length > 0
-    ? `<div class="home-status-card home-status-card--warning" onclick="switchScreen('medicacoesScreen')" style="cursor:pointer;">
-        <span class="home-status-icon home-status-icon--warning">!</span>
+    ? `<div class="home-status-card home-status-card--warning home-status-card--clickable" onclick="switchScreen('medicacoesScreen')">
+        <span class="home-status-icon home-status-icon--warning"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.72 3h16.92a2 2 0 0 0 1.72-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
         <div class="home-status-text">
           <div class="home-status-title">${atrasadas.length} em atraso</div>
-          <div class="home-status-sub">Medicações atrasadas</div>
+          <div class="home-status-sub">Medicacoes atrasadas</div>
         </div>
       </div>`
-    : `<div class="home-status-card home-status-card--ok" onclick="switchScreen('medicacoesScreen')" style="cursor:pointer;">
-        <span class="home-status-icon home-status-icon--ok">✓</span>
+    : `<div class="home-status-card home-status-card--ok home-status-card--clickable" onclick="switchScreen('medicacoesScreen')">
+        <span class="home-status-icon home-status-icon--ok"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
         <div class="home-status-text">
           <div class="home-status-title">Tudo em dia!</div>
-          <div class="home-status-sub">Medicações em ordem</div>
+          <div class="home-status-sub">Medicacoes em ordem</div>
         </div>
       </div>`;
   document.getElementById('homeNow').innerHTML = nowHtml;
@@ -786,11 +1407,20 @@ function renderHome() {
   // Always include Glicemia
   const glicemia = mockData.sinaisVitais.find(v => v.tipo === 'Glicemia');
   if (glicemia && !vitais.some(v => v.tipo === 'Glicemia')) vitais.push(glicemia);
+  // Always include Sono
+  const sono = mockData.sinaisVitais.find(v => v.tipo === 'Sono');
+  if (sono && !vitais.some(v => v.tipo === 'Sono')) vitais.push(sono);
+  // Always include Oxigenacao
+  const oxig = mockData.sinaisVitais.find(v => v.tipo === 'Oxigenacao' || v.tipo === 'Oxigenação');
+  if (oxig && !vitais.some(v => v.tipo === oxig.tipo)) vitais.push(oxig);
+  // Always include Hidratacao
+  const hidra = mockData.sinaisVitais.find(v => v.tipo === 'Hidratacao' || v.tipo === 'Hidratação');
+  if (hidra && !vitais.some(v => v.tipo === hidra.tipo)) vitais.push(hidra);
   const vitalsHtml = vitais.map(v => createVitalCard(v, { layout: 'home' })).join('');
-  document.getElementById('homeVitals').innerHTML = vitalsHtml || '<div class="card-info" style="padding:8px;">Nenhum sinal configurado para o Dashboard.</div>';
+  document.getElementById('homeVitals').innerHTML = vitalsHtml || '<div class="card-info home-empty-card">Nenhum sinal configurado para o Dashboard.</div>';
 
   var subtitleEl = document.getElementById('homeSaudeSubtitle');
-  if (subtitleEl) subtitleEl.textContent = 'Hoje · ' + vitais.length + ' indicadores';
+  if (subtitleEl) subtitleEl.textContent = 'Hoje - ' + vitais.length + ' indicadores';
 
   const _d15 = new Date(); _d15.setDate(_d15.getDate() + 15);
   const hoje15 = _d15.getFullYear() + '-' + String(_d15.getMonth()+1).padStart(2,'0') + '-' + String(_d15.getDate()).padStart(2,'0');
@@ -798,6 +1428,212 @@ function renderHome() {
     ? createConsultaCard(Object.assign({}, mockData.consultas[0], { data: hoje15 }), 'home')
     : '<div class="empty-state"><div class="empty-text">Nenhuma consulta agendada</div></div>';
   document.getElementById('homeConsulta').innerHTML = consultaHtml;
+}
+
+function addHidratacao(ml) {
+  const hidra = mockData.sinaisVitais.find(v => v.tipo === 'Hidratação');
+  if (!hidra) return;
+  const now = new Date();
+  const hora = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  const data = getTodayISODate();
+  hidra.valor = (parseFloat(hidra.valor) || 0) + ml;
+  const idealMatch = hidra.ideal ? String(hidra.ideal).match(/(\d+)/) : null;
+  const idealLow = idealMatch ? Number(idealMatch[1]) : 2000;
+  hidra.status = hidra.valor >= idealLow ? 'normal' : 'atencao';
+  hidra.dataHora = data + 'T' + hora + ':00';
+  hidra.dataHoraISO = hidra.dataHora;
+  hidra.historico.unshift({ data, hora, valor: hidra.valor, status: hidra.status });
+  renderHome();
+  // also refresh detail modal if it's open for Hidratação
+  var _modal = document.getElementById('vitalDetailModal');
+  if (_modal && _modal.classList.contains('active') && typeof currentVitalDetail !== 'undefined' && currentVitalDetail && currentVitalDetail.tipo === 'Hidratação') {
+    renderVitalDetailContent(currentVitalDetail.historico);
+    renderSparklineChart(currentVitalHistoricoView && currentVitalHistoricoView.length ? currentVitalHistoricoView : currentVitalDetail.historico);
+  }
+}
+
+function addOxigenacao(pct) {
+  var oxi = mockData.sinaisVitais.find(function(v) { return v.tipo === 'Oxigenação'; });
+  if (!oxi) return;
+  var now = new Date();
+  var hora = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  var data = getTodayISODate();
+  var status = pct >= 95 ? 'normal' : (pct >= 90 ? 'atencao' : 'critico');
+  oxi.valor = pct;
+  oxi.status = status;
+  oxi.tempo = 'Agora';
+  oxi.dataHora = data + 'T' + hora + ':00';
+  oxi.dataHoraISO = oxi.dataHora;
+  oxi.historico.unshift({ data: data, hora: hora, valor: pct, status: status });
+  renderHome();
+  var _modal = document.getElementById('vitalDetailModal');
+  if (_modal && _modal.classList.contains('active') && typeof currentVitalDetail !== 'undefined' && currentVitalDetail && currentVitalDetail.tipo === 'Oxigenação') {
+    renderVitalDetailContent(currentVitalDetail.historico);
+    renderSparklineChart(currentVitalHistoricoView && currentVitalHistoricoView.length ? currentVitalHistoricoView : currentVitalDetail.historico);
+  }
+}
+
+var oxigInsertData = { val: 98 };
+
+function openOxigInsertView() {
+  var chart = document.getElementById('pressaoHistoricoView');
+  if (chart) chart.style.display = 'none';
+  var filters = document.getElementById('vitalDefaultPeriodControls');
+  if (filters) filters.style.display = 'none';
+  var content = document.getElementById('vitalDetailContent');
+  if (content) content.style.display = 'none';
+  var addRow = document.querySelector('#vitalDetailModal .vital-detail-add-row');
+  if (addRow) addRow.style.display = 'none';
+  var titleEl = document.getElementById('vitalDetailTitle');
+  if (titleEl) titleEl.textContent = 'Saturação de O?,,';
+  oxigInsertData.val = 98;
+  var view = document.getElementById('oxigInsertView');
+  if (view) {
+    view.style.display = 'flex';
+    _oxigRenderGrid(98);
+    _oxigUpdateBadge(98);
+    _oxigUpdateDisplay(98);
+  }
+}
+
+function closeOxigInsertView() {
+  var view = document.getElementById('oxigInsertView');
+  if (view) view.style.display = 'none';
+  var chart = document.getElementById('pressaoHistoricoView');
+  if (chart) chart.style.display = '';
+  var filters = document.getElementById('vitalDefaultPeriodControls');
+  if (filters) filters.style.display = '';
+  var content = document.getElementById('vitalDetailContent');
+  if (content) content.style.display = '';
+  var addRow = document.querySelector('#vitalDetailModal .vital-detail-add-row');
+  if (addRow) addRow.style.display = '';
+  var titleEl = document.getElementById('vitalDetailTitle');
+  if (titleEl) titleEl.textContent = 'Histórico de Oxigenação';
+}
+
+function oxigSelectValue(v) {
+  oxigInsertData.val = v;
+  _oxigRenderGrid(v);
+  _oxigUpdateBadge(v);
+  _oxigUpdateDisplay(v);
+}
+
+function stepOxig(delta) {
+  var newVal = Math.max(50, Math.min(100, (oxigInsertData.val || 98) + delta));
+  oxigSelectValue(newVal);
+}
+
+function _oxigRenderGrid(selected) {
+  var cells = document.querySelectorAll('#oxigGrid .oxi-cell');
+  cells.forEach(function(c) {
+    var v = parseInt(c.getAttribute('data-val'), 10);
+    c.classList.toggle('oxi-cell--selected', v === selected);
+  });
+}
+
+function _oxigUpdateBadge(v) {
+  var badge = document.getElementById('oxigBadge');
+  if (!badge) return;
+  if (v >= 95) {
+    badge.className = 'oxi-badge oxi-badge--normal';
+    badge.textContent = 'Normal';
+  } else if (v >= 90) {
+    badge.className = 'oxi-badge oxi-badge--atencao';
+    badge.textContent = 'Atenção';
+  } else {
+    badge.className = 'oxi-badge oxi-badge--critico';
+    badge.textContent = 'Crítico';
+  }
+}
+
+function _oxigUpdateDisplay(v) {
+  var el = document.getElementById('oxigCurrentVal');
+  if (!el) return;
+  el.innerHTML = v + '<span class="oxi-unit">%</span>';
+}
+
+function oxigConfirm() {
+  var v = oxigInsertData.val;
+  if (!v || v <= 0) return;
+  addOxigenacao(v);
+  closeOxigInsertView();
+}
+
+function openHidraInsertView() {
+  var chart = document.getElementById('pressaoHistoricoView');
+  if (chart) chart.style.display = 'none';
+  var filters = document.getElementById('vitalDefaultPeriodControls');
+  if (filters) filters.style.display = 'none';
+  var content = document.getElementById('vitalDetailContent');
+  if (content) content.style.display = 'none';
+  var addRow = document.querySelector('#vitalDetailModal .vital-detail-add-row');
+  if (addRow) addRow.style.display = 'none';
+  var titleEl = document.getElementById('vitalDetailTitle');
+  if (titleEl) titleEl.textContent = 'Adicionar Água';
+  hidraInsertData.ml = 250;
+  var view = document.getElementById('hidraInsertView');
+  if (view) {
+    view.style.display = 'flex';
+    var inp = document.getElementById('hidraNumInput');
+    if (inp) {
+      inp.value = 250;
+      setTimeout(function() { inp.focus(); inp.select(); }, 120);
+    }
+  }
+}
+
+function closeHidraInsertView() {
+  var view = document.getElementById('hidraInsertView');
+  if (view) view.style.display = 'none';
+  var chart = document.getElementById('pressaoHistoricoView');
+  if (chart) chart.style.display = '';
+  var filters = document.getElementById('vitalDefaultPeriodControls');
+  if (filters) filters.style.display = '';
+  var content = document.getElementById('vitalDetailContent');
+  if (content) content.style.display = '';
+  var addRow = document.querySelector('#vitalDetailModal .vital-detail-add-row');
+  if (addRow) addRow.style.display = '';
+  var titleEl = document.getElementById('vitalDetailTitle');
+  if (titleEl && typeof currentVitalDetail !== 'undefined' && currentVitalDetail) {
+    titleEl.textContent = 'Histórico de Hidratação';
+  }
+}
+
+function hidraDrumConfirm() {
+  var v = hidraInsertData.ml;
+  if (!v || v <= 0) return;
+  addHidratacao(v);
+  closeHidraInsertView();
+}
+
+function onHidraNumInput(el) {
+  var v = parseInt(el.value, 10);
+  if (!isNaN(v) && v > 0) {
+    hidraInsertData.ml = Math.min(9999, Math.max(1, v));
+  }
+}
+
+function stepHidra(delta) {
+  var newVal = Math.max(50, Math.min(9999, (hidraInsertData.ml || 250) + delta));
+  hidraInsertData.ml = newVal;
+  var inp = document.getElementById('hidraNumInput');
+  if (inp) inp.value = newVal;
+}
+
+function hidraQuickAdd(ml) {
+  addHidratacao(ml);
+  closeHidraInsertView();
+}
+
+function hidraQuickAddManual() {
+  var inp = document.getElementById('hidraManualInput');
+  var val = inp ? parseInt(inp.value, 10) : 0;
+  if (!val || val <= 0 || val > 5000) {
+    if (inp) inp.focus();
+    return;
+  }
+  addHidratacao(val);
+  closeHidraInsertView();
 }
 
 function renderSaude() {
@@ -990,10 +1826,38 @@ function renderCompartilhamentoInPerfil() {
   }
 }
 
+function togglePerfilMask(elId) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  var showing = el.dataset.showing === 'true';
+  el.textContent = showing ? el.dataset.masked : el.dataset.real;
+  el.dataset.showing = showing ? 'false' : 'true';
+}
+
+function togglePerfilMenuSection() {
+  var sec = document.getElementById('perfilMenuSection');
+  var chevron = document.getElementById('perfilMenuChevron');
+  if (!sec) return;
+  var open = sec.style.display !== 'none';
+  sec.style.display = open ? 'none' : '';
+  if (chevron) {
+    if (open) { chevron.classList.remove('config-chevron--open'); }
+    else { chevron.classList.add('config-chevron--open'); }
+  }
+}
+
 function renderPerfil() {
   const usuario = mockData.usuario;
-  const diasVida = calcularIdade(usuario.dataNascimento);
+  const idade = calcularIdade(usuario.dataNascimento);
   ensureBottomNavConfig();
+
+  // Helpers para mascarar dados sensíveis
+  function maskCpf(cpf) {
+    return cpf ? cpf.replace(/(\d{3})\.(\d{3})\.(\d{3})-(\d{2})/, '?????????.?????????.$3-$4') : '??"';
+  }
+  function maskTel(tel) {
+    return tel ? tel.replace(/(\(\d{2}\))\s(\d{4,5})-(\d{4})/, '$1 ???????????????-$3') : '??"';
+  }
 
   const navControlItems = [
     {
@@ -1031,9 +1895,7 @@ function renderPerfil() {
       const gear =
         item.personalize === 'vitais'
           ? `<button type="button" class="config-gear-btn config-gear-btn--nav-row" onclick="event.stopPropagation(); openVitaisConfigModal()" aria-label="Personalizar o que aparece em Saúde e no Dashboard"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>`
-          : item.personalize === 'corpo'
-            ? `<button type="button" class="config-gear-btn config-gear-btn--nav-row" onclick="event.stopPropagation(); openComposicaoConfigModal()" aria-label="Personalizar o que aparece em Corpo e no Dashboard"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>`
-            : '';
+          : '';
       return `
     <div class="config-item">
       <div class="config-item-content">
@@ -1055,19 +1917,49 @@ function renderPerfil() {
     </div>`;
     })
     .join('');
-  
+
+  // Iniciais para o avatar
+  const iniciais = getIniciaisNome(usuario.nome);
+
+  // Avatar: foto ou iniciais
+  const avatarHtml = usuario.fotoPerfilUrl
+    ? `<img src="${usuario.fotoPerfilUrl}" class="perfil-hero-avatar" alt="Foto de perfil" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="perfil-hero-avatar perfil-hero-avatar--initials" style="display:none">${iniciais}</div>`
+    : `<div class="perfil-hero-avatar perfil-hero-avatar--initials">${iniciais}</div>`;
+
   let html = `
-    <div class="profile-card">
-      <div class="profile-avatar profile-avatar--initials">${getIniciaisNome(usuario.nome)}</div>
-      <div class="profile-info">
-        <div class="profile-name">${usuario.nome}</div>
-        <div class="profile-email">${usuario.email}</div>
-        <div class="profile-email">CPF: ${usuario.cpf}</div>
-        <div class="profile-email">Telefone: ${usuario.telefone}</div>
+    <!-- ?"??"? HERO ?"??"? -->
+    <div class="perfil-hero">
+      <div class="perfil-hero-avatar-wrap">
+        ${avatarHtml}
+      </div>
+      <div class="perfil-hero-name">${usuario.nome}</div>
+      <div class="perfil-hero-meta">${idade} anos • Paciente</div>
+
+      <!-- Dados pessoais com máscara -->
+      <div class="perfil-hero-dados">
+        <div class="perfil-dado-row">
+          <span class="perfil-dado-lbl">E-mail</span>
+          <span class="perfil-dado-val">${usuario.email}</span>
+        </div>
+        <div class="perfil-dado-row">
+          <span class="perfil-dado-lbl">CPF</span>
+          <span class="perfil-dado-val perfil-dado-masked" data-real="${usuario.cpf}" data-masked="${maskCpf(usuario.cpf)}" id="perfilCpf">${maskCpf(usuario.cpf)}</span>
+          <button type="button" class="perfil-reveal-btn" onclick="togglePerfilMask('perfilCpf')" aria-label="Revelar CPF">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="perfil-dado-row">
+          <span class="perfil-dado-lbl">Telefone</span>
+          <span class="perfil-dado-val perfil-dado-masked" data-real="${usuario.telefone}" data-masked="${maskTel(usuario.telefone)}" id="perfilTel">${maskTel(usuario.telefone)}</span>
+          <button type="button" class="perfil-reveal-btn" onclick="togglePerfilMask('perfilTel')" aria-label="Revelar telefone">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
-    <div class="section-title section-title--icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Configurações</div>
+    <!-- ⚙️ CONFIGURAÇÕES ⚙️ --> ?"??"? CONFIGURAA?AES ?"??"? -->
+    <div class="perfil-section-title">Configurações</div>
     <div class="config-item" onclick="openMeusIndicadoresModal()" style="cursor:pointer;">
       <div class="config-item-content">
         <div class="config-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
@@ -1076,60 +1968,286 @@ function renderPerfil() {
           <div class="config-subtitle">Gerenciar sinais vitais e composição</div>
         </div>
       </div>
-      <div>›</div>
+      <span class="config-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
     </div>
 
-    <div class="section-title section-title--icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> Itens do Menu</div>
-    ${navControlsHtml}
+    <!-- Personalizar menu ??" colapsável -->
+    <div class="config-item config-item--collapsible" onclick="togglePerfilMenuSection()" style="cursor:pointer;" id="perfilMenuToggleRow">
+      <div class="config-item-content">
+        <div class="config-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+        <div class="config-text">
+          <div class="config-title">Personalizar menu</div>
+          <div class="config-subtitle">Escolher o que aparece na barra inferior</div>
+        </div>
+      </div>
+      <span id="perfilMenuChevron" class="config-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </div>
+    <div id="perfilMenuSection" style="display:none;">
+      ${navControlsHtml}
+    </div>
 
-    <div class="section-title section-title--icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> Dispositivos</div>
-    <button class="button button-confirm" id="addDispositivoBtn" style="margin-bottom: 12px;">+ Cadastrar Dispositivo</button>
+    <!-- ?"??"? DISPOSITIVOS ?"??"? -->
+    <div class="perfil-section-title">Dispositivos</div>
+    <div class="config-item" onclick="openAddDispositivoModal()" style="cursor:pointer;">
+      <div class="config-item-content">
+        <div class="config-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="6.5 6.5 3 10 6.5 13.5"/><polyline points="17.5 6.5 21 10 17.5 13.5"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+        <div class="config-text">
+          <div class="config-title">Cadastrar Dispositivo</div>
+          <div class="config-subtitle">Conectar relógio, balança ou app</div>
+        </div>
+      </div>
+      <span class="config-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </div>
     <div id="dispositivosContent"></div>
 
-    <div class="section-title section-title--icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Compartilhamento</div>
-    <button class="button button-confirm" id="addCompartilhamentoBtn">+ Compartilhar com Médico</button>
+    <!--?"??"? COMPARTILHAMENTO ?"??"? -->
+    <div class="perfil-section-title">Compartilhamento</div>
+    <div class="config-item" id="addCompartilhamentoBtn" style="cursor:pointer;">
+      <div class="config-item-content">
+        <div class="config-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+        <div class="config-text">
+          <div class="config-title">Compartilhar com MAcdico</div>
+          <div class="config-subtitle">Liberar acesso aos seus dados de saúde</div>
+        </div>
+      </div>
+      <span class="config-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </div>
+    <div id="compartilhamentoContent" style="margin-top:8px;"></div>
 
-    <div id="compartilhamentoContent" style="margin-top: 16px;"></div>
+    <!--?"??"? CONTA ?"??"? -->
+    <div class="perfil-section-title">Conta</div>
+    <div class="config-item" style="cursor:pointer;">
+      <div class="config-item-content">
+        <div class="config-icon config-icon--bell"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+        <div class="config-text">
+          <div class="config-title">Notificações</div>
+          <div class="config-subtitle">Lembretes de medicação e alertas</div>
+        </div>
+      </div>
+      <span class="config-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </div>
+    <div class="config-item" style="cursor:pointer;">
+      <div class="config-item-content">
+        <div class="config-icon config-icon--purple"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+        <div class="config-text">
+          <div class="config-title">Privacidade e Segurança</div>
+          <div class="config-subtitle">Gerenciar seus dados pessoais</div>
+        </div>
+      </div>
+      <span class="config-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </div>
+    <div class="config-item config-item--danger" style="cursor:pointer; margin-bottom:32px;">
+      <div class="config-item-content">
+        <div class="config-icon config-icon--red"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
+        <div class="config-text">
+          <div class="config-title">Sair da conta</div>
+          <div class="config-subtitle">Encerrar sessão no app</div>
+        </div>
+      </div>
+    </div>
 
-    <div class="section-title section-title--icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Exames Realizados</div>
+    <!-- ?"??"? DEMO ?"??"? -->
+    <div class="perfil-section-title perfil-section-title--muted">Demo</div>
+    <div class="config-item" onclick="simulatePushNotification()" style="cursor:pointer;">
+      <div class="config-item-content">
+        <div class="config-icon config-icon--amber">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="12" y1="2" x2="12" y2="3"/></svg>
+        </div>
+        <div class="config-text">
+          <div class="config-title">Simular Notificação Push</div>
+          <div class="config-subtitle">Demonstração de alerta de medição</div>
+        </div>
+      </div>
+      <span class="config-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </div>
+    <div class="config-item" onclick="simulateAlertPopup()" style="cursor:pointer;margin-bottom:40px;">
+      <div class="config-item-content">
+        <div class="config-icon config-icon--red">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="config-text">
+          <div class="config-title">Simular Alerta Pop-up</div>
+          <div class="config-subtitle">Demonstração de aviso de medição</div>
+        </div>
+      </div>
+      <span class="config-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </div>
   `;
 
-  if (mockData.examesRealizados.length > 0) {
-    html += mockData.examesRealizados.map(e => createExameCard(e, true)).join('');
-  } else {
-    html += '<div class="empty-state"><div class="empty-text">Nenhum exame realizado</div></div>';
-  }
-
   document.getElementById('perfilContent').innerHTML = html;
-  
+
   document.getElementById('addCompartilhamentoBtn').addEventListener('click', () => {
     document.getElementById('addCompartilhamentoModal').classList.add('active');
   });
-
-  document.getElementById('addDispositivoBtn').addEventListener('click', openAddDispositivoModal);
 
   renderCompartilhamentoInPerfil();
   renderDispositivos();
 }
 
+function simulatePushNotification() {
+  // Remove any existing banner
+  var _old = document.getElementById('pushNotifBanner');
+  if (_old) { _old.remove(); }
+
+  var _dur = 5000; // ms visible
+  var _banner = document.createElement('div');
+  _banner.id = 'pushNotifBanner';
+  _banner.className = 'push-notif-banner';
+  _banner.innerHTML = [
+    '<div class="push-notif-header">',
+      '<div class="push-notif-icon">',
+        '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+      '</div>',
+      '<span class="push-notif-appname">Teep Sa\u00fade</span>',
+      '<span class="push-notif-time">agora</span>',
+      '<button class="push-notif-dismiss" onclick="(function(){var b=document.getElementById(\'pushNotifBanner\');if(b)b.classList.remove(\'show\');setTimeout(function(){if(b)b.remove();},420);})()" aria-label="Fechar notifica\u00e7\u00e3o">\u2715</button>',
+    '</div>',
+    '<div class="push-notif-title">\ud83d\udc89 Lembrete de Sa\u00fade</div>',
+    '<div class="push-notif-body">Est\u00e1 na hora de medir sua press\u00e3o arterial. Toque para registrar agora.</div>',
+    '<div class="push-notif-progress"><div class="push-notif-progress-bar" id="pushNotifProgressBar"></div></div>'
+  ].join('');
+  document.body.appendChild(_banner);
+
+  // Vibrate on mobile if available
+  if (navigator.vibrate) navigator.vibrate([120, 60, 80]);
+
+  // Show with animation
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      _banner.classList.add('show');
+      // Animate shrinking progress bar over _dur ms
+      var _bar = document.getElementById('pushNotifProgressBar');
+      if (_bar) {
+        _bar.style.transition = 'none';
+        _bar.style.width = '100%';
+        requestAnimationFrame(function() {
+          _bar.style.transition = 'width ' + (_dur / 1000) + 's linear';
+          _bar.style.width = '0%';
+        });
+      }
+    });
+  });
+
+  // Auto-dismiss
+  var _tid = setTimeout(function() {
+    _banner.classList.remove('show');
+    setTimeout(function() { if (_banner.parentNode) _banner.remove(); }, 420);
+  }, _dur);
+
+  // Clicking banner body closes it
+  _banner.addEventListener('click', function(e) {
+    if (e.target.classList.contains('push-notif-dismiss')) return;
+    clearTimeout(_tid);
+    _banner.classList.remove('show');
+    setTimeout(function() { if (_banner.parentNode) _banner.remove(); }, 420);
+  });
+}
+
+function simulateAlertPopup() {
+  var _old = document.getElementById('alertPopupOverlay');
+  if (_old) _old.remove();
+
+  var _overlay = document.createElement('div');
+  _overlay.id = 'alertPopupOverlay';
+  _overlay.className = 'alert-popup-overlay';
+  _overlay.innerHTML = [
+    '<div class="alert-popup-box">',
+      '<div class="alert-popup-type-badge">',
+        '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+        'Press\u00e3o Arterial',
+      '</div>',
+      '<div class="alert-popup-icon-ring">',
+        '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+      '</div>',
+      '<div class="alert-popup-title">Hora da Medi\u00e7\u00e3o!</div>',
+      '<div class="alert-popup-msg">Sua press\u00e3o arterial ainda n\u00e3o foi registrada hoje. Fa\u00e7a a medi\u00e7\u00e3o agora para manter seu hist\u00f3rico em dia.</div>',
+      '<div class="alert-popup-actions">',
+        '<button class="alert-popup-btn-primary" onclick="registrarVitalFromAlert(\'Press\u00e3o Arterial\')">Registrar agora</button>',
+        '<button class="alert-popup-btn-secondary" onclick="closeAlertPopup()">Lembrar em 30 minutos</button>',
+      '</div>',
+    '</div>'
+  ].join('');
+
+  _overlay.addEventListener('click', function(e) {
+    if (e.target === _overlay) closeAlertPopup();
+  });
+
+  document.body.appendChild(_overlay);
+
+  if (navigator.vibrate) navigator.vibrate([100]);
+
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      _overlay.classList.add('show');
+    });
+  });
+}
+
+function closeAlertPopup() {
+  var _overlay = document.getElementById('alertPopupOverlay');
+  if (!_overlay) return;
+  _overlay.classList.remove('show');
+  setTimeout(function() { if (_overlay.parentNode) _overlay.remove(); }, 280);
+}
+
+function registrarVitalFromAlert(tipo) {
+  closeAlertPopup();
+  var v = mockData.sinaisVitais.find(function(x) { return x.tipo === tipo; });
+  if (!v) return;
+  setTimeout(function() {
+    openVitalDetailModal(tipo, v.id);
+    setTimeout(function() {
+      if (tipo === 'Press\u00e3o Arterial') {
+        openPressaoInsertForm();
+      } else {
+        openAddVitalModal(tipo);
+      }
+    }, 150);
+  }, 310);
+}
+
 // ===== NAVEGAÇÃO =====
 
 function setupNavigation() {
-  document.querySelectorAll('.nav-item').forEach(item => {
+  document.querySelectorAll('.tab-link').forEach(item => {
     item.addEventListener('click', () => {
       const screenId = item.dataset.screen;
       switchScreen(screenId);
       
-      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-      item.classList.add('active');
+      document.querySelectorAll('.tab-link').forEach(i => i.classList.remove('tab-link-active'));
+      item.classList.add('tab-link-active');
     });
   });
 }
 
 function switchScreen(screenId) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(screenId).classList.add('active');
+  var prevScreen = document.querySelector('.screen.active');
+  var nextScreen = document.getElementById(screenId);
+  if (!nextScreen || nextScreen === prevScreen) return;
+
+  // Garante que telas sobressalentes não fiquem visíveis ao trocar de aba.
+  document.querySelectorAll('.screen.active').forEach(function(screen) {
+    if (screen !== prevScreen && screen !== nextScreen) {
+      screen.classList.remove('active', 'screen--leaving', 'screen--entering');
+    }
+  });
+
+  if (prevScreen) {
+    prevScreen.classList.add('screen--leaving');
+    prevScreen.addEventListener('animationend', function handler() {
+      prevScreen.classList.remove('active', 'screen--leaving');
+      prevScreen.removeEventListener('animationend', handler);
+    }, { once: true });
+  }
+
+  nextScreen.classList.add('active', 'screen--entering');
+  nextScreen.addEventListener('animationend', function handler() {
+    nextScreen.classList.remove('screen--entering');
+    nextScreen.removeEventListener('animationend', handler);
+  }, { once: true });
+
   currentScreen = screenId;
+  setGlobalHeaderVisible(true);
   updateHeaderForScreen(screenId);
 
   if (screenId === 'homeScreen') renderHome();
@@ -1190,7 +2308,7 @@ function refreshEstoqueSugeridoAdd() {
     return;
   }
   const sug = d * dosesPorDia;
-  hint.textContent = `Sugestão de estoque para o período: ${sug} unidades (${d} dia(s) × ${dosesPorDia} dose(s)/dia).`;
+  hint.textContent = `Sugestão de estoque para o período: ${sug} unidades (${d} dia(s) í ${dosesPorDia} dose(s)/dia).`;
 }
 
 function refreshEstoqueSugeridoEdit() {
@@ -1214,7 +2332,7 @@ function refreshEstoqueSugeridoEdit() {
     return;
   }
   const sug = d * dosesPorDia;
-  hint.textContent = `Sugestão de estoque para o período: ${sug} unidades (${d} dia(s) × ${dosesPorDia} dose(s)/dia).`;
+  hint.textContent = `Sugestão de estoque para o período: ${sug} unidades (${d} dia(s) í ${dosesPorDia} dose(s)/dia).`;
 }
 
 function toggleSemDataFimMedicacao(mode) {
@@ -1247,9 +2365,9 @@ function updateAddMedNavButtons() {
   const back = document.getElementById('addMedWizardBack');
   const next = document.getElementById('addMedWizardNext');
   const save = document.getElementById('addMedWizardSave');
-  if (back) back.style.display = addMedStep > 1 ? '' : 'none';
+  if (back) back.style.display = addMedStep > 1 ? 'block' : 'none';
   if (next) next.style.display = addMedStep < 4 ? '' : 'none';
-  if (save) save.style.display = addMedStep === 4 ? '' : 'none';
+  if (save) save.style.display = addMedStep === 4 ? 'block' : 'none';
 }
 
 function resetAddMedFrequenciaExpand() {
@@ -1383,7 +2501,7 @@ function registerCustomMedicamentoFromSearch() {
   dosagemSelect.innerHTML = `
     <option value="">Selecione a dosagem</option>
     <option value="Conforme prescrição">Conforme prescrição</option>
-    <option value="Uso conforme orientação médica">Uso conforme orientação médica</option>
+    <option value="Uso conforme orientação mAcdica">Uso conforme orientação mAcdica</option>
     <option value="1 comprimido">1 comprimido</option>
     <option value="5 ml">5 ml</option>
     <option value="10 ml">10 ml</option>
@@ -1535,7 +2653,7 @@ function setupMedicacaoModal() {
       const est = parseInt(estoqueAtual, 10);
       if (!Number.isNaN(est) && est < need) {
         openConfirmModal(
-          `O estoque informado (${est}) é menor que o necessário para o período (${need} unidades = ${duracaoDias} dia(s) × ${horarios.length} dose(s)/dia). Deseja continuar mesmo assim?`,
+          `O estoque informado (${est}) Ac menor que o necessário para o período (${need} unidades = ${duracaoDias} dia(s) í ${horarios.length} dose(s)/dia). Deseja continuar mesmo assim?`,
           saveMedicacao,
           'Estoque abaixo do necessário'
         );
@@ -1676,14 +2794,14 @@ function setupCompartilhamentoModal() {
   });
 }
 
-// ===== AÇÕES DE MEDICAÇÃO =====
+// ===== AÇÕES DE MEDICAÇÃO ===== AA?AES DE MEDICAÇÃO =====
 
 function markAsTaken(medicacaoId) {
   const medicacao = mockData.medicacoes.find(m => m.id === medicacaoId);
   if (medicacao) {
     const now = new Date();
     const hora = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-    medicacao.ultimo = `${hora} ✅`;
+    medicacao.ultimo = hora;
     medicacao.historico.push({
       data: now.toISOString().slice(0, 10),
       hora: hora,
@@ -1698,7 +2816,7 @@ function editMedicacao(medicacaoId) {
   showFeedbackModal('Funcionalidade de edicao em desenvolvimento.', 'info');
 }
 
-// ===== FUNÇÕES AUXILIARES =====
+// ===== FUNÇÕES AUXILIARES ===== FUNA?AES AUXILIARES =====
 
 function calcularIdade(dataNascimento) {
   const hoje = new Date();
@@ -1826,7 +2944,7 @@ function setupEditMedicacaoModal() {
       const est = parseInt(estoqueAtual, 10);
       if (!Number.isNaN(est) && est < need) {
         openConfirmModal(
-          `O estoque informado (${est}) é menor que o necessário para o período (${need} unidades = ${duracaoDias} dia(s) × ${horarios.length} dose(s)/dia). Deseja continuar mesmo assim?`,
+          `O estoque informado (${est}) Ac menor que o necessário para o período (${need} unidades = ${duracaoDias} dia(s) í ${horarios.length} dose(s)/dia). Deseja continuar mesmo assim?`,
           saveEditMedicacao,
           'Estoque abaixo do necessário'
         );
@@ -2101,46 +3219,534 @@ function setupAgendaModal() {
 // ===== RENDERIZAÇÃO DE COMPOSIÇÃO CORPORAL =====
 
 function renderComposicao() {
-  const ativos = mockData.composicaoCorporal
-    .filter(c => (mockData.configComposicao[c.tipo] || {}).exibirCorpo !== false);
+  ensureCorpoAvaliacoesData();
+  var subtitle = document.getElementById('composicaoSubtitle');
+  if (subtitle) subtitle.textContent = 'Antropometria';
 
-  const isOutOfIdeal = (c) => {
-    if (!c || c.valor == null || !c.ideal) return false;
-    const ideal = c.ideal;
-    const current = parseFloat(c.valor);
-    if (Number.isNaN(current)) return false;
+  var listView = document.getElementById('corpoAvaliacoesListView');
+  var detailView = document.getElementById('corpoAvaliacaoDetailView');
+  var wizardView = document.getElementById('corpoAvaliacaoWizardView');
+  if (!listView || !detailView || !wizardView) return;
 
-    if (ideal.type === 'range' && ideal.min != null && ideal.max != null) return current < ideal.min || current > ideal.max;
-    if (ideal.type === 'max' && ideal.max != null) return current > ideal.max;
-    if (ideal.type === 'min' && ideal.min != null) return current < ideal.min;
-    if (ideal.type === 'target' && ideal.target != null) return current !== ideal.target;
-    return false;
+  var isList = corpoAvaliacaoViewMode === 'list';
+  var isDetail = corpoAvaliacaoViewMode === 'detail';
+  var isWizard = corpoAvaliacaoViewMode === 'wizard';
+
+  listView.style.display = isList ? '' : 'none';
+  detailView.style.display = isDetail ? '' : 'none';
+  wizardView.style.display = isWizard ? '' : 'none';
+
+  renderCorpoAvaliacoesList();
+  if (isDetail) renderCorpoAvaliacaoDetail();
+  if (isWizard) renderCorpoForm();
+
+  setGlobalHeaderVisible(isList);
+}
+
+var CORPO_GERAL_FIELDS = [
+  { key: 'peso', label: 'Peso', unit: 'kg', decimals: 1 },
+  { key: 'altura', label: 'Altura', unit: 'm', decimals: 2 },
+  { key: 'imc', label: 'IMC', unit: '', decimals: 1 },
+  { key: 'percMassaGorda', label: '% massa gorda', unit: '%', decimals: 1 },
+  { key: 'percMassaMagra', label: '% massa magra', unit: '%', decimals: 1 },
+  { key: 'massaGordaKg', label: 'Massa gorda', unit: 'kg', decimals: 1 },
+  { key: 'massaMagraKg', label: 'Massa magra', unit: 'kg', decimals: 1 },
+  { key: 'rcq', label: 'Razao cintura/quadril', unit: '', decimals: 2 }
+];
+
+var CORPO_CIRC_FIELDS = [
+  { key: 'ombro', label: 'Ombro', unit: 'cm' },
+  { key: 'peitoral', label: 'Peitoral', unit: 'cm' },
+  { key: 'cintura', label: 'Cintura', unit: 'cm' },
+  { key: 'abdomen', label: 'Abdomen', unit: 'cm' },
+  { key: 'quadril', label: 'Quadril', unit: 'cm' },
+  { key: 'bracoEsqRelaxado', label: 'Braco esquerdo relaxado', unit: 'cm' },
+  { key: 'bracoDirRelaxado', label: 'Braco direito relaxado', unit: 'cm' },
+  { key: 'bracoEsqContraido', label: 'Braco esquerdo contraido', unit: 'cm' },
+  { key: 'bracoDirContraido', label: 'Braco direito contraido', unit: 'cm' },
+  { key: 'panturrilhaEsq', label: 'Panturrilha esquerda', unit: 'cm' },
+  { key: 'panturrilhaDir', label: 'Panturrilha direita', unit: 'cm' },
+  { key: 'coxaEsq', label: 'Coxa esquerda', unit: 'cm' },
+  { key: 'coxaDir', label: 'Coxa direita', unit: 'cm' }
+];
+
+var CORPO_DOBRAS_FIELDS = [
+  { key: 'abdominal', label: 'Abdominal', unit: 'mm' },
+  { key: 'triceps', label: 'Triceps', unit: 'mm' },
+  { key: 'suprailiaca', label: 'Suprailiaca', unit: 'mm' },
+  { key: 'axilarMedia', label: 'Axilar media', unit: 'mm' },
+  { key: 'subescapular', label: 'Subescapular', unit: 'mm' },
+  { key: 'torax', label: 'Torax', unit: 'mm' },
+  { key: 'coxa', label: 'Coxa', unit: 'mm' }
+];
+
+// CORPO_WIZARD_INPUT_MAP removed — form IDs are hardcoded in syncCorpoFormDraft()
+
+function ensureCorpoAvaliacoesData() {
+  if (!Array.isArray(mockData.avaliacoesAntropometricas)) {
+    mockData.avaliacoesAntropometricas = [];
+  }
+}
+
+function getCorpoAvaliacoesSorted() {
+  ensureCorpoAvaliacoesData();
+  return mockData.avaliacoesAntropometricas.slice().sort(function(a, b) {
+    return String(b.data || '').localeCompare(String(a.data || ''));
+  });
+}
+
+function getCorpoAvaliacaoOrdinalLabel(index) {
+  return (index + 1) + 'ª Avaliação Física';
+}
+
+function getNextCorpoAvaliacaoOrdinalLabel() {
+  ensureCorpoAvaliacoesData();
+  return getCorpoAvaliacaoOrdinalLabel(mockData.avaliacoesAntropometricas.length);
+}
+
+function formatCorpoWizardDateBR(isoDate) {
+  if (!isoDate) return '';
+  return formatDateForUI(isoDate);
+}
+
+function normalizeCorpoWizardDateInput(rawValue) {
+  var digits = String(rawValue || '').replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return digits.slice(0, 2) + '/' + digits.slice(2);
+  return digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+}
+
+function parseCorpoWizardDateInputToISO(rawValue) {
+  var txt = String(rawValue || '').trim();
+  if (!txt) return '';
+  var normalized = txt.replace(/\./g, '/').replace(/-/g, '/');
+  if (typeof toISODate === 'function') return toISODate(normalized) || '';
+  var m = normalized.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return '';
+  return m[3] + '-' + m[2] + '-' + m[1];
+}
+
+function bindCorpoWizardDateInputMask() {
+  var dataEl = document.getElementById('corpoFormData');
+  var nativeEl = document.getElementById('corpoFormDataNative');
+  if (!dataEl || dataEl.dataset.brDateMaskBound === '1') return;
+  dataEl.dataset.brDateMaskBound = '1';
+  dataEl.addEventListener('input', function() {
+    this.value = normalizeCorpoWizardDateInput(this.value);
+  });
+  dataEl.addEventListener('blur', function() {
+    var iso = parseCorpoWizardDateInputToISO(this.value);
+    if (iso) this.value = formatCorpoWizardDateBR(iso);
+    if (nativeEl) nativeEl.value = iso || '';
+    if (corpoAvaliacaoDraft) corpoAvaliacaoDraft.data = iso || '';
+  });
+  if (nativeEl && nativeEl.dataset.brNativeDateBound !== '1') {
+    nativeEl.dataset.brNativeDateBound = '1';
+    nativeEl.addEventListener('change', function() {
+      var iso = this.value || '';
+      if (!iso) return;
+      dataEl.value = formatCorpoWizardDateBR(iso);
+      if (corpoAvaliacaoDraft) corpoAvaliacaoDraft.data = iso;
+    });
+  }
+}
+
+function openCorpoWizardNativeDatePicker() {
+  var nativeEl = document.getElementById('corpoFormDataNative');
+  var dataEl = document.getElementById('corpoFormData');
+  if (!nativeEl) return;
+  var iso = parseCorpoWizardDateInputToISO(dataEl ? dataEl.value : '');
+  nativeEl.value = iso || getTodayISODate();
+  if (typeof nativeEl.showPicker === 'function') nativeEl.showPicker();
+  else nativeEl.click();
+}
+
+function formatCorpoMeasure(value, unit, decimals) {
+  var n = Number(value);
+  if (!Number.isFinite(n)) return '-';
+  var precision = Number.isFinite(decimals) ? decimals : 1;
+  var txt = n.toLocaleString('pt-BR', { minimumFractionDigits: precision, maximumFractionDigits: precision });
+  return unit ? (txt + ' ' + unit) : txt;
+}
+
+function renderCorpoAvaliacoesList() {
+  var listEl = document.getElementById('corpoAvaliacoesList');
+  if (!listEl) return;
+  var list = getCorpoAvaliacoesSorted();
+  if (!list.length) {
+    listEl.innerHTML = '<div class="empty-state" style="margin-top:12px;"><div class="empty-text">Sem avaliações cadastradas.</div></div>';
+    return;
+  }
+
+  listEl.innerHTML = list.map(function(item, idx) {
+    var title = (item.nome && String(item.nome).trim()) ? String(item.nome).trim() : getCorpoAvaliacaoOrdinalLabel(idx);
+    var dateTxt = item.data ? formatDateForUI(item.data) : 'Sem data';
+
+    // Mini KPI chips — preview dos dados mais relevantes
+    var kpiChips = '';
+    var geral = item.geral || {};
+    var parts = [];
+    var peso = Number(geral.peso);
+    var imc = Number(geral.imc);
+    var percGorda = Number(geral.percMassaGorda);
+    if (Number.isFinite(peso)) parts.push('<span class="corpo-av-kpi-chip">' + peso.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' kg</span>');
+    if (Number.isFinite(imc)) parts.push('<span class="corpo-av-kpi-chip">IMC ' + imc.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '</span>');
+    if (Number.isFinite(percGorda)) parts.push('<span class="corpo-av-kpi-chip">Gordura ' + percGorda.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%</span>');
+    if (parts.length) {
+      kpiChips = '<div class="corpo-av-row-kpis">' + parts.join('') + '</div>';
+    }
+
+    // Indicador de evolução (comparar com avaliação anterior)
+    var evoHtml = '';
+    if (idx < list.length - 1) {
+      var prev = list[idx + 1]; // lista é ordenada mais recente primeiro
+      var prevPeso = prev.geral && Number(prev.geral.peso);
+      var currPeso = Number(geral.peso);
+      if (Number.isFinite(prevPeso) && Number.isFinite(currPeso) && prevPeso !== 0) {
+        var diff = currPeso - prevPeso;
+        if (Math.abs(diff) >= 0.1) {
+          var dir = diff < 0 ? 'down' : 'up';
+          var arrow = dir === 'down' ? '↓' : '↑';
+          var cls = dir === 'down' ? 'corpo-av-evo-pill--down' : 'corpo-av-evo-pill--up';
+          evoHtml = ' <span class="corpo-av-evo-pill ' + cls + '">' + arrow + ' ' + Math.abs(diff).toFixed(1) + ' kg</span>';
+        }
+      }
+    }
+
+    return (
+      '<div class="corpo-av-row" onclick="openCorpoAvaliacaoDetail(' + item.id + ')" role="button" tabindex="0">' +
+        '<div class="corpo-av-row-main">' +
+          '<div class="corpo-av-row-title">' + title + evoHtml + '</div>' +
+          '<div class="corpo-av-row-date">' + dateTxt + '</div>' +
+          kpiChips +
+        '</div>' +
+        '<span class="corpo-av-view-btn" onclick="event.stopPropagation(); openCorpoAvaliacaoDetail(' + item.id + ')" title="Visualizar">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">' +
+            '<polyline points="9 18 15 12 9 6"/>' +
+          '</svg>' +
+        '</span>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+function openCorpoAvaliacaoDetail(id) {
+  corpoAvaliacaoSelectedId = id;
+  corpoAvaliacaoViewMode = 'detail';
+  renderComposicao();
+}
+
+function closeCorpoAvaliacaoDetail() {
+  corpoAvaliacaoViewMode = 'list';
+  corpoAvaliacaoSelectedId = null;
+  renderComposicao();
+}
+
+function renderCorpoRows(targetId, fields, source) {
+  var el = document.getElementById(targetId);
+  if (!el) return;
+  var rows = fields.map(function(field) {
+    var val = source ? source[field.key] : null;
+    var formatted = formatCorpoMeasure(val, field.unit, Number.isFinite(field.decimals) ? field.decimals : 1);
+    return '<div class="corpo-av-data-row"><span>' + field.label + '</span><strong>' + formatted + '</strong></div>';
+  });
+  el.innerHTML = rows.join('');
+}
+
+function renderCorpoAvaliacaoDetail() {
+  var list = getCorpoAvaliacoesSorted();
+  var item = list.find(function(a) { return a.id === corpoAvaliacaoSelectedId; });
+  if (!item) {
+    corpoAvaliacaoViewMode = 'list';
+    renderComposicao();
+    return;
+  }
+  var idx = list.findIndex(function(a) { return a.id === item.id; });
+  var title = (item.nome && String(item.nome).trim()) ? String(item.nome).trim() : getCorpoAvaliacaoOrdinalLabel(Math.max(0, idx));
+  var titleEl = document.getElementById('corpoAvaliacaoDetailTitle');
+  var dateEl = document.getElementById('corpoAvaliacaoDetailDate');
+  if (titleEl) titleEl.textContent = title;
+  if (dateEl) dateEl.textContent = item.data ? formatDateForUI(item.data) : 'Sem data';
+
+  var kpiGorda = document.getElementById('corpoKpiMassaGorda');
+  var kpiMagra = document.getElementById('corpoKpiMassaMagra');
+  var kpiGordaCard = document.getElementById('corpoKpiMassaGordaCard');
+  var kpiMagraCard = document.getElementById('corpoKpiMassaMagraCard');
+  var kpiGordaStatus = document.getElementById('corpoKpiMassaGordaStatus');
+  var kpiMagraStatus = document.getElementById('corpoKpiMassaMagraStatus');
+  var kpiGordaBar = document.getElementById('corpoKpiMassaGordaBar');
+  var kpiMagraBar = document.getElementById('corpoKpiMassaMagraBar');
+  if (kpiGorda) kpiGorda.textContent = formatCorpoMeasure(item.geral && item.geral.percMassaGorda, '%', 1);
+  if (kpiMagra) kpiMagra.textContent = formatCorpoMeasure(item.geral && item.geral.percMassaMagra, '%', 1);
+
+  function setKpiState(cardEl, statusEl, barEl, state, text, pct) {
+    if (!cardEl || !statusEl) return;
+    cardEl.classList.remove('is-good', 'is-attention', 'is-high', 'is-low');
+    if (state) cardEl.classList.add(state);
+    statusEl.textContent = text;
+    if (barEl) {
+      barEl.style.width = Math.max(5, Math.min(100, (pct || 0))) + '%';
+      barEl.style.background = state === 'is-good' ? '#22c55e' : state === 'is-attention' ? '#f59e0b' : state ? '#ef4444' : '#cbd5e1';
+    }
+  }
+
+  var percGorda = Number(item.geral && item.geral.percMassaGorda);
+  var percMagra = Number(item.geral && item.geral.percMassaMagra);
+
+  if (Number.isFinite(percGorda)) {
+    if (percGorda <= 20) setKpiState(kpiGordaCard, kpiGordaStatus, kpiGordaBar, 'is-good', 'Bom', Math.min(100, percGorda / 0.35 * 100));
+    else if (percGorda <= 25) setKpiState(kpiGordaCard, kpiGordaStatus, kpiGordaBar, 'is-attention', 'Atenção', Math.min(100, percGorda / 0.35 * 100));
+    else setKpiState(kpiGordaCard, kpiGordaStatus, kpiGordaBar, 'is-high', 'Alto', Math.min(100, percGorda / 0.35 * 100));
+  } else {
+    setKpiState(kpiGordaCard, kpiGordaStatus, kpiGordaBar, '', 'Sem dado', 0);
+  }
+
+  if (Number.isFinite(percMagra)) {
+    if (percMagra >= 80) setKpiState(kpiMagraCard, kpiMagraStatus, kpiMagraBar, 'is-good', 'Bom', percMagra);
+    else if (percMagra >= 70) setKpiState(kpiMagraCard, kpiMagraStatus, kpiMagraBar, 'is-attention', 'Atenção', percMagra);
+    else setKpiState(kpiMagraCard, kpiMagraStatus, kpiMagraBar, 'is-low', 'Baixo', percMagra);
+  } else {
+    setKpiState(kpiMagraCard, kpiMagraStatus, kpiMagraBar, '', 'Sem dado', 0);
+  }
+
+  renderCorpoRows('corpoAvaliacaoGeralRows', CORPO_GERAL_FIELDS, item.geral || {});
+  renderCorpoRows('corpoAvaliacaoCircRows', CORPO_CIRC_FIELDS, item.circunferencias || {});
+  renderCorpoRows('corpoAvaliacaoDobrasRows', CORPO_DOBRAS_FIELDS, item.dobras || {});
+}
+
+function buildEmptyCorpoAvaliacaoDraft() {
+  return {
+    nome: getNextCorpoAvaliacaoOrdinalLabel(),
+    data: getTodayISODate(),
+    geral: {},
+    circunferencias: {},
+    dobras: {}
+  };
+}
+
+function openCorpoNovaAvaliacaoWizard() {
+  corpoAvaliacaoDraft = buildEmptyCorpoAvaliacaoDraft();
+  corpoAvaliacaoViewMode = 'wizard';
+  renderComposicao();
+}
+
+function closeCorpoNovaAvaliacaoWizard() {
+  corpoAvaliacaoDraft = null;
+  corpoAvaliacaoViewMode = 'list';
+  renderComposicao();
+}
+
+function readFormNumeric(id) {
+  var el = document.getElementById(id);
+  if (!el) return null;
+  var raw = String(el.value || '').replace(',', '.').trim();
+  if (raw === '') return null;
+  var v = Number(raw);
+  return Number.isFinite(v) ? v : null;
+}
+
+function syncCorpoFormDraft() {
+  if (!corpoAvaliacaoDraft) return;
+  var dataEl = document.getElementById('corpoFormData');
+  corpoAvaliacaoDraft.nome = getNextCorpoAvaliacaoOrdinalLabel();
+  if (dataEl) {
+    var isoDate = parseCorpoWizardDateInputToISO(dataEl.value);
+    corpoAvaliacaoDraft.data = isoDate || '';
+  }
+  corpoAvaliacaoDraft.geral = {
+    peso: readFormNumeric('corpoFormPeso'),
+    altura: readFormNumeric('corpoFormAltura'),
+    percMassaGorda: readFormNumeric('corpoFormPercGorda'),
+    percMassaMagra: readFormNumeric('corpoFormPercMagra')
+  };
+  corpoAvaliacaoDraft.circunferencias = {
+    ombro: readFormNumeric('corpoFormCircOmbro'),
+    peitoral: readFormNumeric('corpoFormCircPeitoral'),
+    cintura: readFormNumeric('corpoFormCircCintura'),
+    abdomen: readFormNumeric('corpoFormCircAbdomen'),
+    quadril: readFormNumeric('corpoFormCircQuadril'),
+    bracoEsqRelaxado: readFormNumeric('corpoFormCircBracoEsqRelax'),
+    bracoDirRelaxado: readFormNumeric('corpoFormCircBracoDirRelax'),
+    bracoEsqContraido: readFormNumeric('corpoFormCircBracoEsqContr'),
+    bracoDirContraido: readFormNumeric('corpoFormCircBracoDirContr'),
+    panturrilhaEsq: readFormNumeric('corpoFormCircPantuEsq'),
+    panturrilhaDir: readFormNumeric('corpoFormCircPantuDir'),
+    coxaEsq: readFormNumeric('corpoFormCircCoxaEsq'),
+    coxaDir: readFormNumeric('corpoFormCircCoxaDir')
+  };
+  corpoAvaliacaoDraft.dobras = {
+    abdominal: readFormNumeric('corpoFormDobraAbdominal'),
+    triceps: readFormNumeric('corpoFormDobraTriceps'),
+    suprailiaca: readFormNumeric('corpoFormDobraSuprailiaca'),
+    axilarMedia: readFormNumeric('corpoFormDobraAxilarMedia'),
+    subescapular: readFormNumeric('corpoFormDobraSubescapular'),
+    torax: readFormNumeric('corpoFormDobraTorax'),
+    coxa: readFormNumeric('corpoFormDobraCoxa')
+  };
+}
+
+function writeCorpoFormDraftToInputs() {
+  if (!corpoAvaliacaoDraft) return;
+  var dataEl = document.getElementById('corpoFormData');
+  var nativeEl = document.getElementById('corpoFormDataNative');
+  corpoAvaliacaoDraft.nome = getNextCorpoAvaliacaoOrdinalLabel();
+  if (dataEl) {
+    var dataIso = corpoAvaliacaoDraft.data || getTodayISODate();
+    dataEl.value = formatCorpoWizardDateBR(dataIso);
+    if (nativeEl) nativeEl.value = dataIso;
+  }
+  bindCorpoWizardDateInputMask();
+}
+
+function updateCorpoCalcBar() {
+  var bar = document.getElementById('corpoFormCalcBar');
+  if (!bar) return;
+  var peso = readFormNumeric('corpoFormPeso');
+  var altura = readFormNumeric('corpoFormAltura');
+  var percG = readFormNumeric('corpoFormPercGorda');
+  var percM = readFormNumeric('corpoFormPercMagra');
+  var parts = [];
+  if (Number.isFinite(peso) && Number.isFinite(altura) && altura > 0) {
+    var alturaM = altura > 3 ? (altura / 100) : altura;
+    var imc = Math.round((peso / (alturaM * alturaM)) * 10) / 10;
+    parts.push('IMC <strong>' + imc.toFixed(1) + '</strong>');
+  }
+  if (Number.isFinite(peso) && Number.isFinite(percG)) {
+    var gordaKg = Math.round((peso * (percG / 100)) * 10) / 10;
+    parts.push('Gorda <strong>' + gordaKg.toFixed(1) + ' kg</strong>');
+  }
+  if (Number.isFinite(peso) && Number.isFinite(percM)) {
+    var magraKg = Math.round((peso * (percM / 100)) * 10) / 10;
+    parts.push('Magra <strong>' + magraKg.toFixed(1) + ' kg</strong>');
+  }
+  if (parts.length) {
+    bar.innerHTML = '<span class="corpo-form-calc-icon">📊</span><span class="corpo-form-calc-text">' + parts.join('<span class="corpo-form-calc-sep">·</span>') + '</span>';
+  } else {
+    bar.innerHTML = '<span class="corpo-form-calc-icon">📊</span><span class="corpo-form-calc-text">Preencha peso e altura para ver o IMC</span>';
+  }
+}
+
+function markCorpoFormError(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  var card = el.closest('.corpo-form-card');
+  if (card) {
+    card.classList.add('is-error', 'is-shake');
+    setTimeout(function() { card.classList.remove('is-shake'); }, 500);
+    setTimeout(function() { card.classList.remove('is-error'); }, 3000);
+  }
+}
+
+function corpoFormSave() {
+  syncCorpoFormDraft();
+  var g = corpoAvaliacaoDraft.geral || {};
+  var errors = [];
+  if (!corpoAvaliacaoDraft.data) errors.push('Data');
+  if (!Number.isFinite(g.peso)) { errors.push('Peso'); markCorpoFormError('corpoFormPeso'); }
+  if (!Number.isFinite(g.altura)) { errors.push('Altura'); markCorpoFormError('corpoFormAltura'); }
+  if (!Number.isFinite(g.percMassaGorda)) { errors.push('% Gordura'); markCorpoFormError('corpoFormPercGorda'); }
+  if (!Number.isFinite(g.percMassaMagra)) { errors.push('% Magra'); markCorpoFormError('corpoFormPercMagra'); }
+  if (errors.length) return;
+
+  if (!Number.isFinite(Number(g.percMassaGorda)) && Number.isFinite(Number(g.percMassaMagra))) g.percMassaGorda = Math.max(0, 100 - g.percMassaMagra);
+  if (!Number.isFinite(Number(g.percMassaMagra)) && Number.isFinite(Number(g.percMassaGorda))) g.percMassaMagra = Math.max(0, 100 - g.percMassaGorda);
+
+  if (Number.isFinite(g.peso) && Number.isFinite(g.altura) && g.altura > 0) {
+    var alturaM = g.altura > 3 ? (g.altura / 100) : g.altura;
+    g.imc = Math.round((g.peso / (alturaM * alturaM)) * 10) / 10;
+  }
+  if (Number.isFinite(g.peso) && Number.isFinite(Number(g.percMassaGorda))) {
+    g.massaGordaKg = Math.round((g.peso * (g.percMassaGorda / 100)) * 10) / 10;
+  }
+  if (Number.isFinite(g.peso) && Number.isFinite(Number(g.percMassaMagra))) {
+    g.massaMagraKg = Math.round((g.peso * (g.percMassaMagra / 100)) * 10) / 10;
+  }
+
+  ensureCorpoAvaliacoesData();
+  var nextId = mockData.avaliacoesAntropometricas.reduce(function(max, item) {
+    return Math.max(max, Number(item && item.id) || 0);
+  }, 0) + 1;
+
+  var payload = {
+    id: nextId,
+    nome: (corpoAvaliacaoDraft.nome || '').trim(),
+    data: corpoAvaliacaoDraft.data,
+    geral: Object.assign({}, g),
+    circunferencias: Object.assign({}, corpoAvaliacaoDraft.circunferencias),
+    dobras: Object.assign({}, corpoAvaliacaoDraft.dobras)
   };
 
-  const foraDoIdeal = ativos.filter(isOutOfIdeal);
-  const principaisTipos = new Set(['Peso', 'IMC', 'Circunferência Cintura', 'Percentual de Gordura', 'Massa Muscular', 'Hidratação']);
-  const principais = ativos.filter(c => !foraDoIdeal.includes(c) && principaisTipos.has(c.tipo));
-  const outros = ativos.filter(c => !foraDoIdeal.includes(c) && !principaisTipos.has(c.tipo));
+  mockData.avaliacoesAntropometricas.push(payload);
+  corpoAvaliacaoSelectedId = nextId;
+  corpoAvaliacaoViewMode = 'detail';
+  corpoAvaliacaoDraft = null;
+  showFeedbackModal('Avaliação salva com sucesso.', 'success');
+  renderComposicao();
+}
 
-  let html = '';
+function initCorpoFormEnterNavigation() {
+  var inputIds = [
+    'corpoFormData',
+    'corpoFormPeso', 'corpoFormAltura', 'corpoFormPercGorda', 'corpoFormPercMagra',
+    'corpoFormCircOmbro', 'corpoFormCircPeitoral', 'corpoFormCircCintura', 'corpoFormCircAbdomen',
+    'corpoFormCircQuadril', 'corpoFormCircBracoEsqRelax', 'corpoFormCircBracoDirRelax',
+    'corpoFormCircBracoEsqContr', 'corpoFormCircBracoDirContr',
+    'corpoFormCircPantuEsq', 'corpoFormCircPantuDir',
+    'corpoFormCircCoxaEsq', 'corpoFormCircCoxaDir',
+    'corpoFormDobraAbdominal', 'corpoFormDobraTriceps', 'corpoFormDobraSuprailiaca',
+    'corpoFormDobraAxilarMedia', 'corpoFormDobraSubescapular', 'corpoFormDobraTorax', 'corpoFormDobraCoxa'
+  ];
+  inputIds.forEach(function(id, idx) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.removeEventListener('keydown', corpoFormEnterHandler);
+    el.addEventListener('keydown', corpoFormEnterHandler);
+  });
+}
 
-  if (foraDoIdeal.length) {
-    html += `<div class="subsection-title">Fora do ideal</div>`;
-    html += foraDoIdeal.map(createComposicaoCard).join('');
+function corpoFormEnterHandler(e) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  var inputIds = [
+    'corpoFormData',
+    'corpoFormPeso', 'corpoFormAltura', 'corpoFormPercGorda', 'corpoFormPercMagra',
+    'corpoFormCircOmbro', 'corpoFormCircPeitoral', 'corpoFormCircCintura', 'corpoFormCircAbdomen',
+    'corpoFormCircQuadril', 'corpoFormCircBracoEsqRelax', 'corpoFormCircBracoDirRelax',
+    'corpoFormCircBracoEsqContr', 'corpoFormCircBracoDirContr',
+    'corpoFormCircPantuEsq', 'corpoFormCircPantuDir',
+    'corpoFormCircCoxaEsq', 'corpoFormCircCoxaDir',
+    'corpoFormDobraAbdominal', 'corpoFormDobraTriceps', 'corpoFormDobraSuprailiaca',
+    'corpoFormDobraAxilarMedia', 'corpoFormDobraSubescapular', 'corpoFormDobraTorax', 'corpoFormDobraCoxa'
+  ];
+  var idx = inputIds.indexOf(e.target.id);
+  if (idx === -1) return;
+  syncCorpoFormDraft();
+  updateCorpoCalcBar();
+  if (idx < inputIds.length - 1) {
+    var nextEl = document.getElementById(inputIds[idx + 1]);
+    if (nextEl) { nextEl.focus(); nextEl.select(); }
+  } else {
+    var saveBtn = document.getElementById('corpoFormSaveBtn');
+    if (saveBtn) saveBtn.focus();
   }
+}
 
-  if (principais.length) {
-    html += `<div class="subsection-title">Principais</div>`;
-    html += principais.map(createComposicaoCard).join('');
-  }
-
-  if (outros.length) {
-    html += `<div class="subsection-title">Outros</div>`;
-    html += outros.map(createComposicaoCard).join('');
-  }
-
-  document.getElementById('composicaoContent').innerHTML = html ||
-    '<div class="empty-state"><div class="empty-text">Nenhum dado de composição corporal</div></div>';
+function renderCorpoForm() {
+  if (!corpoAvaliacaoDraft) corpoAvaliacaoDraft = buildEmptyCorpoAvaliacaoDraft();
+  writeCorpoFormDraftToInputs();
+  updateCorpoCalcBar();
+  setTimeout(initCorpoFormEnterNavigation, 50);
+  // Bind live calc updates
+  ['corpoFormPeso', 'corpoFormAltura', 'corpoFormPercGorda', 'corpoFormPercMagra'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && !el.dataset.corpoCalcBound) {
+      el.dataset.corpoCalcBound = '1';
+      el.addEventListener('input', function() {
+        syncCorpoFormDraft();
+        updateCorpoCalcBar();
+      });
+    }
+  });
 }
 
 
@@ -2161,7 +3767,7 @@ function openEcgDetail(ecgId) {
           <div class="ecg-rhythm-line">${ecg.ritmo}</div>
         </div>
       </div>
-      <div class="ecg-meta"><span class="ecg-date">📅 ${formatDateTimeForUI(ecg.dataHora)}</span></div>
+      <div class="ecg-meta"><span class="ecg-date">dY". ${formatDateTimeForUI(ecg.dataHora)}</span></div>
       <div class="ecg-interpretation">${ecg.interpretacao}</div>
     </div>
   `;
@@ -2170,11 +3776,11 @@ function openEcgDetail(ecgId) {
     html += '<div class="section-title" style="margin-top: 16px; margin-bottom: 12px;">Histórico</div>';
     html += ecg.historico.map(h => {
       const dataFormatada = h.data;
-      const hora = h.hora ? ` às ${h.hora}` : '';
+      const hora = h.hora ? ` às${h.hora}` : '';
       return `
         <div class="card card-saude" style="margin-bottom: 8px;">
           <div class="card-info"><strong>${dataFormatada}${hora}</strong></div>
-          <div class="card-info">${h.frequencia} bpm · ${h.ritmo}</div>
+          <div class="card-info">${h.frequencia} bpm às ${h.ritmo}</div>
           <div class="card-info">Interpretação: ${h.interpretacao}</div>
         </div>
       `;
@@ -2183,6 +3789,7 @@ function openEcgDetail(ecgId) {
 
   document.getElementById('ecgDetailContent').innerHTML = html;
   document.getElementById('ecgDetailModal').classList.add('active');
+  setGlobalHeaderVisible(false);
 }
 
 function setupEcgDetailModal() {
@@ -2193,23 +3800,31 @@ function setupEcgDetailModal() {
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
       modal.classList.remove('active');
+      setGlobalHeaderVisible(true);
     });
   }
 
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       modal.classList.remove('active');
+      setGlobalHeaderVisible(true);
     }
   });
 }
 
-// ===== FECHAR MODAL DE HISTÓRICO =====
+// ===== FECHAR MODAL DE HISTA"RICO =====
 
 document.addEventListener('DOMContentLoaded', () => {
   const closeVitalDetailModal = document.getElementById('closeVitalDetailModal');
   if (closeVitalDetailModal) {
     closeVitalDetailModal.addEventListener('click', () => {
+      if (window._batHdActive) { closeBatHourlyDetail(); return; }
+      if (window._pressaoInsertActive) { closePressaoInsertForm(); return; }
+      if (window._glicemiaInsertActive) { closeAddGlicemiaWizard(); return; }
+      if (window._pressaoColetaActive) { closePressaoColetaDetail(); return; }
+      if (window._passaosDiaActive) { closePassosDiaDetail(); return; }
       document.getElementById('vitalDetailModal').classList.remove('active');
+      setGlobalHeaderVisible(true);
     });
   }
 
@@ -2262,7 +3877,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   setupAgendaModal();
-  setupComposicaoModal();
 
   window.addEventListener('resize', () => {
     const m = document.getElementById('exercicioDetalheModal');
@@ -2271,88 +3885,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
-
-
-// ===== MODAL DE COMPOSIÇÃO CORPORAL =====
-
-let currentComposicaoId = null;
-
-function setupComposicaoModal() {
-  const modal = document.getElementById('composicaoModal');
-  const cancelBtn = document.getElementById('cancelComposicaoBtn');
-  const form = document.getElementById('composicaoForm');
-
-  const closeModal = () => { modal.classList.remove('active'); form.reset(); };
-
-  cancelBtn.addEventListener('click', closeModal);
-  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const valor = parseFloat(document.getElementById('composicaoValorInput').value);
-    const fonte = document.getElementById('composicaoFonteInput').value;
-    const data = document.getElementById('composicaoDataInput').value;
-
-    const composicao = mockData.composicaoCorporal.find(c => c.id === currentComposicaoId);
-    if (composicao) {
-      composicao.valor = valor;
-      composicao.fonte = fonte;
-      composicao.dataHora = data;
-      
-      if (!composicao.historico) {
-        composicao.historico = [];
-      }
-      
-      composicao.historico.unshift({
-        data: data,
-        valor: valor,
-        variacao: composicao.variacao,
-        fonte: fonte
-      });
-
-      showFeedbackModal(`${composicao.tipo} atualizado com sucesso.`, 'success');
-      modal.classList.remove('active');
-      form.reset();
-      renderComposicao();
-    }
-  });
-}
-
-function openComposicaoModal(composicaoId, tipo) {
-  currentComposicaoId = composicaoId;
-  const composicao = mockData.composicaoCorporal.find(c => c.id === composicaoId);
-  
-  if (!composicao) return;
-
-  document.getElementById('composicaoModalTitle').textContent = `Adicionar ${tipo}`;
-  document.getElementById('composicaoValorInput').value = '';
-  document.getElementById('composicaoFonteInput').value = composicao.fonte || 'Manual';
-  document.getElementById('composicaoDataInput').value = new Date().toISOString().split('T')[0];
-
-  renderComposicaoHistorico(composicao.historico || []);
-  document.getElementById('composicaoModal').classList.add('active');
-}
-
-function renderComposicaoHistorico(historico) {
-  if (historico.length === 0) {
-    document.getElementById('composicaoHistoricoContent').innerHTML = '<div class="empty-state"><div class="empty-text">Nenhum registro encontrado</div></div>';
-    return;
-  }
-
-  const html = historico.map(h => {
-    const variacaoIcon = h.variacao === 'normal' ? '🟢' : '🔴';
-    return `
-      <div class="card card-saude" style="margin-bottom: 8px;">
-        <div class="card-info"><strong>${formatDateForUI(h.data)}</strong> ${variacaoIcon}</div>
-        <div class="card-value" style="font-size: 16px;">${h.valor}</div>
-        <div class="card-info">Fonte: ${h.fonte}</div>
-      </div>
-    `;
-  }).join('');
-  document.getElementById('composicaoHistoricoContent').innerHTML = html;
-}
-
-
 
 
 // ===== CLOCK WIDGET =====
@@ -2574,7 +4106,7 @@ function undoMedicationTaken(medId, dateISO, horario) {
 function handleMedicationScheduleClick(medId, horario, status, nome, dosagem, dateISO = getTodayISODate()) {
   if (status === 'tomado') {
     openConfirmModal(
-      `Desfazer "${nome} ${dosagem}" marcado como tomado às ${horario}?`,
+      `Desfazer "${nome} ${dosagem}" marcado como tomado às${horario}?`,
       () => {
         const undone = undoMedicationTaken(medId, dateISO, horario);
         if (!undone) {
@@ -2611,7 +4143,7 @@ function renderEditMedicacaoTomadasList(med) {
     <p class="form-hint" style="margin:0 0 8px 0;">Toque em <strong>Desfazer</strong> para cancelar um registro errado.</p>
     ${tomados
     .map((h) => {
-      const label = `${fmt(h.data)} · ${h.hora}`;
+      const label = `${fmt(h.data)} às ${h.hora}`;
       const d = String(h.data || '').replace(/"/g, '');
       const hh = String(h.hora || '').replace(/"/g, '');
       return `
@@ -2660,9 +4192,9 @@ function renderMedicationCalendarDay() {
   const summaryEl = document.getElementById('medicationCalendarSummary');
   if (summaryEl) {
     summaryEl.innerHTML = `
-      <span class="calendar-day-pill ok">✅ ${totalTaken} tomadas</span>
-      <span class="calendar-day-pill pending">⏳ ${totalPending} pendentes</span>
-      <span class="calendar-day-pill missed">🔴 ${totalMissed} atrasadas</span>
+      <span class="calendar-day-pill ok">${totalTaken} tomadas</span>
+      <span class="calendar-day-pill pending">${totalPending} pendentes</span>
+      <span class="calendar-day-pill missed">${totalMissed} atrasadas</span>
     `;
   }
 
@@ -2688,7 +4220,7 @@ function renderMedicationCalendarDay() {
       <div class="calendar-med-slots">
         ${group.slots.map(slot => `
           <span class="calendar-slot ${slot.status}">
-            ${slot.horario} ${slot.status === 'tomado' ? '✓' : slot.status === 'atrasado' ? '!' : '•'}
+            ${slot.horario}
           </span>
         `).join('')}
       </div>
@@ -2717,7 +4249,7 @@ function searchMedicamentos(termo) {
   if (resultados.length === 0) {
     searchResults.innerHTML = `
       <div class="search-no-result-panel">
-        <p class="search-no-result-text">Nenhum resultado no catálogo para “${termoEsc}”.</p>
+        <p class="search-no-result-text">Nenhum resultado no catálogo para ??o${termoEsc}???.</p>
         <p class="search-no-result-hint">Use o botão <strong>Cadastrar com este nome</strong> abaixo do campo de busca.</p>
       </div>`;
     searchResults.style.display = 'block';
@@ -2758,7 +4290,7 @@ function searchMedicamentos(termo) {
     const items = grouped.get(key).sort((a, b) => a.nome.localeCompare(b.nome));
     html += `<div style="padding: 6px 8px; font-size: 11px; color: #666; font-weight: 700; background: #fafafa; border-bottom: 1px solid #eee;">${labelForForma(key)}</div>`;
     items.forEach(med => {
-      const formasTxt = (med.formas && med.formas.length) ? med.formas.join(' • ') : '';
+      const formasTxt = (med.formas && med.formas.length) ? med.formas.join(' ??? ') : '';
       html += `
         <div class="search-result-item" onclick="selectMedicamento(${med.id})">
           <div class="search-result-name">${med.nome}</div>
@@ -2771,7 +4303,7 @@ function searchMedicamentos(termo) {
   html += `
     <div class="med-search-custom-footer">
       <button type="button" class="med-search-custom-btn" onclick="registerCustomMedicamentoFromSearch()">
-        Não é nenhum destes — cadastrar “${termoEsc}” manualmente
+        Não há nenhum destes ??" cadastrar ??o${termoEsc}??? manualmente
       </button>
     </div>`;
 
@@ -2779,7 +4311,7 @@ function searchMedicamentos(termo) {
   searchResults.style.display = 'block';
 }
 
-/** Um remédio por vez: mostra busca ou o nome escolhido + “Trocar”. */
+/** Um remAcdio por vez: mostra busca ou o nome escolhido + ??oTrocar???. */
 function setAddMedicacaoMedPickPhase(showSearch) {
   const searchRow = document.getElementById('medSearchRow');
   const selectedRow = document.getElementById('medSelectedRow');
@@ -3090,9 +4622,9 @@ function getPeriodDates() {
 }
 
 function getPeriodLabel() {
-  if (currentPeriodFilter === '7d') return 'Últimos 7 dias';
-  if (currentPeriodFilter === '30d') return 'Últimos 30 dias';
-  if (currentPeriodFilter === '90d') return 'Últimos 90 dias';
+  if (currentPeriodFilter === '7d') return 'Asltimos 7 dias';
+  if (currentPeriodFilter === '30d') return 'Asltimos 30 dias';
+  if (currentPeriodFilter === '90d') return 'Asltimos 90 dias';
   if (currentPeriodFilter === 'custom') return `${formatDateForUI(customPeriodStart)} a ${formatDateForUI(customPeriodEnd)}`;
 }
 
@@ -3182,10 +4714,10 @@ function renderDailyAdherence(startDate, endDate) {
     });
     
     const percentage = dayExpected > 0 ? Math.round((dayTaken / dayExpected) * 100) : 0;
-    const icon = percentage === 100 ? '✅' : percentage >= 50 ? '⚠️' : '❌';
+    const statusText = percentage === 100 ? 'Excelente' : percentage >= 50 ? 'Atencao' : 'Baixa';
     
     html += `
-      <div class=\"daily-adherence-item\">\n        <div class=\"daily-date\">${formatDateForUI(data)}</div>\n        <div class=\"daily-stats\">\n          <span>${dayTaken}/${dayExpected}</span>\n          <span class=\"daily-icon\">${icon}</span>\n        </div>\n      </div>\n    `;
+      <div class=\"daily-adherence-item\">\n        <div class=\"daily-date\">${formatDateForUI(data)}</div>\n        <div class=\"daily-stats\">\n          <span>${dayTaken}/${dayExpected}</span>\n          <span class=\"daily-icon\">${statusText}</span>\n        </div>\n      </div>\n    `;
   });
   
   document.getElementById('dailyAdherenceContent').innerHTML = html;
@@ -3309,7 +4841,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function toggleAlertaVitalFields() {
   const ativo = document.getElementById('toggleAlertaVital').classList.contains('active');
-  document.getElementById('alertaVitalFields').style.display = ativo ? 'block' : 'none';
+  document.getElementById('alertaVitalFields').classList.toggle('is-hidden', !ativo);
 }
 
 function openAlertasModal() {
@@ -3326,7 +4858,7 @@ function openAlertasModal() {
 function renderAlertasVitais() {
   const comAlerta = mockData.sinaisVitais.filter(v => v.alerta && v.alerta.ativo);
   if (!comAlerta.length) {
-    document.getElementById('alertasVitaisContent').innerHTML = '<div class="card-info" style="padding:12px;color:#999;">Nenhum alerta de sinal vital configurado.<br>Configure em Perfil → Meus Indicadores.</div>';
+    document.getElementById('alertasVitaisContent').innerHTML = '<div class="card-info" style="padding:12px;color:#999;">Nenhum alerta de sinal vital configurado.<br>Configure em Perfil -> Meus Indicadores.</div>';
     return;
   }
   document.getElementById('alertasVitaisContent').innerHTML = comAlerta.map(v => `
@@ -3335,13 +4867,13 @@ function renderAlertasVitais() {
       <div style="flex:1;">
         <div class="vital-config-name">${v.tipo}</div>
         <div style="font-size:11px;color:#aaa;">
-          ${v.alerta.acima != null ? `↑ Acima de ${v.alerta.acima} ${v.unidade}` : ''}
-          ${v.alerta.acima != null && v.alerta.abaixo != null ? ' • ' : ''}
-          ${v.alerta.abaixo != null ? `↓ Abaixo de ${v.alerta.abaixo} ${v.unidade}` : ''}
+          ${v.alerta.acima != null ? `Acima de ${v.alerta.acima} ${v.unidade}` : ''}
+          ${v.alerta.acima != null && v.alerta.abaixo != null ? ' | ' : ''}
+          ${v.alerta.abaixo != null ? `Abaixo de ${v.alerta.abaixo} ${v.unidade}` : ''}
         </div>
       </div>
       <button class="toggle active" onclick="toggleAlertaVitalAtivo(${v.id}, this)"></button>
-      <button onclick="editAlertaVital(${v.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#454545;padding:4px 2px;">✏️</button>
+      <button onclick="editAlertaVital(${v.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#454545;padding:4px 2px;">Editar</button>
     </div>
   `).join('');
 }
@@ -3360,15 +4892,15 @@ function renderAlertasMeds() {
   const html = mockData.medicacoes.filter(m => m.alertas).map(m => {
     const a = m.alertas;
     const tags = [];
-    if (a.lembrete) tags.push(`⏰ ${a.antecedencia}min antes`);
-    if (a.atrasada) tags.push('⚠️ Dose atrasada');
-    if (a.estoqueBaixo) tags.push('📦 Estoque baixo');
+    if (a.lembrete) tags.push(`??? ${a.antecedencia}min antes`);
+    if (a.atrasada) tags.push('?s??,? Dose atrasada');
+    if (a.estoqueBaixo) tags.push('dY"? Estoque baixo');
     return `
       <div class="vital-config-row">
-        <span class="vital-config-icon">💊</span>
+        <span class="vital-config-icon">dY'S</span>
         <div style="flex:1;">
           <div class="vital-config-name">${m.nome} ${m.dosagem}</div>
-          <div style="font-size:11px;color:#aaa;">${tags.join(' • ') || 'Sem alertas'}</div>
+          <div style="font-size:11px;color:#aaa;">${tags.join(' ??? ') || 'Sem alertas'}</div>
         </div>
         <button class="toggle ${a.lembrete || a.atrasada || a.estoqueBaixo ? 'active' : ''}" onclick="toggleAlertaMed(${m.id}, this)"></button>
       </div>
@@ -3397,10 +4929,10 @@ function renderAlertasAgenda() {
   const antLabel = min => min >= 1440 ? `${min/1440} dia(s) antes` : `${min/60}h antes`;
   document.getElementById('alertasAgendaContent').innerHTML = todas.map(a => `
     <div class="vital-config-row">
-      <span class="vital-config-icon">${a.medico ? '📅' : '🔬'}</span>
+      <span class="vital-config-icon">${a.medico ? 'dY".' : 'dY"?'}</span>
       <div style="flex:1;">
         <div class="vital-config-name">${a.medico || a.nome}</div>
-        <div style="font-size:11px;color:#aaa;">${formatDateForUI(a.data)} • ${a.alerta.ativo ? antLabel(a.alerta.antecedencia) : 'Desativado'}</div>
+        <div style="font-size:11px;color:#aaa;">${formatDateForUI(a.data)} ??? ${a.alerta.ativo ? antLabel(a.alerta.antecedencia) : 'Desativado'}</div>
       </div>
       <button class="toggle ${a.alerta.ativo ? 'active' : ''}" onclick="toggleAlertaAgenda(${a.id}, '${a.medico ? 'consulta' : 'exame'}', this)"></button>
     </div>
@@ -3503,14 +5035,14 @@ function renderMeusIndicadoresVitais() {
       <span class="vital-config-icon">${v.icon}</span>
       <div style="flex:1;">
         <div class="vital-config-name">${v.tipo}</div>
-        <div style="font-size:11px;color:#aaa;">${v.unidade} • Ideal: ${getIdealLabel(v.ideal)}</div>
+        <div style="font-size:11px;color:#aaa;">${v.unidade} | Ideal: ${getIdealLabel(v.ideal)}</div>
       </div>
       <span class="vital-alert-indicator ${v.alerta && v.alerta.ativo ? 'active' : 'inactive'}"
         title="${v.alerta && v.alerta.ativo ? 'Alerta configurado' : 'Sem alerta configurado'}">
-        ${v.alerta && v.alerta.ativo ? '🔔' : '🔕'}
+        ${v.alerta && v.alerta.ativo ? 'ON' : 'OFF'}
       </span>
-      <button onclick="editIndicador('vitais',${v.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#454545;padding:4px;">✏️</button>
-      <button onclick="removeIndicador('vitais',${v.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#ddd;padding:4px;">🗑️</button>
+      <button onclick="editIndicador('vitais',${v.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#454545;padding:4px;">Editar</button>
+      <button onclick="removeIndicador('vitais',${v.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#ddd;padding:4px;">Remover</button>
     </div>
   `).join('');
   document.getElementById('meusIndicadoresVitaisContent').innerHTML = html || '<div class="card-info" style="padding:8px;">Nenhum indicador.</div>';
@@ -3522,10 +5054,10 @@ function renderMeusIndicadoresCorpo() {
       <span class="vital-config-icon">${c.icon}</span>
       <div style="flex:1;">
         <div class="vital-config-name">${c.tipo}</div>
-        <div style="font-size:11px;color:#aaa;">${c.unidade} • Ideal: ${getIdealLabel(c.ideal)}</div>
+        <div style="font-size:11px;color:#aaa;">${c.unidade} | Ideal: ${getIdealLabel(c.ideal)}</div>
       </div>
-      <button onclick="editIndicador('corpo',${c.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#454545;padding:4px;">✏️</button>
-      <button onclick="removeIndicador('corpo',${c.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#ddd;padding:4px;">🗑️</button>
+      <button onclick="editIndicador('corpo',${c.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#454545;padding:4px;">Editar</button>
+      <button onclick="removeIndicador('corpo',${c.id})" style="background:none;border:none;font-size:14px;cursor:pointer;color:#ddd;padding:4px;">Remover</button>
     </div>
   `).join('');
   document.getElementById('meusIndicadoresCorpoContent').innerHTML = html || '<div class="card-info" style="padding:8px;">Nenhum indicador.</div>';
@@ -3578,20 +5110,20 @@ function editIndicador(categoria, id) {
   document.getElementById('novoIndicadorFonte').value = item.fonte || 'Manual';
   document.getElementById('salvarIndicadorBtn').textContent = 'Salvar';
 
-  // Alertas — só para vitais
+  // Alertas ??" só para vitais
   const alertaContainer = document.getElementById('alertaVitalContainer');
   if (categoria === 'vitais') {
-    alertaContainer.style.display = 'block';
+    alertaContainer.classList.remove('is-hidden');
     const alerta = item.alerta || { ativo: false, acima: '', abaixo: '' };
     const toggleBtn = document.getElementById('toggleAlertaVital');
     toggleBtn.classList.toggle('active', !!alerta.ativo);
-    document.getElementById('alertaVitalFields').style.display = alerta.ativo ? 'block' : 'none';
+    document.getElementById('alertaVitalFields').classList.toggle('is-hidden', !alerta.ativo);
     document.getElementById('alertaAcimaInput').value = alerta.acima != null ? alerta.acima : '';
     document.getElementById('alertaAbaixoInput').value = alerta.abaixo != null ? alerta.abaixo : '';
     document.getElementById('alertaUnidadeLabel').textContent = item.unidade;
     document.getElementById('alertaUnidadeLabel2').textContent = item.unidade;
   } else {
-    alertaContainer.style.display = 'none';
+    alertaContainer.classList.add('is-hidden');
   }
 
   document.getElementById('novoIndicadorModal').classList.add('active');
@@ -3608,13 +5140,13 @@ function openNovoIndicadorModal() {
   const toggleBtn = document.getElementById('toggleAlertaVital');
   const fields = document.getElementById('alertaVitalFields');
   if (_indicadoresAba === 'vitais') {
-    alertaContainer.style.display = 'block';
+    alertaContainer.classList.remove('is-hidden');
     toggleBtn.classList.remove('active');
-    fields.style.display = 'none';
+    fields.classList.add('is-hidden');
     document.getElementById('alertaAcimaInput').value = '';
     document.getElementById('alertaAbaixoInput').value = '';
   } else {
-    alertaContainer.style.display = 'none';
+    alertaContainer.classList.add('is-hidden');
   }
   document.getElementById('novoIndicadorModal').classList.add('active');
 }
@@ -3653,7 +5185,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const nome = document.getElementById('novoIndicadorNome').value.trim();
     const unidade = document.getElementById('novoIndicadorUnidade').value.trim();
     const ideal = document.getElementById('novoIndicadorIdeal').value.trim() || '-';
-    const icon = document.getElementById('novoIndicadorIcon').value.trim() || '📊';
+    const icon = document.getElementById('novoIndicadorIcon').value.trim() || 'dY"S';
     const fonte = document.getElementById('novoIndicadorFonte').value;
     const alertaVital = categoria === 'vitais' ? buildVitalAlertFromForm() : null;
 
@@ -3705,13 +5237,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ===== COMPOSIÇÃO CORPORAL - CONFIG =====
-
-function openComposicaoConfigModal() {
-  renderComposicaoConfig();
-  document.getElementById('composicaoConfigModal').classList.add('active');
-}
-
 // ===== VALORES IDEAIS =====
 
 // (unificado em openValoresIdeaisModal acima)
@@ -3740,7 +5265,7 @@ function renderDispositivos() {
         <div class="config-icon">${getDispositivoIcon(d.tipo)}</div>
         <div class="config-text">
           <div class="config-title">${d.nome}</div>
-          <div class="config-subtitle">${d.tipo} • ${d.sinaisColetados.length} sinais</div>
+          <div class="config-subtitle">${d.tipo} ??? ${d.sinaisColetados.length} sinais</div>
           <div class="config-subtitle" style="font-size: 10px; margin-top: 2px; color: #bbb;">${d.sinaisColetados.join(', ')}</div>
         </div>
       </div>
@@ -3815,7 +5340,7 @@ document.addEventListener('DOMContentLoaded', () => {
       id: newId,
       nome,
       tipo,
-      icon: catalogo ? catalogo.icon : '📱',
+      icon: catalogo ? catalogo.icon : 'dY"?',
       conectado: true,
       sinaisColetados: sinais
     });
@@ -3849,7 +5374,7 @@ function renderVitaisConfig() {
   const allDash = allVitaisColumnOn('exibirDashboard');
   const todosRow = `
       <div class="vital-config-row vital-config-row--todos">
-        <span class="vital-config-icon" aria-hidden="true">⊞</span>
+        <span class="vital-config-icon" aria-hidden="true">?Sz</span>
         <span class="vital-config-name vital-config-name--todos">Todos</span>
         <div class="vital-config-toggles">
           <div class="toggle-col">
@@ -3956,7 +5481,7 @@ function simulatePressureCaptureForFonte(fonte) {
     Pulseira: () => ({
       sistolica: r(108, 126),
       diastolica: r(68, 84),
-      linha: 'Sensor da pulseira — leitura estável'
+      linha: 'Sensor da pulseira ??" leitura estável'
     }),
     'Google Fit': () => ({
       sistolica: r(114, 132),
@@ -4060,10 +5585,10 @@ function openExercicioDetalheModal(sessao) {
   if (periodoEl) {
     const ini = sessao.inicioISO ? formatDateTimeForUI(sessao.inicioISO) : '';
     const fim = sessao.fimISO ? formatDateTimeForUI(sessao.fimISO) : '';
-    periodoEl.textContent = ini && fim ? `Início ${ini} · Fim ${fim}` : '';
+    periodoEl.textContent = ini && fim ? `Início ${ini} às Fim ${fim}` : '';
   }
 
-  const cal = sessao.caloriasKcal != null ? `${sessao.caloriasKcal} kcal` : '—';
+  const cal = sessao.caloriasKcal != null ? `${sessao.caloriasKcal} kcal` : '??"';
   gridEl.innerHTML = `
     <div class="exercise-metric-cell">
       <span class="exercise-metric-label">Duração total</span>
@@ -4074,12 +5599,12 @@ function openExercicioDetalheModal(sessao) {
       <span class="exercise-metric-value">${cal}</span>
     </div>
     <div class="exercise-metric-cell">
-      <span class="exercise-metric-label">Freq. card. média</span>
-      <span class="exercise-metric-value">${sessao.freqMedia != null ? `${sessao.freqMedia} bpm` : '—'}</span>
+      <span class="exercise-metric-label">Freq. card. mAcdia</span>
+      <span class="exercise-metric-value">${sessao.freqMedia != null ? `${sessao.freqMedia} bpm` : '??"'}</span>
     </div>
     <div class="exercise-metric-cell">
       <span class="exercise-metric-label">Freq. card. máxima</span>
-      <span class="exercise-metric-value">${sessao.freqMax != null ? `${sessao.freqMax} bpm` : '—'}</span>
+      <span class="exercise-metric-value">${sessao.freqMax != null ? `${sessao.freqMax} bpm` : '??"'}</span>
     </div>
   `;
 
@@ -4087,7 +5612,7 @@ function openExercicioDetalheModal(sessao) {
   const ticks = [0, dur / 4, dur / 2, (3 * dur) / 4, dur];
   axisEl.innerHTML = `${ticks
     .map((t) => `<span>${formatElapsedMMSS(t)}</span>`)
-    .join('')}<span class="exercise-axis-flag" title="Fim">🏁</span>`;
+    .join('')}<span class="exercise-axis-flag" title="Fim">dY??</span>`;
 
   window._lastExercicioSessaoCanvas = sessao;
   document.getElementById('exercicioDetalheModal').classList.add('active');
@@ -4126,7 +5651,7 @@ function openSonoDetalheFromBatimentoHour(hour) {
   if (r && r.sonoSessao) openSonoDetalheModal(r.sonoSessao);
 }
 
-/** Rótulos de contexto (Exercício / Sono / …) agregados num bucket horário. */
+/** Rótulos de contexto (Exercício / Sono / ???) agregados num bucket horário. */
 function batimentoBucketContextBadgeHtml(bucket) {
   if (!bucket || !bucket.readings || bucket.readings.length === 0) return '';
   const set = new Set();
@@ -4136,7 +5661,7 @@ function batimentoBucketContextBadgeHtml(bucket) {
   });
   const labs = Array.from(set);
   if (labs.length === 0) return '';
-  const text = labs.length === 1 ? labs[0] : labs.join(' · ');
+  const text = labs.length === 1 ? labs[0] : labs.join(' às ');
   return `<span class="vital-context-badge">${text}</span>`;
 }
 
@@ -4150,11 +5675,11 @@ function openSonoDetalheModal(sessao) {
   titulo.textContent = 'Sono';
   const ini = sessao.inicioISO ? formatDateTimeForUI(sessao.inicioISO) : '';
   const fim = sessao.fimISO ? formatDateTimeForUI(sessao.fimISO) : '';
-  periodo.textContent = ini && fim ? `Início ${ini} · Fim ${fim}` : '';
+  periodo.textContent = ini && fim ? `Início ${ini} às Fim ${fim}` : '';
 
   const dm = sessao.duracaoMinutos;
   const durLabel =
-    dm != null && Number.isFinite(dm) ? `${Math.floor(dm / 60)} h ${dm % 60} min` : '—';
+    dm != null && Number.isFinite(dm) ? `${Math.floor(dm / 60)} h ${dm % 60} min` : '??"';
   const cell = (label, val) =>
     `<div class="sono-metric-cell"><span class="sono-metric-label">${label}</span><span class="sono-metric-value">${val}</span></div>`;
 
@@ -4172,16 +5697,16 @@ function openSonoDetalheModal(sessao) {
       fcSonoMax = Math.round(Math.max(...sonoVals));
     }
   }
-  const fcSonoLabel = fcSonoMin != null ? `${fcSonoMin} – ${fcSonoMax} bpm` : '—';
+  const fcSonoLabel = fcSonoMin != null ? `${fcSonoMin} ??" ${fcSonoMax} bpm` : '??"';
 
   grid.innerHTML = [
     cell('Duração registada', durLabel),
-    cell('Pontuação', sessao.score != null ? String(sessao.score) : '—'),
-    cell('FC mín – máx', fcSonoLabel),
-    cell('Leve', sessao.leveMin != null ? `${sessao.leveMin} min` : '—'),
-    cell('REM', sessao.remMin != null ? `${sessao.remMin} min` : '—'),
-    cell('Profundo', sessao.profundoMin != null ? `${sessao.profundoMin} min` : '—'),
-    cell('Acordado', sessao.acordadoMin != null ? `${sessao.acordadoMin} min` : '—')
+    cell('Pontuação', sessao.score != null ? String(sessao.score) : '??"'),
+    cell('FC mín ??" máx', fcSonoLabel),
+    cell('Leve', sessao.leveMin != null ? `${sessao.leveMin} min` : '??"'),
+    cell('REM', sessao.remMin != null ? `${sessao.remMin} min` : '??"'),
+    cell('Profundo', sessao.profundoMin != null ? `${sessao.profundoMin} min` : '??"'),
+    cell('Acordado', sessao.acordadoMin != null ? `${sessao.acordadoMin} min` : '??"')
   ].join('');
 
   document.getElementById('sonoDetalheModal').classList.add('active');
@@ -4194,15 +5719,15 @@ function closeSonoDetalheModal() {
 
 /** Igual ao subtítulo do modal por minuto: faixa da hora em uma linha. */
 function formatBatimentoBpmRangeLine(minV, maxV) {
-  if (minV == null || maxV == null || !Number.isFinite(minV) || !Number.isFinite(maxV)) return '—';
-  return `${Math.round(minV)} – ${Math.round(maxV)} bpm`;
+  if (minV == null || maxV == null || !Number.isFinite(minV) || !Number.isFinite(maxV)) return '??"';
+  return `${Math.round(minV)} ??" ${Math.round(maxV)} bpm`;
 }
 
-/** Igual ao subtítulo do modal por minuto: "08:00 – 08:59". */
+/** Igual ao subtítulo do modal por minuto: "08:00 ??" 08:59". */
 function formatBatimentoHourIntervalLabel(hour) {
   const h = Math.floor(Number(hour));
   const s = String(Number.isFinite(h) && h >= 0 && h <= 23 ? h : 0).padStart(2, '0');
-  return `${s}:00 – ${s}:59`;
+  return `${s}:00 ??" ${s}:59`;
 }
 
 const BATIMENTO_HISTORICO_PREVIEW = 3;
@@ -4210,13 +5735,13 @@ const BATIMENTO_HISTORICO_PREVIEW = 3;
 let batimentoMinutoReadingsCache = [];
 let batimentoMinutoCurrentHour = null;
 
-/** Mesma hierarquia visual da lista “por hora” (medida em cima, horário em baixo, chevron). */
+/** Mesma hierarquia visual da lista ??opor hora??? (medida em cima, horário em baixo, chevron). */
 function buildBatimentoMinutoHistoricoRowHtml(r) {
   const v = parseBatimentoHistoricoValor(r);
   const dateIso = historicoEntryDayISO(r);
-  const dateTxt = dateIso ? formatDateForUI(dateIso) : '—';
-  const hora = r.hora ? String(r.hora).slice(0, 5) : '—';
-  const measureLine = Number.isFinite(v) ? `${Math.round(v)} bpm` : '—';
+  const dateTxt = dateIso ? formatDateForUI(dateIso) : '??"';
+  const hora = r.hora ? String(r.hora).slice(0, 5) : '??"';
+  const measureLine = Number.isFinite(v) ? `${Math.round(v)} bpm` : '??"';
   const ctxLabel = typeof getLabelContextoColetaHistorico === 'function' ? getLabelContextoColetaHistorico(r) : '';
   const badgeHtml = ctxLabel ? `<span class="vital-context-badge">${ctxLabel}</span>` : '';
   const bg = typeof batimentoHistoricoRowBgClassForEntry === 'function' ? batimentoHistoricoRowBgClassForEntry(r) : '';
@@ -4229,7 +5754,7 @@ function buildBatimentoMinutoHistoricoRowHtml(r) {
     badgeHtml,
     hourDetail: {
       measureLine,
-      timeLine: `${dateTxt} · ${hora}`,
+      timeLine: `${dateTxt} às ${hora}`,
       trailHtml
     }
   });
@@ -4286,13 +5811,13 @@ function openBatimentoMinutoDetalhe(hour, contexto) {
   if (!modal) return;
 
   document.getElementById('batimentoMinutoTitulo').textContent = 'Detalhado por minuto';
-  document.getElementById('batimentoMinutoSubtitulo').textContent = formatDateForUI(dayIso) + ' · ' + labelHora;
+  document.getElementById('batimentoMinutoSubtitulo').textContent = formatDateForUI(dayIso) + ' às ' + labelHora;
 
   // Estatísticas da hora
   const hasRange = bucket.min != null && bucket.max != null;
   document.getElementById('batimentoMinutoRange').textContent = hasRange
     ? formatBatimentoBpmRangeLine(bucket.min, bucket.max)
-    : '—';
+    : '??"';
 
   // Badge de contexto
   const ctxMap = { exercicio: 'Exercício', sono: 'Sono', repouso: 'Repouso' };
@@ -4406,7 +5931,7 @@ function renderBatimentoMinutoCanvas(readings) {
   });
 }
 
-/** Lista do período: toque no dia → mesma vista que tocar na coluna do gráfico. */
+/** Lista do período: toque no dia ?+' mesma vista que tocar na coluna do gráfico. */
 function selectBatimentoDayFromList(dayIso) {
   if (!dayIso || typeof dayIso !== 'string') return;
   vitalBatimentoChartSelection = { kind: 'day', iso: dayIso };
@@ -4465,7 +5990,7 @@ function aggregateHeartRateByDay(historico) {
   return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 }
 
-/** Segunda-feira da semana (ISO) para agregar séries longas. */
+/** Segunda-feira da semana (ISO) para agregar sAcries longas. */
 function getWeekStartMondayISO(isoDate) {
   const d = localNoonFromISODate(isoDate);
   const dow = d.getDay();
@@ -4562,7 +6087,7 @@ function batimentoHistoricoRowBgClassForEntry(h) {
   return 'vital-list-item--bc-outros';
 }
 
-/** Lista por dia (período): Baixo / Normal / Alto conforme pico do dia vs faixa ideal — alinhado ao gráfico de barras. */
+/** Lista por dia (período): Baixo / Normal / Alto conforme pico do dia vs faixa ideal ??" alinhado ao gráfico de barras. */
 function batimentoHistoricoDailyRowBgClass(readings) {
   if (!Array.isArray(readings) || readings.length === 0) return '';
   let peak = null;
@@ -4574,7 +6099,7 @@ function batimentoHistoricoDailyRowBgClass(readings) {
 }
 
 /**
- * Contexto da hora (lista + gráfico horário): Sono → Exercício → Repouso → demais.
+ * Contexto da hora (lista + gráfico horário): Sono ?+' Exercício ?+' Repouso ?+' demais.
  * Não confundir com Baixo/Normal/Alto do histórico por período.
  */
 function batimentoHourlyBucketContextGroup(bucket) {
@@ -4608,7 +6133,7 @@ function batimentoHourlyBucketRowBgClass(bucket) {
 }
 
 /**
- * Uma linha por dia civil: mín. e máx. do dia (alinhado às barras do gráfico).
+ * Uma linha por dia civil: mín. e máx. do dia (alinhado àsbarras do gráfico).
  */
 function buildBatimentoHistoricoDailyRows(entries) {
   const map = new Map();
@@ -4655,7 +6180,7 @@ function buildBatimentoHistoricoDailyRows(entries) {
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([day, g]) => {
       const labs = ctxLabels(g.readings);
-      const ctxBadge = labs.length === 0 ? '' : (labs.length === 1 ? labs[0] : labs.join(' · '));
+      const ctxBadge = labs.length === 0 ? '' : (labs.length === 1 ? labs[0] : labs.join(' às '));
       return {
         day,
         min: g.min,
@@ -4686,7 +6211,7 @@ function sortHistoricoBatimentoDesc(arr) {
   });
 }
 
-/** Ordem cronológica (mais antiga primeiro) — lista do dia ao tocar numa coluna. */
+/** Ordem cronológica (mais antiga primeiro) ??" lista do dia ao tocar numa coluna. */
 function sortHistoricoBatimentoAsc(arr) {
   if (!Array.isArray(arr)) return [];
   return [...arr].sort((a, b) => {
@@ -4723,7 +6248,7 @@ function batimentoSelectionEquals(a, b) {
 
 /**
  * Atualiza gráficos do chrome de Batimento (período OU vista dia) + painéis visíveis.
- * Não altera lista — use depois de renderVitalDetailContent ou dentro de updateVitalBatimentoModalView.
+ * Não altera lista ??" use depois de renderVitalDetailContent ou dentro de updateVitalBatimentoModalView.
  */
 function renderBatimentoChromeCharts(filtrado, start, end) {
   if (vitalBatimentoChartSelection && vitalBatimentoChartSelection.kind === 'day') {
@@ -4736,7 +6261,7 @@ function renderBatimentoChromeCharts(filtrado, start, end) {
   }
 }
 
-// ─── Batimento: Min/Max card ───────────────────────────────────────────────
+// ?"??"??"? Batimento: Min/Max card ?"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"?
 function renderBatimentoMinMaxCard(historico) {
   const el = document.getElementById('batMinMaxCard');
   if (!el) return;
@@ -4765,14 +6290,14 @@ function renderBatimentoMinMaxCard(historico) {
 
 let batHourlySelectedHour = null;
 let batHdSelectedSlot = null;
-// ─── Batimento: Gráfico mín/máx por hora ──────────────────────────────────
+// ?"??"??"? Batimento: Gráfico mín/máx por hora ?"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"?
 function renderBatimentoHourlyChart(historico) {
   const el = document.getElementById('batHourlyChart');
   if (!el) return;
 
   const band = typeof getBatimentoChartIdealBand === 'function' ? getBatimentoChartIdealBand() : { min: 60, max: 100 };
 
-  // Agrupar por hora (0–23)
+  // Agrupar por hora (0??"23)
   const hours = Array.from({ length: 24 }, () => ({ min: null, max: null }));
   historico.forEach(h => {
     const v = parseBatimentoHistoricoValor(h);
@@ -4795,7 +6320,7 @@ function renderBatimentoHourlyChart(historico) {
       <span class="bhc-leg"><span class="bhc-dot bhc-dot--normal"></span>Normal</span>
       <span class="bhc-leg"><span class="bhc-dot bhc-dot--high"></span>Alto</span>
       <span class="bhc-leg"><span class="bhc-dot bhc-dot--low"></span>Baixo</span>
-      <span class="bhc-leg bhc-leg--ref"><span class="bhc-ref-line"></span>Ref. ${band.min}–${band.max}</span>
+      <span class="bhc-leg bhc-leg--ref"><span class="bhc-ref-line"></span>Ref. ${band.min}??"${band.max}</span>
     </div>` : `<p class="bat-hourly-chart-empty">Sem dados para este dia</p>`}`;
 
   if (!hasData) {
@@ -4825,7 +6350,7 @@ function renderBatimentoHourlyChart(historico) {
     const yRange = dataHi - dataLo;
     const toY = (v) => padT + gh - ((v - dataLo) / yRange) * gh;
 
-    // Função de desenho reutilizável — não reconstrói o DOM
+    // Função de desenho reutilizável ??" não reconstrói o DOM
     function drawBatHourly() {
       const ctx = canvas.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -4860,7 +6385,7 @@ function renderBatimentoHourlyChart(historico) {
         ctx.fillText(Math.round(v), padL - 3, padT + t * gh);
       });
 
-      // Barras — não selecionadas ficam apagadas quando há seleção ativa
+      // Barras ??" não selecionadas ficam apagadas quando háseleção ativa
       const hasSel = Number.isInteger(batHourlySelectedHour);
       hours.forEach((slot, i) => {
         if (slot.min === null) return;
@@ -4937,11 +6462,11 @@ function renderBatimentoHourlyChart(historico) {
 
       const slot = hours[hitIdx];
       const hEnd = (hitIdx + 1) % 24;
-      const label = String(hitIdx).padStart(2,'0') + ':00 – ' + String(hEnd).padStart(2,'0') + ':00';
+      const label = String(hitIdx).padStart(2,'0') + ':00 ??" ' + String(hEnd).padStart(2,'0') + ':00';
       const tip = document.createElement('div');
       tip.id = 'batHourlyTooltip';
       tip.style.cssText = 'position:absolute;background:#1e293b;color:#fff;border-radius:8px;padding:7px 12px;font-size:12px;line-height:1.5;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.2);';
-      tip.innerHTML = label + '&nbsp;&nbsp;<strong style="color:#fbbf24;"><span style="font-size:1.2em;">' + slot.min + '</span> até <span style="font-size:1.2em;">' + slot.max + '</span> bpm</strong>';
+      tip.innerHTML = label + '&nbsp;&nbsp;<strong style="color:#fbbf24;"><span style="font-size:1.2em;">' + slot.min + '</span> até<span style="font-size:1.2em;">' + slot.max + '</span> bpm</strong>';
 
       const parent = canvas.parentElement;
       parent.style.position = 'relative';
@@ -4963,15 +6488,29 @@ function renderBatimentoHourlyChart(historico) {
   });
 }
 
-// ─── Batimento: Tabela horária ─────────────────────────────────────────────
-function renderBatimentoHourlyTable(historico) {
+// ?"??"??"? Batimento: Tabela horária ?"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"?
+function renderBatimentoHourlyTable(historico, isoDate) {
   const el = document.getElementById('batHourlyTable');
   if (!el) return;
+
+  // Atualiza label de data acima do card
+  const _labelEl = document.getElementById('batHourlyDateLabel');
+  if (_labelEl) {
+    if (isoDate) {
+      const _p = isoDate.split('-').map(Number);
+      const _dt = new Date(_p[0], _p[1] - 1, _p[2]);
+      const _dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'S\u00e1b'];
+      const _meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+      _labelEl.textContent = _dias[_dt.getDay()] + ', ' + String(_p[2]).padStart(2, '0') + ' ' + _meses[_p[1] - 1];
+    } else {
+      _labelEl.textContent = '';
+    }
+  }
 
   // Guardar referência global para uso no onclick das linhas
   window.__batHourlyHistorico = historico;
 
-  // Agrupar por slot de hora (hh:00–hh+1:00), ordenado do mais recente
+  // Agrupar por slot de hora (hh:00??"hh+1:00), ordenado do mais recente
   const slotMap = new Map();
   historico.forEach(h => {
     const v = parseBatimentoHistoricoValor(h);
@@ -4979,7 +6518,7 @@ function renderBatimentoHourlyTable(historico) {
     const horaStr = String(h.hora || '').slice(0, 5); // "HH:MM"
     if (!/^\d{2}:\d{2}$/.test(horaStr)) return;
     const hNum = parseInt(horaStr.slice(0, 2), 10);
-    const slotKey = `${String(hNum).padStart(2,'0')}:00 – ${String((hNum+1)%24).padStart(2,'0')}:00`;
+    const slotKey = `${String(hNum).padStart(2,'0')}:00 ??" ${String((hNum+1)%24).padStart(2,'0')}:00`;
     const ms = typeof historicoEntryToMs === 'function' ? (historicoEntryToMs(h) || 0) : 0;
     if (!slotMap.has(slotKey)) slotMap.set(slotKey, { min: v, max: v, ms });
     else {
@@ -4995,7 +6534,7 @@ function renderBatimentoHourlyTable(historico) {
 
   if (!rows.length) { el.innerHTML = ''; return; }
 
-  const INITIAL = 4;
+  const INITIAL = 3;
   let showAll = false;
 
   const BAT_CLS = {
@@ -5003,7 +6542,7 @@ function renderBatimentoHourlyTable(historico) {
     run:      { color: '#94a3b8', p: '<path fill="#94a3b8" stroke="none" d="M13.49 5.48c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm-3.6 13.9l1-4.4 2.1 2v6h2v-7.5l-2.1-2 .6-3c1.3 1.5 3.3 2.5 5.5 2.5v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1l-5.2 2.2v4.7h2v-3.4l1.8-.7-1.6 8.1-4.9-1-.4 2 7 1.4z"/>' },
     exercise: { color: '#94a3b8', p: '<line x1="6" y1="12" x2="18" y2="12"/><line x1="6" y1="8" x2="6" y2="16"/><line x1="18" y1="8" x2="18" y2="16"/><line x1="3" y1="9" x2="3" y2="15"/><line x1="21" y1="9" x2="21" y2="15"/>' }
   };
-  // Horas fixas com ícone de exercício (treino) e corrida — mock decorativo
+  // Horas fixas com ícone de exercício (treino) e corrida ??" mock decorativo
   const EXERCISE_HOURS = new Set([8, 9, 17]);
   const RUN_HOURS      = new Set([7, 10, 16, 18]);
   const getBatCls = (slot) => {
@@ -5014,17 +6553,19 @@ function renderBatimentoHourlyTable(historico) {
     return null;
   };
 
+  const _chevron = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
+
   const renderRows = (all) => rows.slice(0, all ? rows.length : INITIAL).map(([slot, d]) => {
     const cls = getBatCls(slot);
-    const icoHtml = cls ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${cls.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${cls.p}</svg>` : '';
+    const icoHtml = cls ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${cls.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${cls.p}</svg>` : '';
     const safeSlot = slot.replace(/'/g, "\\'");
     return `
     <div class="bat-hourly-row" onclick="openBatHourlyDetail('${safeSlot}', ${d.min}, ${d.max}, window.__batHourlyHistorico)">
       <div class="bat-hourly-left">
-        <span class="bat-hourly-range">${d.min} <span class="bat-hourly-sep">–</span> ${d.max} <span class="bat-hourly-unit">bpm</span></span>
+        <span class="bat-hourly-range">${d.min} <span class="bat-hourly-sep">??"</span> ${d.max} <span class="bat-hourly-unit">bpm</span></span>
         <span class="bat-hourly-slot">${slot}</span>
       </div>
-      <div class="bat-hourly-right">${icoHtml}</div>
+      <div class="bat-hourly-right">${icoHtml}${_chevron}</div>
     </div>`;
   }).join('');
 
@@ -5040,11 +6581,12 @@ function renderBatimentoHourlyTable(historico) {
   rebuild(showAll);
 }
 
-// ─── Batimento: Detalhe de uma hora específica ────────────────────────────
+// ?"??"??"? Batimento: Detalhe de uma hora específica ?"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"?
 let _batHdCurrentHistorico = null;
 
 function openBatHourlyDetail(slotKey, dMin, dMax, historico) {
   _batHdCurrentHistorico = historico;
+  window._batHdActive = true;
 
   // Oculta os cards normais
   ['batDayPickerCard','batMinMaxCard','batHourlyChart','batHourlyTable','batRestingTrend'].forEach(id => {
@@ -5064,7 +6606,13 @@ function openBatHourlyDetail(slotKey, dMin, dMax, historico) {
   const _meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
   const _dateLabel = `${_diasSem[_dateObj.getDay()]}, ${String(_d).padStart(2,'0')} ${_meses[_m - 1]}`;
   document.getElementById('batHdSlotLabel').innerHTML =
-    `${slotKey} <span style="font-size:13px;font-weight:400;color:#94a3b8;">· ${_dateLabel}</span>`;
+    `${slotKey} <span style="font-size:13px;font-weight:400;color:#94a3b8;">às ${_dateLabel}</span>`;
+
+  // Atualiza título e subtítulo do navbar principal
+  const _titleEl = document.getElementById('vitalDetailTitle');
+  if (_titleEl) _titleEl.textContent = 'Medição horária';
+  const _subtitleEl = document.getElementById('vitalDetailSubtitle');
+  if (_subtitleEl) _subtitleEl.textContent = slotKey;
 
   // Min/Max card
   const mmEl = document.getElementById('batHdMinMax');
@@ -5092,8 +6640,18 @@ function openBatHourlyDetail(slotKey, dMin, dMax, historico) {
 }
 
 function closeBatHourlyDetail() {
+  window._batHdActive = false;
+
   const view = document.getElementById('batHourlyDetailView');
   if (view) view.style.display = 'none';
+
+  // Restaura título do navbar e limpa subtítulo
+  const _titleEl = document.getElementById('vitalDetailTitle');
+  if (_titleEl && currentVitalDetail && currentVitalDetail.tipo) {
+    _titleEl.textContent = 'Histórico de ' + currentVitalDetail.tipo;
+  }
+  const _subtitleEl = document.getElementById('vitalDetailSubtitle');
+  if (_subtitleEl) _subtitleEl.textContent = '';
 
   ['batDayPickerCard','batMinMaxCard','batHourlyChart','batHourlyTable','batRestingTrend'].forEach(id => {
     const el = document.getElementById(id);
@@ -5121,7 +6679,7 @@ function _buildHourlyFiveMinPoints(hNum, dMin, dMax, historico) {
   }
 
   // Gera os 12 slots (0,5,10,...,55) com min/max por slot
-  // Quando há apenas um valor real no slot, aplica pequena faixa para manter a leitura visual da barra.
+  // Quando háapenas um valor real no slot, aplica pequena faixa para manter a leitura visual da barra.
   const mid = Math.round((dMin + dMax) / 2);
   const amp = Math.max(Math.round((dMax - dMin) / 2), 2);
   const pts = [];
@@ -5142,7 +6700,7 @@ function _buildHourlyFiveMinPoints(hNum, dMin, dMax, historico) {
       pts.push({ min: m, bpm: center, minBpm: slotMin, maxBpm: slotMax });
       prev = center;
     } else {
-      // variação sintética suave
+      // variação sintActica suave
       const drift = Math.round((Math.random() - 0.5) * amp * 0.6);
       const v = Math.min(dMax, Math.max(dMin, prev + drift));
       const localPad = Math.max(4, Math.min(11, spreadPad + Math.round(Math.abs(v - prev) * 0.45)));
@@ -5208,7 +6766,7 @@ function renderBatHdChart(points, dMin, dMax, hNum) {
   ctx.rect(PAD_L, PAD_T, chartW, chartH);
   ctx.clip();
 
-  // Usa min/max já preparados por slot; fallback mantém compatibilidade com formato antigo ({min,bpm})
+  // Usa min/max jápreparados por slot; fallback mantAcm compatibilidade com formato antigo ({min,bpm})
   const slotData = points.map(p => ({
     min: p.min,
     minBpm: p.minBpm !== undefined ? p.minBpm : (p.bpm !== undefined ? p.bpm : dMin),
@@ -5314,7 +6872,7 @@ function renderBatHdChart(points, dMin, dMax, hNum) {
     const h = (hNum != null ? hNum : 0);
     const startMin = String(p.min).padStart(2,'0');
     const endMin = String(Math.min(p.min + 4, 59)).padStart(2, '0');
-    tooltip.innerHTML = `${String(h).padStart(2,'0')}:${startMin} – ${String(h).padStart(2,'0')}:${endMin}&nbsp;&nbsp;<strong><span style="font-size:1.2em;">${p.minBpm}</span> até <span style="font-size:1.2em;">${p.maxBpm}</span> bpm</strong>`;
+    tooltip.innerHTML = `${String(h).padStart(2,'0')}:${startMin} ??" ${String(h).padStart(2,'0')}:${endMin}&nbsp;&nbsp;<strong><span style="font-size:1.2em;">${p.minBpm}</span> até<span style="font-size:1.2em;">${p.maxBpm}</span> bpm</strong>`;
     tooltip.style.display = 'block';
     const cardRect = canvas.parentElement.getBoundingClientRect();
     const canvasRect = canvas.getBoundingClientRect();
@@ -5355,7 +6913,7 @@ function renderBatHdChart(points, dMin, dMax, hNum) {
   document.addEventListener('click', document._batHdOutsideClick);
 }
 
-// ─── Batimento: Tendência de repouso 7 dias ────────────────────────────────
+// ?"??"??"? Batimento: Tendência de repouso 7 dias ?"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"?
 function renderBatimentoRestingTrend(historico) {
   const el = document.getElementById('batRestingTrend');
   if (!el) return;
@@ -5363,7 +6921,7 @@ function renderBatimentoRestingTrend(historico) {
 
   const band = typeof getBatimentoChartIdealBand === 'function' ? getBatimentoChartIdealBand() : { min: 60, max: 100 };
 
-  // Últimos 7 dias: filtrar repouso/sono por dia, calcular média
+  // Asltimos 7 dias: filtrar repouso/sono por dia, calcular mAcdia
   const today = new Date();
   const days = [];
   for (let i = 6; i >= 0; i--) {
@@ -5384,7 +6942,7 @@ function renderBatimentoRestingTrend(historico) {
     if (slot) slot.vals.push(v);
   });
 
-  // Se não há dados de repouso, usa todos
+  // Se não hádados de repouso, usa todos
   const hasResting = days.some(d => d.vals.length > 0);
   if (!hasResting) {
     historico.forEach(h => {
@@ -5401,7 +6959,7 @@ function renderBatimentoRestingTrend(historico) {
     val: d.vals.length ? Math.round(d.vals.reduce((a,b)=>a+b,0)/d.vals.length) : null
   }));
 
-  // Calcular média geral para destaque
+  // Calcular mAcdia geral para destaque
   const allVals = points.filter(p => p.val != null).map(p => p.val);
   const avgVal = allVals.length ? Math.round(allVals.reduce((a,b)=>a+b,0)/allVals.length) : null;
 
@@ -5419,7 +6977,7 @@ function renderBatimentoRestingTrend(historico) {
 
   el.innerHTML = `
     <div class="bat-resting-header">Tendência em repouso <span class="bat-resting-sub">7 dias</span></div>
-    ${avgVal != null ? `<div class="bat-resting-avg"><span class="bat-resting-avg-value">${avgVal}</span><span class="bat-resting-avg-unit">bpm média</span></div>` : ''}
+    ${avgVal != null ? `<div class="bat-resting-avg"><span class="bat-resting-avg-value">${avgVal}</span><span class="bat-resting-avg-unit">bpm mAcdia</span></div>` : ''}
     <canvas id="batRestingCanvas" class="bat-resting-canvas" height="100"></canvas>
     <div class="bat-resting-labels" id="batRestingLabels"></div>`;
 
@@ -5454,7 +7012,7 @@ function renderBatimentoRestingTrend(historico) {
     const toX = (i) => padL + i * slotW;
     const toY = (v) => padT + gh - ((v - minV) / (maxV - minV)) * gh;
 
-    // Faixa de referência normal (60–100 bpm)
+    // Faixa de referência normal (60??"100 bpm)
     const refLo = band.min, refHi = band.max;
     const refYTop = Math.max(padT, toY(Math.min(refHi, maxV + 5)));
     const refYBot = Math.min(padT + gh, toY(Math.max(refLo, minV - 5)));
@@ -5477,7 +7035,7 @@ function renderBatimentoRestingTrend(historico) {
       ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
     });
 
-    // Y labels — só mín e máx reais para não poluir
+    // Y labels ??" só mín e máx reais para não poluir
     ctx.fillStyle = '#94a3b8';
     ctx.font = `600 10px Inter, sans-serif`;
     ctx.textAlign = 'right';
@@ -5523,7 +7081,7 @@ function renderBatimentoRestingTrend(historico) {
   });
 }
 
-// ─── Batimento: Detalhe Tendência em Repouso ──────────────────────────────
+// ?"??"??"? Batimento: Detalhe Tendência em Repouso ?"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"?
 let __batRestingPeriod = '7d';
 
 function openBatRestingDetail() {
@@ -5563,7 +7121,7 @@ function _brdUpdateChips(active) {
 
 function _brdGetStatus(avg) {
   if (avg < 50) return { cls: 'brd-status-red',    label: 'Bradicardia', text: 'Frequência cardíaca em repouso muito abaixo do normal. Recomenda-se consultar um médico.', tip: 'Procure seu cardiologista para uma avaliação completa.' };
-  if (avg <= 60) return { cls: 'brd-status-blue',   label: 'Atlético',   text: 'Frequência típica de pessoas com alta aptidão cardiovascular.',                             tip: 'Mantenha a rotina de exercícios — seu coração agradece.' };
+  if (avg <= 60) return { cls: 'brd-status-blue',   label: 'AtlActico',   text: 'Frequência típica de pessoas com alta aptidão cardiovascular.',                             tip: 'Mantenha a rotina de exercícios ??" seu coração agradece.' };
   if (avg <= 72) return { cls: 'brd-status-green',  label: 'Excelente',  text: 'Frequência cardíaca em repouso em nível excelente.',                                         tip: 'Continue dormindo bem e mantendo a atividade física regular.' };
   if (avg <= 80) return { cls: 'brd-status-green',  label: 'Normal',     text: 'Frequência cardíaca em repouso dentro da faixa saudável para adultos.',                     tip: 'Sono de qualidade e caminhadas diárias ajudam a manter esse resultado.' };
   if (avg <= 90) return { cls: 'brd-status-yellow', label: 'Atenção',    text: 'Frequência cardíaca em repouso levemente acima do ideal.',                                   tip: 'Tente reduzir o estresse e priorize pelo menos 7h de sono por noite.' };
@@ -5670,7 +7228,7 @@ function _brdRenderContent(period) {
   var statVar = document.getElementById('brdStatVar');
   if (statMin) statMin.textContent = minV;
   if (statMax) statMax.textContent = maxV;
-  if (statVar) statVar.textContent = '±' + Math.round((maxV - minV) / 2);
+  if (statVar) statVar.textContent = 'Δ' + Math.round((maxV - minV) / 2);
 
   // Range label
   var rangeEl = document.getElementById('brdChartRange');
@@ -5715,7 +7273,7 @@ function _brdRenderContent(period) {
     var toX = function(i) { return PAD_L + (i / (n - 1)) * chartW; };
     var toY = function(v) { return PAD_T + chartH - ((v - rangeMin) / (rangeMax - rangeMin)) * chartH; };
 
-    // Green reference band (60–80 bpm)
+    // Green reference band (60??"80 bpm)
     var refYTop = Math.max(PAD_T, toY(80));
     var refYBot = Math.min(PAD_T + chartH, toY(60));
     if (refYBot > refYTop) {
@@ -5891,7 +7449,7 @@ function _brdRenderContent(period) {
   });
 }
 
-// ─── Batimento: Compartilhar card ─────────────────────────────────────────
+// ?"??"??"? Batimento: Compartilhar card ?"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"?
 async function shareBatimentoCard() {
   if (!currentVitalDetail) return;
 
@@ -5924,7 +7482,7 @@ async function shareBatimentoCard() {
     ].join(';');
     document.body.appendChild(clone);
 
-    // cloneNode não copia pixels de <canvas> — copiar manualmente
+    // cloneNode não copia pixels de <canvas> ??" copiar manualmente
     const origCanvases = chrome.querySelectorAll('canvas');
     const cloneCanvases = clone.querySelectorAll('canvas');
     origCanvases.forEach((orig, i) => {
@@ -5978,7 +7536,7 @@ async function shareBatimentoCard() {
 
     ctx.fillStyle = '#64748b';
     ctx.font = `400 ${12 * dpr}px Inter, system-ui, sans-serif`;
-    ctx.fillText(nome ? `${dateLabel} · ${nome}` : dateLabel, 20 * dpr, 55 * dpr);
+    ctx.fillText(nome ? `${dateLabel} às ${nome}` : dateLabel, 20 * dpr, 55 * dpr);
 
     ctx.fillStyle = '#f1f5f9';
     ctx.fillRect(0, (headerH - 1) * dpr, W, dpr); // divisor
@@ -5986,7 +7544,7 @@ async function shareBatimentoCard() {
     // --- Conteúdo capturado ---
     ctx.drawImage(chromeCanvas, 0, headerH * dpr);
 
-    // --- Rodapé ---
+    // --- RodapAc ---
     const footerY = headerH * dpr + chromeCanvas.height;
     ctx.fillStyle = '#f8fafc';
     ctx.fillRect(0, footerY, W, footerH * dpr);
@@ -5995,7 +7553,7 @@ async function shareBatimentoCard() {
     ctx.font = `400 ${11 * dpr}px Inter, system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Gerado por Teep Saúde · teepsaude.com.br', W / 2, footerY + (footerH / 2) * dpr);
+    ctx.fillText('Gerado por Teep Saúde — teepsaude.com.br', W / 2, footerY + (footerH / 2) * dpr);
 
     if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
 
@@ -6004,7 +7562,7 @@ async function shareBatimentoCard() {
       const file = new File([blob], `batimento-${selISO}.png`, { type: 'image/png' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-          await navigator.share({ files: [file], title: 'Batimento Cardíaco', text: `${dateLabel}${nome ? ' · ' + nome : ''}` });
+          await navigator.share({ files: [file], title: 'Batimento Cardíaco', text: `${dateLabel}${nome ? ' às ' + nome : ''}` });
           return;
         } catch (e) { /* cancelado pelo usuário */ }
       }
@@ -6022,7 +7580,7 @@ async function shareBatimentoCard() {
   }
 }
 
-// ─── Batimento: Day Picker ─────────────────────────────────────────────────
+// ?"??"??"? Batimento: Day Picker ?"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"?
 function renderBatimentoDayPicker(historico) {
   const el = document.getElementById('batDayPickerCard');
   if (!el) return;
@@ -6030,7 +7588,7 @@ function renderBatimentoDayPicker(historico) {
   const todayISO = getTodayISODate();
   const selectedISO = batimentoSelectedDayISO || todayISO;
 
-  // Agrupar por dia ISO → { iso, min, max }
+  // Agrupar por dia ISO ?+' { iso, min, max }
   const dayMap = new Map();
   historico.forEach(h => {
     const v = parseBatimentoHistoricoValor(h);
@@ -6139,11 +7697,11 @@ function selectBatimentoDay(iso) {
 
   renderBatimentoMinMaxCard(dayData);
   renderBatimentoHourlyChart(dayData);
-  renderBatimentoHourlyTable(dayData);
+  renderBatimentoHourlyTable(dayData, iso);
 }
 
 /**
- * Único ponto de atualização do modal de Batimento: lista + resumo do período + gráficos.
+ * Asnico ponto de atualização do modal de Batimento: lista + resumo do período + gráficos.
  */
 function updateVitalBatimentoModalView() {
   syncCurrentBatimentoVitalFromMockData();
@@ -6156,7 +7714,7 @@ function updateVitalBatimentoModalView() {
   renderBatimentoChromeCharts(filtrado, start, end);
   updateBatimentoPeriodSummary(filtrado, start, end);
 
-  // Day picker — usa todo o histórico sem filtro de contexto para incluir todos os dias
+  // Day picker ??" usa todo o histórico sem filtro de contexto para incluir todos os dias
   const allHist = currentVitalDetail.historico;
   renderBatimentoDayPicker(allHist);
 
@@ -6168,7 +7726,7 @@ function updateVitalBatimentoModalView() {
   });
   renderBatimentoMinMaxCard(dayData);
   renderBatimentoHourlyChart(dayData);
-  renderBatimentoHourlyTable(dayData);
+  renderBatimentoHourlyTable(dayData, selISO);
   renderBatimentoRestingTrend(allHist);
 }
 
@@ -6195,7 +7753,7 @@ function onVitalBatimentoCanvasClick(ev) {
 }
 
 /**
- * Ano: agrega por semana/quinzena. Demais chips e livre: uma barra por dia no intervalo (7 → 7 colunas, etc.).
+ * Ano: agrega por semana/quinzena. Demais chips e livre: uma barra por dia no intervalo (7 ?+' 7 colunas, etc.).
  */
 function pickBatimentoChartRows(historico, startISO, endISO, periodKey) {
   if (periodKey === 'year') {
@@ -6246,7 +7804,7 @@ function getBatimentoPeriodRange() {
   return { start: dateToLocalISODate(startD), end: endToday };
 }
 
-/** Resumo curto do período (batimento): evita a frase longa “dia(s) com registro · leitura(s) · …”. */
+/** Resumo curto do período (batimento): evita a frase longa ??odia(s) com registro às leitura(s) às ?????. */
 function updateBatimentoPeriodSummary(filtrado, startISO, endISO) {
   const el = document.getElementById('vitalDetailPeriodSummary');
   if (!el) return;
@@ -6263,10 +7821,10 @@ function updateBatimentoPeriodSummary(filtrado, startISO, endISO) {
       ? getBatimentoIdealRangeForChart(currentVitalDetail)
       : null;
   const idealHint = fromIndicador
-    ? ` · Ideal ${band.min}–${band.max} bpm`
-    : ` · Ref. ${band.min}–${band.max} bpm (padrão)`;
-  const modeHint = ` · Dados: ${getBatimentoContextModeLabel()}`;
-  el.textContent = `${nLeit} leit. · ${nDias}d · ${p0}–${p1}${idealHint}${modeHint}`;
+    ? ` à Ideal ${band.min}??"${band.max} bpm`
+    : ` à Ref. ${band.min}??"${band.max} bpm (padrão)`;
+  const modeHint = ` à Dados: ${getBatimentoContextModeLabel()}`;
+  el.textContent = `${nLeit} leit. às ${nDias}d às ${p0}??"${p1}${idealHint}${modeHint}`;
   el.removeAttribute('title');
   el.style.cursor = '';
   el.onclick = null;
@@ -6309,7 +7867,7 @@ function setVitalBatimentoPeriod(period) {
   applyVitalBatimentoView();
 }
 
-/** Evita barra invisível quando min≈max (mesma regra no gráfico por dia e por hora). */
+/** Evita barra invisível quando min?%^max (mesma regra no gráfico por dia e por hora). */
 function expandBatimentoBarBpmRange(rawMin, rawMax, axisLo, axisHi) {
   let hi = rawMax;
   let lo = rawMin;
@@ -6326,7 +7884,7 @@ function expandBatimentoBarBpmRange(rawMin, rawMax, axisLo, axisHi) {
 }
 
 /**
- * Barra vertical min–max. `roundTop` / `roundBottom` permitem empilhar segmentos (só cantos externos arredondados).
+ * Barra vertical min??"max. `roundTop` / `roundBottom` permitem empilhar segmentos (só cantos externos arredondados).
  */
 function drawBatimentoRoundedRangeBar(ctx, x, top, barW, bottom, radius, fillStyle, cornerOpts) {
   const roundTop = !(cornerOpts && cornerOpts.roundTop === false);
@@ -6375,7 +7933,7 @@ function getBatimentoSelectedBarIndex(rows, mode) {
 }
 
 /**
- * Faixa desenhada no gráfico (fundo verde + segmentos Baixo/Normal/Alto): Meus Indicadores, ou 60–100 se não houver intervalo.
+ * Faixa desenhada no gráfico (fundo verde + segmentos Baixo/Normal/Alto): Meus Indicadores, ou 60??"100 se não houver intervalo.
  */
 function getBatimentoChartIdealBand() {
   const r = typeof getBatimentoIdealRangeForChart === 'function' ? getBatimentoIdealRangeForChart(currentVitalDetail) : null;
@@ -6386,7 +7944,7 @@ function getBatimentoChartIdealBand() {
 }
 
 /**
- * Eixo Y do gráfico: inclui todos os dados **e** a faixa ideal, para barras não ficarem “presas” em 60–100.
+ * Eixo Y do gráfico: inclui todos os dados **e** a faixa ideal, para barras não ficarem ??opresas??? em 60??"100.
  * A faixa ideal (verde + tracejados) continua nos BPM do indicador; o que passar para baixo/cima aparece com as cores Baixo/Normal/Alto.
  */
 function getBatimentoPlotYBoundsFromDataRange(vDataMin, vDataMax) {
@@ -6415,7 +7973,7 @@ function getBatimentoPlotYBoundsFromDataRange(vDataMin, vDataMax) {
   return { yLow, yHigh };
 }
 
-/** Fundo: apenas a faixa ideal (verde claro) + linhas tracejadas nos limites — como no histórico original. */
+/** Fundo: apenas a faixa ideal (verde claro) + linhas tracejadas nos limites ??" como no histórico original. */
 function drawBatimentoChartIdealBackground(ctx, padL, gw, toY, yAxisLo, yAxisHi, idealMin, idealMax) {
   const imn = Math.min(idealMin, idealMax);
   const imx = Math.max(idealMin, idealMax);
@@ -6462,7 +8020,7 @@ function batimentoListaBgClassFromChartLevel(level) {
   }
 }
 
-/** Trechos da barra: Baixo = laranja escuro, Normal = laranja claro, Alto = vermelho (não é legenda de “faixa” texto). */
+/** Trechos da barra: Baixo = laranja escuro, Normal = laranja claro, Alto = vermelho (não Ac legenda de ??ofaixa??? texto). */
 function batimentoGradientForIdealSegment(ctx, x0, x1, yTop, yBot, kind) {
   const g = ctx.createLinearGradient(x0, yTop, x0, yBot);
   if (kind === 'low') {
@@ -6482,7 +8040,7 @@ function batimentoGradientForIdealSegment(ctx, x0, x1, yTop, yBot, kind) {
 }
 
 /**
- * Barra min–max segmentada pelo ideal: baixo / normal / alto (cores distintas da lista por contexto).
+ * Barra min??"max segmentada pelo ideal: baixo / normal / alto (cores distintas da lista por contexto).
  */
 /** Barra única por hora na vista Detalhado: cor = situação da medição (não Baixo/Normal/Alto). */
 function batimentoGradientForHourlyContext(ctx, x0, x1, yTop, yBot, group) {
@@ -6504,7 +8062,7 @@ function batimentoGradientForHourlyContext(ctx, x0, x1, yTop, yBot, group) {
       g.addColorStop(1, '#ca8a04');
       break;
     default:
-      /* Demais: fora de sono / exercício / repouso — laranja */
+      /* Demais: fora de sono / exercício / repouso ??" laranja */
       g.addColorStop(0, '#ffedd5');
       g.addColorStop(0.55, '#fb923c');
       g.addColorStop(1, '#c2410c');
@@ -6841,7 +8399,7 @@ function onVitalBatimentoHourlyCanvasClick(ev) {
   }
   const labelStart = `${String(idx).padStart(2, '0')}:00`;
   const labelEnd = `${String(idx).padStart(2, '0')}:59`;
-  tip.innerHTML = `<strong>${labelStart} – ${labelEnd}</strong><br>${Math.round(b.min)} a ${Math.round(b.max)} bpm`;
+  tip.innerHTML = `<strong>${labelStart} ??" ${labelEnd}</strong><br>${Math.round(b.min)} a ${Math.round(b.max)} bpm`;
   tip.style.display = 'block';
   const wrapRect = wrap.getBoundingClientRect();
   const tw = tip.offsetWidth || 150;
@@ -6865,15 +8423,15 @@ function renderBatimentoDayDrilldown(dayIso) {
   if (dateEl) dateEl.textContent = formatDateForUI(dayIso);
   if (rangeEl) {
     if (stats.minV != null && stats.maxV != null) {
-      rangeEl.textContent = `${Math.round(stats.minV)} – ${Math.round(stats.maxV)} bpm`;
+      rangeEl.textContent = `${Math.round(stats.minV)} ??" ${Math.round(stats.maxV)} bpm`;
     } else {
-      rangeEl.textContent = '—';
+      rangeEl.textContent = '??"';
     }
   }
   if (lastEl) {
     if (stats.lastVal != null && Number.isFinite(stats.lastVal)) {
       lastEl.style.display = 'block';
-      lastEl.textContent = `Última leitura: ${Math.round(stats.lastVal)} bpm${stats.lastTime ? ` · ${stats.lastTime}` : ''}`;
+      lastEl.textContent = `Última leitura: ${Math.round(stats.lastVal)} bpm${stats.lastTime ? ` às ${stats.lastTime}` : ''}`;
     } else {
       lastEl.style.display = 'none';
       lastEl.textContent = '';
@@ -6893,7 +8451,7 @@ function renderBatimentoDayDrilldown(dayIso) {
       if (vals.length > 0) {
         const rMin = Math.round(Math.min(...vals));
         const rMax = Math.round(Math.max(...vals));
-        repousoEl.textContent = `Repouso: ${rMin} – ${rMax} bpm`;
+        repousoEl.textContent = `Repouso: ${rMin} ??" ${rMax} bpm`;
         repousoEl.style.display = 'block';
       } else {
         repousoEl.style.display = 'none';
@@ -6907,7 +8465,7 @@ function renderBatimentoDayDrilldown(dayIso) {
   renderBatimentoHourlyRangeChart(dayIso, buckets);
 }
 
-/** Título do modal: "Detalhado" na vista dia; "Histórico de …" no período. */
+/** Título do modal: "Detalhado" na vista dia; "Histórico de ???" no período. */
 function updateVitalBatimentoModalTitle() {
   const el = document.getElementById('vitalDetailTitle');
   if (!el || !currentVitalDetail || currentVitalDetail.tipo !== 'Batimento Cardíaco') return;
@@ -7018,7 +8576,7 @@ function renderBatimentoDailyBarChart(historico, rangeOpts) {
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.font = '13px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Sem dados numéricos no período', w / 2, h / 2);
+    ctx.fillText('Sem dados numAcricos no período', w / 2, h / 2);
     return;
   }
 
@@ -7152,7 +8710,7 @@ function interpBpmFromAmostras(sorted, tSec) {
   return a.bpm + u * (b.bpm - a.bpm);
 }
 
-/** Uma barra por janela de 2 min: FC no instante médio da janela (interpolação entre amostras). */
+/** Uma barra por janela de 2 min: FC no instante mAcdio da janela (interpolação entre amostras). */
 function buildExercicioHrBarSeries(sessao) {
   const amp = sessao.amostras;
   const lastOff = amp[amp.length - 1].offsetSec;
@@ -7237,13 +8795,18 @@ function openVitalDetailModal(tipoVital, vitalId) {
   }
 
   window.__vitalDetailModalTipoLabel = tipoVital;
-  document.getElementById('vitalDetailTitle').textContent = `Histórico de ${tipoVital}`;
+  document.getElementById('vitalDetailTitle').textContent = tipoVital === 'Passos' ? tipoVital : (tipoVital === 'Glicemia' ? 'Glicose no Sangue' : `Histórico de ${tipoVital}`);
+  document.getElementById('vitalDetailSubtitle').textContent = '';
   document.getElementById('filterVitalDataInicio').value = '';
   document.getElementById('filterVitalDataFim').value = '';
 
   const bc = tipoVital === 'Batimento Cardíaco';
   const isPressao = tipoVital === 'Pressão Arterial';
   const isPassos = tipoVital === 'Passos';
+  const isGlicemia = tipoVital === 'Glicemia';
+  const isSono = tipoVital === 'Sono';
+  const isOxig = tipoVital === 'Oxigenação';
+  const isHidra = tipoVital === 'Hidratação';
   const bcChrome = document.getElementById('vitalDetailBatimentoChrome');
   const defChrome = document.getElementById('vitalDetailDefaultChrome');
   const batimentoBackBtn = document.getElementById('vitalBatimentoHeaderBackBtn');
@@ -7261,15 +8824,35 @@ function openVitalDetailModal(tipoVital, vitalId) {
   if (bcChrome) bcChrome.style.display = bc ? 'block' : 'none';
   if (defChrome) defChrome.style.display = bc ? 'none' : 'block';
   if (batimentoBackBtn && !bc) batimentoBackBtn.hidden = true;
-  if (defaultPeriodControls) defaultPeriodControls.style.display = !bc && (isPressao || isPassos) ? 'block' : 'none';
-  if (defaultDateFilterRow) defaultDateFilterRow.style.display = !bc && !isPressao && !isPassos ? 'block' : 'none';
+  if (defaultPeriodControls) defaultPeriodControls.style.display = !bc && (isPressao || isPassos || isGlicemia || isSono || isOxig || isHidra) ? 'block' : 'none';
+  if (defaultDateFilterRow) defaultDateFilterRow.style.display = !bc && !isPressao && !isPassos && !isGlicemia && !isSono && !isOxig && !isHidra ? 'block' : 'none';
 
   const vitalDetailContentEl = document.getElementById('vitalDetailContent');
   const vitalDetailAddRowEl = document.querySelector('#vitalDetailModal .vital-detail-add-row');
   if (vitalDetailContentEl) vitalDetailContentEl.style.display = bc ? 'none' : '';
-  if (vitalDetailAddRowEl) vitalDetailAddRowEl.style.display = bc ? 'none' : '';
+  if (vitalDetailAddRowEl) vitalDetailAddRowEl.style.display = (bc || isPassos) ? 'none' : '';
 
   if (pressaoHistoricoView) pressaoHistoricoView.style.display = 'block';
+
+  // Reset all sub-views whenever opening a new vital modal
+  var _pdv = document.getElementById('pressaoDiaDetailView');
+  if (_pdv) _pdv.style.display = 'none';
+  var _pcv = document.getElementById('pressaoColetaDetailView');
+  if (_pcv) _pcv.style.display = 'none';
+  var _passv = document.getElementById('passosDiaDetailView');
+  if (_passv) _passv.style.display = 'none';
+  var _giv = document.getElementById('glicemiaInsertView');
+  if (_giv) _giv.style.display = 'none';
+  var _hiv = document.getElementById('hidraInsertView');
+  if (_hiv) _hiv.style.display = 'none';
+  var _oiv = document.getElementById('oxigInsertView');
+  if (_oiv) _oiv.style.display = 'none';
+  window._pressaoDiaActive = false;
+  window._pressaoColetaActive = false;
+  window._passaosDiaActive = false;
+  window._glicemiaInsertActive = false;
+  if (vitalDetailContentEl) vitalDetailContentEl.style.display = bc ? 'none' : '';
+  if (vitalDetailAddRowEl) vitalDetailAddRowEl.style.display = (bc || isPassos) ? 'none' : '';
 
   if (bc) {
     vitalBatimentoChartSelection = null;
@@ -7295,11 +8878,14 @@ function openVitalDetailModal(tipoVital, vitalId) {
       summaryEl.style.cursor = '';
       summaryEl.removeAttribute('title');
     }
-    if (isPressao || isPassos) {
+    if (isPressao || isPassos || isGlicemia || isSono || isOxig || isHidra) {
       vitalDefaultPeriod = '7d';
       if (isPassos) {
         passosSelectedDayIso = null;
         passosSelectedHour = null;
+      }
+      if (isGlicemia) {
+        glicemiaSelectedDayIso = null;
       }
       if (defaultLivreRow) defaultLivreRow.style.display = 'none';
       const di = document.getElementById('filterVitalLivreInicio');
@@ -7317,6 +8903,7 @@ function openVitalDetailModal(tipoVital, vitalId) {
   }
 
   document.getElementById('vitalDetailModal').classList.add('active');
+  setGlobalHeaderVisible(false);
 
   if (bc) {
     updateVitalBatimentoModalView();
@@ -7329,8 +8916,16 @@ function openVitalDetailModal(tipoVital, vitalId) {
     });
   }
 
-  document.getElementById('addVitalMedicaoBtn').onclick = () => {
-    openAddVitalModal(tipoVital);
+  document.getElementById('addVitalMedicaoBtn').onclick = function() {
+    if (tipoVital === 'Glicemia') {
+      openAddGlicemiaWizard();
+    } else if (tipoVital === 'Hidratação') {
+      openHidraInsertView();
+    } else if (tipoVital === 'Oxigenação') {
+      openOxigInsertView();
+    } else {
+      openAddVitalModal(tipoVital);
+    }
   };
 }
 
@@ -7353,13 +8948,18 @@ function openPressaoDiaDetail(dayIso, entries) {
   const labelEl = document.getElementById('pressaoDiaDetailLabel');
   if (labelEl) labelEl.textContent = dateLabel;
 
+  window._pressaoDiaActive = true;
+  window._pressaoDiaLabel = dateLabel;
+  const _titleEl = document.getElementById('vitalDetailTitle');
+  if (_titleEl) _titleEl.textContent = dateLabel;
+
   const pares = entries.map(h => typeof parseHistoricoPressurePair === 'function' ? parseHistoricoPressurePair(h) : null).filter(Boolean);
   const minS = pares.length ? Math.min(...pares.map(p => p.s)) : null;
   const maxS = pares.length ? Math.max(...pares.map(p => p.s)) : null;
   const minD = pares.length ? Math.min(...pares.map(p => p.d)) : null;
   const maxD = pares.length ? Math.max(...pares.map(p => p.d)) : null;
-  const sRange = pares.length ? (minS === maxS ? String(maxS) : `${minS} – ${maxS}`) : '—';
-  const dRange = pares.length ? (minD === maxD ? String(minD) : `${minD} – ${maxD}`) : '—';
+  const sRange = pares.length ? (minS === maxS ? String(maxS) : `${minS} ??" ${maxS}`) : '??"';
+  const dRange = pares.length ? (minD === maxD ? String(minD) : `${minD} ??" ${maxD}`) : '??"';
 
   const mmEl = document.getElementById('pressaoDiaMinMax');
   if (mmEl) {
@@ -7395,6 +8995,13 @@ function openPressaoDiaDetail(dayIso, entries) {
   }
 }
 
+function _pressaoClassificar(sis, dia) {
+  if (!Number.isFinite(sis) || !Number.isFinite(dia)) return 'normal';
+  if (sis >= 140 || dia >= 90) return 'alta';
+  if (sis >= 130 || dia >= 80) return 'limitrofe';
+  return 'normal';
+}
+
 function _renderPressaoDiaColetaList() {
   const listEl = document.getElementById('pressaoDiaReadingsList');
   if (!listEl || !pressaoColetaEntries.length) return;
@@ -7404,11 +9011,9 @@ function _renderPressaoDiaColetaList() {
   const hiddenCount = pressaoColetaEntries.length - LIMIT;
   const hasMore = !pressaoDiaShowAll && hiddenCount > 0;
 
-  // SVG icon strings — small, gray, minimal
-  const _svgNote = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
-  const _svgMed = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7.07-7.07l-10 10a4.95 4.95 0 1 0 7.07 7.07Z"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg>`;
-  const _svgSin = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>`;
-  const _svgChev = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
+  const _svgNote = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
+  const _svgMed  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7.07-7.07l-10 10a4.95 4.95 0 1 0 7.07 7.07Z"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg>`;
+  const _svgChev = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
 
   listEl.innerHTML = toShow.map((h, _idx) => {
     const hora = h.hora ? String(h.hora).trim().slice(0, 5) : '--:--';
@@ -7418,20 +9023,25 @@ function _renderPressaoDiaColetaList() {
 
     const hasNota = h.anotacao && String(h.anotacao).trim().length > 0;
     const hasMed = h.medicamentoPressao && h.medicamentoPressao !== 'nenhum';
-    const hasSin = h.sintomas && String(h.sintomas).trim().length > 0;
 
-    const noteIcon = hasNota ? `<span class="pressao-icon" title="${String(h.anotacao).trim()}">${_svgNote}</span>` : '';
-    const medIcon = hasMed ? `<span class="pressao-icon" title="Medicação: ${h.medicamentoPressao}">${_svgMed}</span>` : '';
-    const sinIcon = hasSin ? `<span class="pressao-icon" title="Sintoma: ${String(h.sintomas).trim()}">${_svgSin}</span>` : '';
+    const icons = [
+      hasMed  ? `<span class="pc-icon" title="RemAcdio tomado">${_svgMed}</span>`   : '',
+      hasNota ? `<span class="pc-icon" title="${String(h.anotacao).trim()}">${_svgNote}</span>` : '',
+    ].filter(Boolean).join('');
 
     return `
       <div class="pressao-coleta-item pressao-coleta-item--clickable" onclick="openPressaoColetaDetail(${_idx})">
-        <div class="pressao-coleta-main">
-          <div class="pressao-coleta-left">
-            <span class="pressao-coleta-valor">${valorFormatado} mmHg</span>${hrLabel ? `<span class="pressao-coleta-sep">·</span><span class="pressao-coleta-fc">${hrLabel}</span>` : ''}
-            <div class="pressao-coleta-hora">${hora}</div>
+        <div class="pc-body">
+          <div class="pc-valor-row">
+            <span class="pc-valor">${valorFormatado}</span>
+            <span class="pc-unit">mmHg</span>
+            ${hrLabel ? `<span class="pc-fc">às ${hrLabel}</span>` : ''}
           </div>
-          <div class="pressao-coleta-icons">${noteIcon}${medIcon}${sinIcon}<span class="pressao-coleta-chevron">${_svgChev}</span></div>
+          <div class="pc-hora">${hora}</div>
+        </div>
+        <div class="pc-right">
+          ${icons ? `<div class="pc-icons">${icons}</div>` : ''}
+          <span class="pressao-coleta-chevron">${_svgChev}</span>
         </div>
       </div>`;
   }).join('') + (hasMore
@@ -7445,15 +9055,30 @@ function pressaoColetaShowMore() {
 }
 
 function closePressaoDiaDetail() {
+  window._pressaoDiaActive = false;
+  const _titleEl = document.getElementById('vitalDetailTitle');
+  if (_titleEl && currentVitalDetail) _titleEl.textContent = 'Histórico de ' + currentVitalDetail.tipo;
+
   pressaoSelectedDay = null;
   const _dCanvas = document.getElementById('sparklineChart');
   if (_dCanvas && typeof _dCanvas.__drawPressao === 'function') _dCanvas.__drawPressao();
   const view = document.getElementById('pressaoDiaDetailView');
   if (view) view.style.display = 'none';
-  const contentEl = document.getElementById('vitalDetailContent');
-  if (contentEl) contentEl.style.display = '';
-  const addRow = document.querySelector('#vitalDetailModal .vital-detail-add-row');
-  if (addRow) addRow.style.display = '';
+
+  // For Pressão Arterial the main view is the sparkline ??" vitalDetailContent stays hidden
+  const _isPressao = currentVitalDetail && currentVitalDetail.tipo === 'Pressão Arterial';
+  if (!_isPressao) {
+    const contentEl = document.getElementById('vitalDetailContent');
+    if (contentEl) contentEl.style.display = '';
+    const addRow = document.querySelector('#vitalDetailModal .vital-detail-add-row');
+    if (addRow) addRow.style.display = '';
+  } else {
+    // Ensure the sparkline chart area is visible
+    const _sparkView = document.getElementById('pressaoHistoricoView');
+    if (_sparkView) _sparkView.style.display = '';
+    const filters = document.getElementById('vitalDefaultPeriodControls');
+    if (filters) filters.style.display = '';
+  }
 }
 
 function openPressaoColetaDetail(idx) {
@@ -7465,6 +9090,7 @@ function openPressaoColetaDetail(idx) {
   const coletaView = document.getElementById('pressaoColetaDetailView');
   if (!coletaView) return;
   coletaView.style.display = 'block';
+  window._pressaoColetaActive = true;
 
   // Hide chart + period filters while in reading detail
   const _chartArea = document.getElementById('pressaoHistoricoView');
@@ -7472,7 +9098,7 @@ function openPressaoColetaDetail(idx) {
   const _periodControls = document.getElementById('vitalDefaultPeriodControls');
   if (_periodControls) _periodControls.style.display = 'none';
 
-  // Label: "Sex, 08 mai · 18:15"
+  // Label: "Sex, 08 mai" (sem horário); navbar: "Pressão Arterial" + horário no subtitle
   const hora = h.hora ? String(h.hora).trim().slice(0, 5) : '--:--';
   const labelEl = document.getElementById('pressaoColetaDetailLabel');
   if (labelEl && pressaoColetaDayIso) {
@@ -7480,7 +9106,12 @@ function openPressaoColetaDetail(idx) {
     const _dateObj = new Date(_y, _m - 1, _d);
     const _dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     const _meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-    labelEl.textContent = `${_dias[_dateObj.getDay()]}, ${String(_d).padStart(2, '0')} ${_meses[_m - 1]} · ${hora}`;
+    const _dateLabel = `${_dias[_dateObj.getDay()]}, ${String(_d).padStart(2, '0')} ${_meses[_m - 1]}`;
+    labelEl.textContent = _dateLabel;
+    const _titleEl = document.getElementById('vitalDetailTitle');
+    if (_titleEl) _titleEl.textContent = 'Pressão Arterial';
+    const _subtitleEl = document.getElementById('vitalDetailSubtitle');
+    if (_subtitleEl) _subtitleEl.textContent = hora;
   }
 
   const pair = typeof parseHistoricoPressurePair === 'function' ? parseHistoricoPressurePair(h) : null;
@@ -7488,10 +9119,9 @@ function openPressaoColetaDetail(idx) {
   const hrLabel = Number.isFinite(hr) ? `${Math.round(hr)} bpm` : null;
   const medTomado = h.medicamentoPressao === 'tomados';
 
-  // Simulate a note if none exists (for demo)
   const nota = (h.anotacao && String(h.anotacao).trim().length > 0)
     ? String(h.anotacao).trim()
-    : 'Medição realizada em repouso, após 5 minutos sentado.';
+    : null;
 
   const medIconHtml = medTomado
     ? `<span class="pressao-det-med-icon" title="Medicação tomada"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7.07-7.07l-10 10a4.95 4.95 0 1 0 7.07 7.07Z"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg></span>`
@@ -7504,30 +9134,37 @@ function openPressaoColetaDetail(idx) {
         <div class="pressao-coleta-det-row">
           <div class="pressao-coleta-det-metric">
             <span class="pressao-coleta-det-label pressao-coleta-det-label--sis">SIS.</span>
-            <span class="pressao-coleta-det-value">${pair ? pair.s : '—'}</span>
+            <span class="pressao-coleta-det-value">${pair ? pair.s : '??"'}</span>
           </div>
           <div class="pressao-coleta-det-center">
             <span class="pressao-coleta-det-unit">/</span>
           </div>
           <div class="pressao-coleta-det-metric">
             <span class="pressao-coleta-det-label pressao-coleta-det-label--dia">DIA.</span>
-            <span class="pressao-coleta-det-value">${pair ? pair.d : '—'}</span>
+            <span class="pressao-coleta-det-value">${pair ? pair.d : '??"'}</span>
           </div>
         </div>
         <div class="pressao-coleta-det-unit-row">mmHg</div>
         ${hrLabel ? `<div class="pressao-coleta-det-hr"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span>${hrLabel}</span>${medIconHtml}</div>` : ''}
       </div>
+      ${nota ? `
       <div class="pressao-nota-card">
         <div class="pressao-nota-header">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           <span>Nota</span>
         </div>
         <p class="pressao-nota-text">${nota}</p>
-      </div>`;
+      </div>` : ''}`;
   }
 }
 
 function closePressaoColetaDetail() {
+  window._pressaoColetaActive = false;
+  const _titleEl = document.getElementById('vitalDetailTitle');
+  if (_titleEl && window._pressaoDiaLabel) _titleEl.textContent = window._pressaoDiaLabel;
+  const _subtitleEl = document.getElementById('vitalDetailSubtitle');
+  if (_subtitleEl) _subtitleEl.textContent = '';
+
   const coletaView = document.getElementById('pressaoColetaDetailView');
   if (coletaView) coletaView.style.display = 'none';
   // Restore chart + period filters
@@ -7539,12 +9176,14 @@ function closePressaoColetaDetail() {
   if (diaView) diaView.style.display = 'block';
 }
 
-/* ── Inserção manual de pressão arterial ──────────────────────────────────── */
+/* ?"??"? Inserção manual de pressão arterial ?"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"? */
 let pressaoInsertStep = 1;
 let pressaoInsertData = { sis: 120, dia: 80, hr: 72, med: 'nenhum', nota: '' };
+var hidraInsertData = { ml: 250 };
 let _piStepTimer = null;
-var PI_DRUM_IH = 56; // height per drum slot (px)
+var PI_DRUM_IH = 72; // height per drum slot (px) ??" 5-slot full-screen drum
 var _piDrumDrag = null;
+var _piReturnToSummary = false;
 
 function openPressaoInsertForm() {
   pressaoInsertStep = 1;
@@ -7558,7 +9197,19 @@ function openPressaoInsertForm() {
   if (filters) filters.style.display = 'none';
 
   const insertView = document.getElementById('pressaoInsertView');
-  if (insertView) insertView.style.display = 'block';
+  if (insertView) insertView.style.display = 'flex';
+
+  // Navigation flag
+  window._pressaoDiaActive = false;
+  window._pressaoInsertActive = true;
+  const _titleEl = document.getElementById('vitalDetailTitle');
+  if (_titleEl) _titleEl.textContent = 'Inserir Medição';
+
+  // Reset input overlays
+  ['sis','dia','hr'].forEach(function(f) {
+    var inp = document.getElementById('piDcInput-' + f);
+    if (inp) { inp.style.pointerEvents = 'none'; inp.style.opacity = '0'; }
+  });
 
   _pressaoInsRender();
 }
@@ -7568,105 +9219,166 @@ function closePressaoInsertForm() {
   const insertView = document.getElementById('pressaoInsertView');
   if (insertView) insertView.style.display = 'none';
 
-  const chart = document.getElementById('pressaoHistoricoView');
-  if (chart) chart.style.display = '';
-  const filters = document.getElementById('vitalDefaultPeriodControls');
-  if (filters) filters.style.display = '';
+  window._pressaoInsertActive = false;
 
-  const diaView = document.getElementById('pressaoDiaDetailView');
-  if (diaView) diaView.style.display = 'block';
+  if (pressaoSelectedDay) {
+    // Return to the day-detail view
+    window._pressaoDiaActive = true;
+    const _dLabel = document.getElementById('pressaoDiaDetailLabel');
+    const _titleEl = document.getElementById('vitalDetailTitle');
+    if (_titleEl && _dLabel) _titleEl.textContent = _dLabel.textContent;
+    const diaView = document.getElementById('pressaoDiaDetailView');
+    if (diaView) diaView.style.display = 'block';
+    // chart + filters stay hidden (dia detail is showing)
+  } else {
+    // No day selected ??" return to main chart
+    const chart = document.getElementById('pressaoHistoricoView');
+    if (chart) chart.style.display = '';
+    const filters = document.getElementById('vitalDefaultPeriodControls');
+    if (filters) filters.style.display = '';
+    const _titleEl = document.getElementById('vitalDetailTitle');
+    if (_titleEl && currentVitalDetail) _titleEl.textContent = 'Histórico de ' + currentVitalDetail.tipo;
+  }
 }
 
 function pressaoInsGo(step) {
   stopStepPA();
+  // Capture nota text before leaving step 4
   if (pressaoInsertStep === 4) {
-    var ta = document.getElementById('piNotaInput');
-    if (ta) pressaoInsertData.nota = ta.value.trim();
+    var _ta = document.getElementById('piNotaInput');
+    if (_ta) pressaoInsertData.nota = _ta.value.trim();
   }
   if (step < 1) { closePressaoInsertForm(); return; }
+  if (step > 5) { pressaoInsSave(); return; }
+  // If user was editing from summary, jump straight back to step 5
+  if (_piReturnToSummary && step < 5) {
+    _piReturnToSummary = false;
+    pressaoInsertStep = 5;
+    _pressaoInsRender();
+    return;
+  }
+  pressaoInsertStep = step;
+  _pressaoInsRender();
+}
+
+function piSumEdit(step) {
+  _piReturnToSummary = true;
+  stopStepPA();
   pressaoInsertStep = step;
   _pressaoInsRender();
 }
 
 function pressaoInsConfirmStep() {
-  var s = pressaoInsertStep;
-  if (s === 4) {
-    var ta = document.getElementById('piNotaInput');
-    if (ta) pressaoInsertData.nota = ta.value.trim();
-    pressaoInsGo(5);
-  } else if (s === 5) {
-    pressaoInsSave();
-  } else {
-    pressaoInsGo(s + 1);
-  }
+  pressaoInsGo(pressaoInsertStep + 1);
 }
 
 function _pressaoInsRender() {
   var s = pressaoInsertStep;
-
-  // Update step dots (5 total)
   [1, 2, 3, 4, 5].forEach(function(i) {
+    var el = document.getElementById('piStep' + i);
+    if (el) el.style.display = i === s ? 'flex' : 'none';
     var dot = document.querySelector('[data-pidot="' + i + '"]');
     if (dot) {
-      if (i === s) dot.classList.add('pressao-ins-dot--active');
-      else dot.classList.remove('pressao-ins-dot--active');
+      if (i <= s) dot.classList.add('pi-progress-dot--active');
+      else dot.classList.remove('pi-progress-dot--active');
     }
-    var stepEl = document.getElementById('piStep' + i);
-    if (stepEl) stepEl.style.display = i === s ? 'flex' : 'none';
   });
-
-  // Wire back button
-  var backBtn = document.getElementById('piBackBtn');
-  if (backBtn) {
-    backBtn.onclick = s === 1 ? closePressaoInsertForm : function() { pressaoInsGo(s - 1); };
-  }
-
-  // Update shared confirm button label/style
-  var btn = document.getElementById('piConfirmBtn');
-  if (btn) {
-    if (s === 5) {
-      btn.textContent = 'Salvar';
-      btn.className = 'pressao-ins-confirm-btn pressao-ins-confirm-btn--save';
-    } else {
-      btn.textContent = 'Confirmar';
-      btn.className = 'pressao-ins-confirm-btn';
-    }
-  }
-
   if (s === 1) { _piDrumRender('sis'); _piDrumRender('dia'); }
   if (s === 2) { _piDrumRender('hr'); }
   if (s === 3) { _pressaoInsMedSync(); }
   if (s === 4) {
-    var ta2 = document.getElementById('piNotaInput');
-    if (ta2) { ta2.value = pressaoInsertData.nota; setTimeout(function() { ta2.focus(); }, 80); }
+    var ta = document.getElementById('piNotaInput');
+    if (ta) { ta.value = pressaoInsertData.nota || ''; setTimeout(function() { ta.focus(); }, 80); }
   }
   if (s === 5) { _piRenderSummary(); }
 }
 
 function _piRenderSummary() {
-  var medLabels = { tomados: 'Tomados', nao_tomados: 'Não tomados', nenhum: 'Não se aplica' };
-  var el;
-  el = document.getElementById('piSumPressao');
-  if (el) el.textContent = pressaoInsertData.sis + '/' + pressaoInsertData.dia + ' mmHg';
-  el = document.getElementById('piSumHr');
-  if (el) el.textContent = pressaoInsertData.hr + ' bpm';
-  el = document.getElementById('piSumMed');
-  if (el) el.textContent = medLabels[pressaoInsertData.med] || pressaoInsertData.med;
-  el = document.getElementById('piSumNota');
-  if (el) {
-    var nota = pressaoInsertData.nota;
-    el.textContent = nota ? (nota.length > 60 ? nota.slice(0, 57) + '...' : nota) : '—';
+  var el = document.getElementById('piSummaryContent');
+  if (!el) return;
+  var medMap = { tomados: 'Tomei os rem\u00e9dios', nao_tomados: 'N\u00e3o tomei hoje', nenhum: 'N\u00e3o tomo rem\u00e9dios' };
+  var nota = pressaoInsertData.nota && pressaoInsertData.nota.trim() ? pressaoInsertData.nota.trim() : '\u2014';
+  var svgBP = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><polyline stroke-linecap="round" stroke-linejoin="round" points="2 12 6 12 8 5 11 19 13 12 15 9 17 15 19 12 22 12"/></svg>';
+  var svgHR = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z"/></svg>';
+  el.innerHTML =
+    '<div class="pi-sum-row" onclick="piSumEdit(1)">' +
+      '<div class="pi-sum-ico pi-sum-ico--bp">' + svgBP + '</div>' +
+      '<div class="pi-sum-body">' +
+        '<div class="pi-sum-lbl">Press\u00e3o Arterial</div>' +
+        '<div class="pi-sum-val">' + pressaoInsertData.sis + '/' + pressaoInsertData.dia + ' <span class="pi-sum-unit">mmHg</span></div>' +
+      '</div>' +
+      '<div class="pi-sum-edit">Editar</div>' +
+    '</div>' +
+    '<div class="pi-sum-row" onclick="piSumEdit(2)">' +
+      '<div class="pi-sum-ico pi-sum-ico--hr">' + svgHR + '</div>' +
+      '<div class="pi-sum-body">' +
+        '<div class="pi-sum-lbl">Frequ\u00eancia Card\u00edaca</div>' +
+        '<div class="pi-sum-val">' + pressaoInsertData.hr + ' <span class="pi-sum-unit">bpm</span></div>' +
+      '</div>' +
+      '<div class="pi-sum-edit">Editar</div>' +
+    '</div>' +
+    '<div class="pi-sum-row" onclick="piSumEdit(3)">' +
+      '<div class="pi-sum-ico pi-sum-ico--med">\uD83D\uDC8A</div>' +
+      '<div class="pi-sum-body">' +
+        '<div class="pi-sum-lbl">Rem\u00e9dios</div>' +
+        '<div class="pi-sum-val">' + (medMap[pressaoInsertData.med] || pressaoInsertData.med) + '</div>' +
+      '</div>' +
+      '<div class="pi-sum-edit">Editar</div>' +
+    '</div>' +
+    '<div class="pi-sum-row" onclick="piSumEdit(4)">' +
+      '<div class="pi-sum-ico pi-sum-ico--nota">&#9998;</div>' +
+      '<div class="pi-sum-body">' +
+        '<div class="pi-sum-lbl">Observa\u00e7\u00e3o</div>' +
+        '<div class="pi-sum-val pi-sum-val--nota">' + nota + '</div>' +
+      '</div>' +
+      '<div class="pi-sum-edit">Editar</div>' +
+    '</div>';
+}
+
+function piDcInputBlur(field, inp) {
+  var v = parseInt(inp.value, 10);
+  if (!isNaN(v)) {
+    if (field === 'glicemia') { glicemiaInsertData.glicemia = Math.max(20, Math.min(600, v)); _glicDrumUpdateBadge(); }
+    else if (field === 'insulina') { glicemiaInsertData.insulina = Math.max(0, Math.min(200, v)); }
+    else if (field === 'sis') pressaoInsertData.sis = Math.max(60, Math.min(250, v));
+    else if (field === 'dia') pressaoInsertData.dia = Math.max(30, Math.min(160, v));
+    else if (field === 'hr')  pressaoInsertData.hr  = Math.max(30, Math.min(250, v));
+    else if (field === 'hidra-ml') hidraInsertData.ml = Math.round(Math.max(50, Math.min(3000, v)) / 50) * 50;
+  }
+  inp.style.pointerEvents = 'none';
+  inp.style.opacity = '0';
+  _piDrumRender(field);
+}
+
+/* ?"??"? Drum picker ?"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"??"? */
+function _glicDrumUpdateBadge() {
+  var badge = document.getElementById('glicRangeBadge');
+  if (!badge) return;
+  var val = glicemiaInsertData.glicemia;
+  if (val <= 99) {
+    badge.textContent = '\u25cf Normal (70\u201399)'; badge.className = 'glic-range-badge glic-range-badge--normal';
+  } else if (val <= 125) {
+    badge.textContent = '\u25cf Aten\u00e7\u00e3o (100\u2013125)'; badge.className = 'glic-range-badge glic-range-badge--atencao';
+  } else {
+    badge.textContent = '\u25cf Alto (acima de 125)'; badge.className = 'glic-range-badge glic-range-badge--alto';
   }
 }
 
-/* ── Drum picker ─────────────────────────────────────────────────────────── */
 function _piDrumRender(field) {
-  var val = pressaoInsertData[field];
+  var val, step;
+  if (field === 'glicemia') { val = glicemiaInsertData.glicemia; step = 1; }
+  else if (field === 'insulina') { val = glicemiaInsertData.insulina || 0; step = 1; }
+  else if (field === 'hidra-ml') { val = hidraInsertData.ml; step = 50; }
+  else { val = pressaoInsertData[field]; step = 1; }
   var track = document.getElementById('piDrumTrack-' + field);
   if (!track) return;
+  // Reset any leftover keyboard-input overlay
+  var inp = document.getElementById('piDcInput-' + field);
+  if (inp) { inp.blur(); inp.style.opacity = '0'; inp.style.pointerEvents = 'none'; }
   var html = '';
+  // 5-slot drum: -2, -1, 0, +1, +2
   for (var offset = -2; offset <= 2; offset++) {
-    var v = val + offset;
+    var v = val + offset * step;
     var cls = 'pi-drum-item';
     if (offset === 0) cls += ' pi-drum-item--sel';
     else if (Math.abs(offset) === 1) cls += ' pi-drum-item--near';
@@ -7679,9 +9391,12 @@ function _piDrumRender(field) {
 }
 
 function _piDrumStep(field, delta) {
-  if (field === 'sis') pressaoInsertData.sis = Math.max(60, Math.min(250, pressaoInsertData.sis + delta));
+  if (field === 'glicemia') { glicemiaInsertData.glicemia = Math.max(20, Math.min(600, glicemiaInsertData.glicemia + delta)); _glicDrumUpdateBadge(); }
+  else if (field === 'insulina') { glicemiaInsertData.insulina = Math.max(0, Math.min(200, (glicemiaInsertData.insulina || 0) + delta)); }
+  else if (field === 'sis') pressaoInsertData.sis = Math.max(60, Math.min(250, pressaoInsertData.sis + delta));
   else if (field === 'dia') pressaoInsertData.dia = Math.max(30, Math.min(160, pressaoInsertData.dia + delta));
   else if (field === 'hr') pressaoInsertData.hr = Math.max(30, Math.min(250, pressaoInsertData.hr + delta));
+  else if (field === 'hidra-ml') hidraInsertData.ml = Math.max(50, Math.min(3000, hidraInsertData.ml + delta * 50));
 }
 
 function _piDrumAnimate(field, fromOffsetPx) {
@@ -7713,9 +9428,9 @@ function piDrumTouchMove(e, wrap) {
   e.preventDefault();
   var dy = e.touches[0].clientY - _piDrumDrag.startY;
   var field = _piDrumDrag.field;
+  _piDrumDrag.liveY = dy;
   var track = document.getElementById('piDrumTrack-' + field);
   if (!track) return;
-  _piDrumDrag.liveY = dy;
   track.style.transition = 'none';
   track.style.transform = 'translateY(' + dy + 'px)';
 }
@@ -7725,7 +9440,6 @@ function piDrumTouchEnd(e, wrap) {
   var dy = _piDrumDrag.liveY || 0;
   var field = _piDrumDrag.field;
   _piDrumDrag = null;
-  // dy > 0 = finger moved down = value decreased
   var steps = -Math.round(dy / PI_DRUM_IH);
   if (steps !== 0) {
     for (var i = 0; i < Math.abs(steps); i++) {
@@ -7733,9 +9447,19 @@ function piDrumTouchEnd(e, wrap) {
     }
     var residual = dy + steps * PI_DRUM_IH;
     _piDrumAnimate(field, residual);
+  } else if (Math.abs(dy) < 8) {
+    // Tap: open keyboard editor for this field
+    var inputEl = document.getElementById('piDcInput-' + field);
+    if (inputEl) {
+      inputEl.value = pressaoInsertData[field];
+      inputEl.style.pointerEvents = 'auto';
+      inputEl.style.opacity = '1';
+      setTimeout(function() { inputEl.focus(); inputEl.select(); }, 0);
+    }
   } else {
-    var track = document.getElementById('piDrumTrack-' + field);
-    if (track) { track.style.transition = 'transform 0.18s ease'; track.style.transform = 'translateY(0)'; }
+    // Drag that didn't complete a step ??" snap back
+    var _snapTrack = document.getElementById('piDrumTrack-' + field);
+    if (_snapTrack) { _snapTrack.style.transition = 'transform 0.18s ease'; _snapTrack.style.transform = 'translateY(0)'; }
   }
 }
 
@@ -7759,25 +9483,78 @@ function stopStepPA() {
 
 function pressaoInsSelectMed(val) {
   pressaoInsertData.med = val;
-  _pressaoInsMedSync();
+  // Aplica highlight
+  ['tomados', 'nao_tomados', 'nenhum'].forEach(function(v) {
+    var el = document.getElementById('piMed-' + v);
+    if (!el) return;
+    el.classList.remove('pi-med-card--active', 'pi-med-card--active-green', 'pi-med-card--active-red', 'pi-med-card--active-gray');
+    if (v === val) {
+      el.classList.add('pi-med-card--active');
+      if (v === 'tomados')     el.classList.add('pi-med-card--active-green');
+      if (v === 'nao_tomados') el.classList.add('pi-med-card--active-red');
+      if (v === 'nenhum')      el.classList.add('pi-med-card--active-gray');
+    }
+  });
+  // Libera o botão Próximo
+  var btn = document.getElementById('piMedNextBtn');
+  if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; }
 }
 
 function _pressaoInsMedSync() {
+  var hasSel = !!pressaoInsertData.med;
   ['tomados', 'nao_tomados', 'nenhum'].forEach(function(v) {
     var el = document.getElementById('piMed-' + v);
-    if (el) {
-      if (v === pressaoInsertData.med) el.classList.add('pressao-ins-med-card--active');
-      else el.classList.remove('pressao-ins-med-card--active');
+    if (!el) return;
+    el.classList.remove('pi-med-card--active', 'pi-med-card--active-green', 'pi-med-card--active-red', 'pi-med-card--active-gray');
+    if (v === pressaoInsertData.med) {
+      el.classList.add('pi-med-card--active');
+      if (v === 'tomados')     el.classList.add('pi-med-card--active-green');
+      if (v === 'nao_tomados') el.classList.add('pi-med-card--active-red');
+      if (v === 'nenhum')      el.classList.add('pi-med-card--active-gray');
     }
   });
+  var btn = document.getElementById('piMedNextBtn');
+  if (btn) {
+    btn.style.opacity = hasSel ? '1' : '0.35';
+    btn.style.pointerEvents = hasSel ? 'auto' : 'none';
+  }
 }
 
 function pressaoInsSave() {
   stopStepPA();
   var ta = document.getElementById('piNotaInput');
   if (ta) pressaoInsertData.nota = ta.value.trim();
-  // TODO: persist to pressaoColetaEntries when backend is ready
-  closePressaoInsertForm();
+
+  // Build and persist entry into the in-memory historico
+  if (currentVitalDetail && Array.isArray(currentVitalDetail.historico)) {
+    var _now = new Date();
+    var _yyyy = _now.getFullYear();
+    var _mm   = String(_now.getMonth() + 1).padStart(2, '0');
+    var _dd   = String(_now.getDate()).padStart(2, '0');
+    var _hh   = String(_now.getHours()).padStart(2, '0');
+    var _min  = String(_now.getMinutes()).padStart(2, '0');
+    var _newEntry = {
+      data: _yyyy + '-' + _mm + '-' + _dd,
+      hora: _hh + ':' + _min,
+      valor: pressaoInsertData.sis + '/' + pressaoInsertData.dia,
+      hr:    pressaoInsertData.hr,
+      medicamentoPressao: pressaoInsertData.med,
+      anotacao: pressaoInsertData.nota || ''
+    };
+    currentVitalDetail.historico.push(_newEntry);
+  }
+
+  // Hide insert form directly ??" let renderSparklineChart handle the rest
+  var insertView = document.getElementById('pressaoInsertView');
+  if (insertView) insertView.style.display = 'none';
+  window._pressaoInsertActive = false;
+  window._pressaoDiaActive = false;
+  pressaoSelectedDay = null;
+  var _titleEl = document.getElementById('vitalDetailTitle');
+  if (_titleEl && currentVitalDetail) _titleEl.textContent = 'Histórico de ' + currentVitalDetail.tipo;
+
+  // Re-render chart ??" auto-selects today and opens day detail with updated entries
+  if (currentVitalDetail) renderSparklineChart(currentVitalDetail.historico);
 }
 
 function renderSparklineChart(historico) {
@@ -7808,7 +9585,7 @@ function renderSparklineChart(historico) {
     if (_oldTip) _oldTip.remove();
     closePressaoDiaDetail();
 
-    // Group readings by day — average systolic and diastolic per day
+    // Group readings by day ??" average systolic and diastolic per day
     const _byDay = new Map();
     historico.forEach((h) => {
       const dayIso = typeof historicoEntryDayISO === 'function' ? historicoEntryDayISO(h) : String(h.data || '').slice(0, 10);
@@ -7895,9 +9672,13 @@ function renderSparklineChart(historico) {
       const dpr = window.devicePixelRatio || 1;
       const n = renderRows.length;
       const containerW = _chartView ? _chartView.offsetWidth : (canvas.parentElement ? canvas.parentElement.offsetWidth : 320);
-      const minColW = _isYearView ? 30 : 44;
-      const colW = Math.max(minColW, containerW / n);
-      const W = Math.max(containerW, n * colW);
+      // padT=44 leaves room for the two-line tooltip bubble above the chart area
+      const padL = 30, padR = 20, padT = 44, padB = 22;
+      const minColW = _isYearView ? 30 : Math.max(10, (containerW - padL - padR) / Math.max(1, n));
+      // Fit all columns in the container when possible; scroll only if minColW floor (10px) forces wider canvas
+      const W = Math.max(containerW, padL + Math.ceil(n * minColW) + padR);
+      const gw = W - padL - padR;
+      const colW = gw / n;  // columns perfectly fill the padded area
       const H = 180;
 
       canvas.width = W * dpr;
@@ -7905,8 +9686,6 @@ function renderSparklineChart(historico) {
       canvas.style.width = W + 'px';
       canvas.style.height = H + 'px';
 
-      const padL = 30, padR = 10, padT = 12, padB = 22;
-      const gw = W - padL - padR;
       const gh = H - padT - padB;
 
       const allS = renderRows.map(r => r.avgS);
@@ -8012,23 +9791,68 @@ function renderSparklineChart(historico) {
           if (isSelected) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); }
         });
 
-        // Value labels on selected dot
+        // Tooltip bubble ??" always visible on canvas for the selected column
         if (hasSel) {
           const selIdx = renderRows.findIndex(r => r.dayIso === pressaoSelectedDay);
           if (selIdx >= 0) {
             const selRow = renderRows[selIdx];
             const x = padL + colW * selIdx + colW / 2;
             ctx.globalAlpha = 1;
-            ctx.font = 'bold 10px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            const syY = toY(selRow.avgS);
-            const diaY = toY(selRow.avgD);
-            ctx.fillStyle = '#f59e0b';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText(String(selRow.avgS), x, syY - 7);
-            ctx.fillStyle = '#3b82f6';
-            ctx.textBaseline = 'top';
-            ctx.fillText(String(selRow.avgD), x, diaY + 7);
+            const sisStr = String(selRow.avgS);
+            const diaStr = String(selRow.avgD);
+            ctx.font = 'bold 11px Inter, sans-serif';
+            const sisW = ctx.measureText(sisStr).width;
+            const sepW = ctx.measureText(' / ').width;
+            const diaW = ctx.measureText(diaStr).width;
+            ctx.font = '10px Inter, sans-serif';
+            const unitW = ctx.measureText(' mmHg').width;
+            const totalTxtW = sisW + sepW + diaW + unitW;
+            // Date label
+            const _ptBrWP = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+            let dateLbl = '';
+            if (!_isYearView && selRow.dayIso) {
+              const _dp = new Date(selRow.dayIso + 'T12:00:00');
+              if (!isNaN(_dp.getTime())) dateLbl = _ptBrWP[_dp.getDay()] + ', ' + _dp.getDate() + ' ' + _mAbr[_dp.getMonth()];
+            } else if (_isYearView && selRow.monthKey) {
+              const [_my, _mm] = selRow.monthKey.split('-').map(Number);
+              dateLbl = _mAbr[_mm - 1] + ' ' + _my;
+            }
+            ctx.font = '10px Inter, sans-serif';
+            const dateLblW = dateLbl ? ctx.measureText(dateLbl).width : 0;
+            const bh = dateLbl ? 34 : 22;
+            const bw = Math.max(totalTxtW + 18, dateLblW + 18, 88);
+            const arrowH = 5;
+            let bx = x - bw / 2;
+            if (bx < padL) bx = padL;
+            if (bx + bw > W - padR) bx = W - padR - bw;
+            const by = padT - arrowH - 2;
+            // Rounded bubble + downward arrow
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            const br = 4;
+            ctx.moveTo(bx + br, by - bh); ctx.lineTo(bx + bw - br, by - bh);
+            ctx.quadraticCurveTo(bx + bw, by - bh, bx + bw, by - bh + br);
+            ctx.lineTo(bx + bw, by - br); ctx.quadraticCurveTo(bx + bw, by, bx + bw - br, by);
+            const ax = Math.min(Math.max(x, bx + 10), bx + bw - 10);
+            ctx.lineTo(ax + 5, by); ctx.lineTo(ax, by + arrowH); ctx.lineTo(ax - 5, by);
+            ctx.lineTo(bx + br, by); ctx.quadraticCurveTo(bx, by, bx, by - br);
+            ctx.lineTo(bx, by - bh + br); ctx.quadraticCurveTo(bx, by - bh, bx + br, by - bh);
+            ctx.closePath(); ctx.fill();
+            // Colored text: SIS amber / DIA blue / mmHg gray + date below
+            ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+            const txtY1 = dateLbl ? by - bh + 11 : by - bh / 2;
+            let cx2 = bx + bw / 2 - totalTxtW / 2;
+            ctx.font = 'bold 11px Inter, sans-serif';
+            ctx.fillStyle = '#fbbf24'; ctx.fillText(sisStr, cx2, txtY1); cx2 += sisW;
+            ctx.fillStyle = '#94a3b8'; ctx.fillText(' / ', cx2, txtY1); cx2 += sepW;
+            ctx.fillStyle = '#60a5fa'; ctx.fillText(diaStr, cx2, txtY1); cx2 += diaW;
+            ctx.font = '10px Inter, sans-serif';
+            ctx.fillStyle = '#94a3b8'; ctx.fillText(' mmHg', cx2, txtY1);
+            if (dateLbl) {
+              const txtY2 = by - bh + 25;
+              ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#94a3b8';
+              ctx.fillText(dateLbl, bx + (bw - dateLblW) / 2, txtY2);
+            }
           }
         }
 
@@ -8052,7 +9876,7 @@ function renderSparklineChart(historico) {
           }
         }
 
-        // X labels — day number for day-range views, month abbrev for year view
+        // X labels ??" day number for day-range views, month abbrev for year view
         ctx.globalAlpha = 1;
         ctx.fillStyle = '#94a3b8';
         ctx.font = '500 9px Inter, sans-serif';
@@ -8097,10 +9921,9 @@ function renderSparklineChart(historico) {
           const _atEl = document.getElementById('pressaoDiaDetailLabel');
           if (_atEl) _atEl.textContent = `${_mAbr[_atm - 1]} ${_aty}`;
         }
-        // Scroll selected column into center of viewport
+        // Scroll to the right end so the most-recent (today) column is visible
         if (_chartView) {
-          const _selCx = padL + colW * _autoIdx;
-          _chartView.scrollLeft = Math.max(0, _selCx - containerW / 2);
+          _chartView.scrollLeft = Math.max(0, W - containerW);
         }
       }
 
@@ -8129,7 +9952,7 @@ function renderSparklineChart(historico) {
 
         const row = renderRows[hitIdx];
 
-        // Build tooltip date label — month name for year view, day+weekday for day views
+        // Build tooltip date label ??" month name for year view, day+weekday for day views
         let dateLabel;
         if (_isYearView) {
           const [_ty, _tm] = row.monthKey.split('-').map(Number);
@@ -8141,26 +9964,6 @@ function renderSparklineChart(historico) {
           dateLabel = `${_dias[_dateObj.getDay()]}, ${String(_d).padStart(2, '0')} ${_mAbr[_m - 1]}`;
         }
 
-        const tip = document.createElement('div');
-        tip.id = 'pressaoChartTooltip';
-        tip.style.cssText = 'position:absolute;background:#1e293b;color:#fff;border-radius:8px;padding:7px 12px;font-size:12px;line-height:1.5;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.2);';
-        tip.innerHTML = `${dateLabel}&nbsp;&nbsp;<strong><span style="color:#f59e0b;font-size:1.2em;">${row.avgS}</span><span style="color:#94a3b8;"> / </span><span style="color:#3b82f6;font-size:1.2em;">${row.avgD}</span> mmHg</strong>`;
-
-        const tipParent = document.getElementById('vitalDetailDefaultChrome') || canvas.parentElement;
-        tipParent.style.position = 'relative';
-        const tipParentRect = tipParent.getBoundingClientRect();
-        const canvasRect = canvas.getBoundingClientRect();
-        const cxCanvas = padL + colW * hitIdx + colW / 2;
-        const cxViewport = canvasRect.left + cxCanvas * (canvasRect.width / W);
-        let left = cxViewport - tipParentRect.left - 90;
-        let top = canvasRect.top - tipParentRect.top - 48;
-        if (left < 0) left = 4;
-        if (left + 260 > tipParent.offsetWidth) left = tipParent.offsetWidth - 264;
-        if (top < 0) top = canvasRect.top - tipParentRect.top + 4;
-        tip.style.left = left + 'px';
-        tip.style.top = top + 'px';
-        tipParent.appendChild(tip);
-
         openPressaoDiaDetail(pressaoSelectedDay, row.entries);
 
         // Override detail-view header label for year view ("mai 2026" instead of a specific day)
@@ -8169,39 +9972,55 @@ function renderSparklineChart(historico) {
           const lEl = document.getElementById('pressaoDiaDetailLabel');
           if (lEl) lEl.textContent = `${_mAbr[_tm - 1]} ${_ty}`;
         }
-
-        const dismiss = () => {
-          const t = document.getElementById('pressaoChartTooltip');
-          if (t) t.remove();
-          document.removeEventListener('click', dismiss);
-        };
-        setTimeout(() => document.addEventListener('click', dismiss), 10);
       };
     });
     return;
   }
 
   if (currentVitalDetail && currentVitalDetail.tipo === 'Passos') {
-    const dayRows = aggregatePassosByDay(historico).slice(0, 10).reverse();
+    const allDayRows = aggregatePassosByDay(historico);
+    const dayRows = allDayRows.slice().sort((a, b) => a.day.localeCompare(b.day));
     const rows = dayRows.map((g) => ({ h: { data: g.day }, v: g.total, day: g.day }));
     if (rows.length === 0) return;
 
     const goal = getStepsDailyGoalValue(currentVitalDetail);
+
+    // Scrollable container (like PA chart)
+    const _passChartView = document.getElementById('pressaoHistoricoView');
+    if (_passChartView) {
+      _passChartView.style.overflowX = 'auto';
+      _passChartView.style.overflowY = 'hidden';
+      _passChartView.style.webkitOverflowScrolling = 'touch';
+    }
+
+    requestAnimationFrame(() => {
+    const dpr = window.devicePixelRatio || 1;
+    const n = rows.length;
+    const containerW = _passChartView ? _passChartView.offsetWidth : (canvas.parentElement ? canvas.parentElement.offsetWidth : 320);
+    const padL = 28, padR = 12, padT = 44, padB = 20;
+    const _isYearView = typeof vitalDefaultPeriod !== 'undefined' && vitalDefaultPeriod === 'year';
+    const minColW = _isYearView ? 20 : Math.max(10, (containerW - padL - padR) / Math.max(1, n));
+    // Fit all columns in the container when possible; scroll only if minColW floor forces wider canvas
+    const W = Math.max(containerW, padL + Math.ceil(n * minColW) + padR);
+    const H = 180;
+    const gw = W - padL - padR;
+    const gh = H - padT - padB;
+
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+
     const maxData = Math.max(...rows.map((r) => r.v), goal);
     const yLow = 0;
     const yHigh = Math.max(goal * 1.15, maxData * 1.1, 1);
     const span = yHigh - yLow;
-
-    const padL = 28;
-    const padR = 8;
-    const padT = 8;
-    const padB = 20;
-    const gw = width - padL - padR;
-    const gh = height - padT - padB;
     const toY = (v) => padT + ((yHigh - v) / span) * gh;
 
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#F8F9FA';
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, W, H);
 
     ctx.fillStyle = 'rgba(34, 197, 94, 0.08)';
     ctx.fillRect(padL, toY(goal), gw, gh - (toY(goal) - padT));
@@ -8215,7 +10034,6 @@ function renderSparklineChart(historico) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    const n = rows.length;
     const slot = gw / Math.max(1, n);
     const barW = Math.min(18, Math.max(7, slot * 0.58));
     const barR = Math.min(5, barW / 2 - 0.5);
@@ -8248,6 +10066,61 @@ function renderSparklineChart(historico) {
       hitBoxes.push({ x0: slotX0, x1: slotX0 + slot, dayIso: row.day });
     });
 
+    // Tooltip para dia selecionado
+    if (passosSelectedDayIso) {
+      const _selIdx = rows.findIndex(r => r.day === passosSelectedDayIso);
+      if (_selIdx >= 0) {
+        const _selRow = rows[_selIdx];
+        const _cx = padL + slot * _selIdx + slot / 2;
+        const _numStr = _selRow.v.toLocaleString('pt-BR');
+        const _ptBrWS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+        const _mAbrS = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+        const [_sy, _smo, _sdd] = _selRow.day.split('-').map(Number);
+        const _sDateLbl = _isYearView ? '' : `${_ptBrWS[new Date(_sy, _smo - 1, _sdd).getDay()]}, ${_sdd} ${_mAbrS[_smo - 1]}`;
+        ctx.font = 'bold 10px Inter, sans-serif';
+        const _nw = ctx.measureText(_numStr).width;
+        ctx.font = '9px Inter, sans-serif';
+        const _sw = ctx.measureText(' passos').width;
+        const _sdlw = _sDateLbl ? ctx.measureText(_sDateLbl).width : 0;
+        const _bw = Math.max(_nw + _sw + 18, _sdlw + 18, 76);
+        const _bh = _sDateLbl ? 34 : 20;
+        const _arr = 5;
+        let _bx = _cx - _bw / 2;
+        if (_bx < padL) _bx = padL;
+        if (_bx + _bw > padL + gw) _bx = padL + gw - _bw;
+        const _by = padT - _arr - 2;
+        const _br = 4;
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.moveTo(_bx + _br, _by - _bh);
+        ctx.lineTo(_bx + _bw - _br, _by - _bh);
+        ctx.quadraticCurveTo(_bx + _bw, _by - _bh, _bx + _bw, _by - _bh + _br);
+        ctx.lineTo(_bx + _bw, _by - _br);
+        ctx.quadraticCurveTo(_bx + _bw, _by, _bx + _bw - _br, _by);
+        const _ax = Math.min(Math.max(_cx, _bx + 10), _bx + _bw - 10);
+        ctx.lineTo(_ax + 5, _by); ctx.lineTo(_ax, _by + _arr); ctx.lineTo(_ax - 5, _by);
+        ctx.lineTo(_bx + _br, _by);
+        ctx.quadraticCurveTo(_bx, _by, _bx, _by - _br);
+        ctx.lineTo(_bx, _by - _bh + _br);
+        ctx.quadraticCurveTo(_bx, _by - _bh, _bx + _br, _by - _bh);
+        ctx.closePath(); ctx.fill();
+        ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+        if (_sDateLbl) {
+          const _ty1 = _by - _bh + 11;
+          let _tx = _bx + (_bw - _nw - _sw) / 2;
+          ctx.font = 'bold 10px Inter, sans-serif'; ctx.fillStyle = '#34d399'; ctx.fillText(_numStr, _tx, _ty1); _tx += _nw;
+          ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.fillText(' passos', _tx, _ty1);
+          ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#6ee7b7';
+          ctx.textAlign = 'center'; ctx.fillText(_sDateLbl, _bx + _bw / 2, _by - _bh + 25);
+        } else {
+          const _ty = _by - _bh / 2;
+          let _tx = _bx + (_bw - _nw - _sw) / 2;
+          ctx.font = 'bold 10px Inter, sans-serif'; ctx.fillStyle = '#34d399'; ctx.fillText(_numStr, _tx, _ty); _tx += _nw;
+          ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.fillText(' passos', _tx, _ty);
+        }
+      }
+    }
+
     ctx.fillStyle = '#8e8e8e';
     ctx.font = '8px sans-serif';
     ctx.textAlign = 'right';
@@ -8255,8 +10128,9 @@ function renderSparklineChart(historico) {
     ctx.fillText('0', padL - 4, toY(0));
     ctx.fillText(String(Math.round(goal)), padL - 4, toY(goal));
 
-    const labelEvery = Math.max(1, Math.ceil(n / 5));
+    const labelEvery = Math.max(1, Math.ceil(n / 8));
     ctx.fillStyle = '#666';
+    ctx.font = '8px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     rows.forEach((row, i) => {
@@ -8265,15 +10139,1084 @@ function renderSparklineChart(historico) {
       const d = String(row.h.data || '');
       const parts = d.split('-');
       const short = parts.length === 3 ? String(Number(parts[2])) : '';
-      ctx.fillText(short, cx, height - 4);
+      ctx.fillText(short, cx, H - 4);
     });
+
+    canvas.style.cursor = 'pointer';
     canvas.onclick = (ev) => {
       const rect = canvas.getBoundingClientRect();
-      const sx = canvas.width / Math.max(1, rect.width);
+      const sx = W / Math.max(1, rect.width);
       const x = (ev.clientX - rect.left) * sx;
       const hit = hitBoxes.find((b) => x >= b.x0 && x <= b.x1);
       if (hit && hit.dayIso) setPassosDayFromChart(hit.dayIso);
     };
+
+    // Hover: crosshair dotted line + tooltip
+    canvas.__drawPassHover = function(hovIdx) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#F8F9FA';
+      ctx.fillRect(0, 0, W, H);
+      // Goal zone
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.08)';
+      ctx.fillRect(padL, toY(goal), gw, gh - (toY(goal) - padT));
+      ctx.strokeStyle = 'rgba(34, 197, 94, 0.55)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(padL, toY(goal)); ctx.lineTo(padL + gw, toY(goal)); ctx.stroke();
+      ctx.setLineDash([]);
+      // Bars
+      rows.forEach((row, i) => {
+        const isSelected = row.day === passosSelectedDayIso;
+        const isHov = i === hovIdx;
+        const cx2 = padL + slot * i + slot / 2;
+        const x02 = cx2 - barW / 2;
+        const yTop2 = toY(row.v);
+        const yBot2 = toY(0);
+        const hBar2 = Math.max(1, yBot2 - yTop2);
+        const g2 = ctx.createLinearGradient(0, yTop2, 0, yBot2);
+        g2.addColorStop(0, isSelected ? '#34d399' : '#6ee7a0');
+        g2.addColorStop(1, isSelected ? '#16a34a' : '#22c55e');
+        ctx.fillStyle = g2;
+        ctx.globalAlpha = passosSelectedDayIso && !isSelected ? 0.35 : (hovIdx >= 0 && !isSelected && !isHov ? 0.5 : 1);
+        if (typeof ctx.roundRect === 'function') { ctx.beginPath(); ctx.roundRect(x02, yTop2, barW, hBar2, [barR, barR, 2, 2]); ctx.fill(); }
+        else { ctx.fillRect(x02, yTop2, barW, hBar2); }
+        ctx.globalAlpha = 1;
+        if (isSelected) {
+          ctx.strokeStyle = '#16a34a'; ctx.lineWidth = 1;
+          ctx.strokeRect(x02 - 0.5, yTop2 - 0.5, barW + 1, hBar2 + 1);
+        }
+      });
+      // Y labels
+      ctx.fillStyle = '#8e8e8e'; ctx.font = '8px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.fillText('0', padL - 4, toY(0));
+      ctx.fillText(String(Math.round(goal)), padL - 4, toY(goal));
+      // X labels
+      const _lbEvery = Math.max(1, Math.ceil(n / 8));
+      ctx.fillStyle = '#666'; ctx.font = '8px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      rows.forEach((row, i) => {
+        if (i % _lbEvery !== 0 && i !== n - 1) return;
+        const cxL = padL + slot * i + slot / 2;
+        const d = String(row.h.data || '');
+        const parts = d.split('-');
+        const short = parts.length === 3 ? String(Number(parts[2])) : '';
+        ctx.fillText(short, cxL, H - 4);
+      });
+      // Sel-day tooltip bubble
+      if (passosSelectedDayIso) {
+        const _si = rows.findIndex(r => r.day === passosSelectedDayIso);
+        if (_si >= 0 && _si !== hovIdx) {
+          const _sr = rows[_si];
+          const _cx = padL + slot * _si + slot / 2;
+          const _numStr = _sr.v.toLocaleString('pt-BR');
+          const _ptBrWD = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+          const _mAbrD = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+          const [_dy, _dmo, _ddd] = _sr.day.split('-').map(Number);
+          const _sdDateLbl = _isYearView ? '' : `${_ptBrWD[new Date(_dy, _dmo - 1, _ddd).getDay()]}, ${_ddd} ${_mAbrD[_dmo - 1]}`;
+          ctx.font = 'bold 10px Inter, sans-serif'; const _nw = ctx.measureText(_numStr).width;
+          ctx.font = '9px Inter, sans-serif'; const _sw = ctx.measureText(' passos').width;
+          const _sdlw2 = _sdDateLbl ? ctx.measureText(_sdDateLbl).width : 0;
+          const _bw = Math.max(_nw + _sw + 18, _sdlw2 + 18, 76), _bh = _sdDateLbl ? 34 : 20, _arr = 5;
+          let _bx = _cx - _bw / 2;
+          if (_bx < padL) _bx = padL;
+          if (_bx + _bw > padL + gw) _bx = padL + gw - _bw;
+          const _by = padT - _arr - 2, _br = 4;
+          ctx.fillStyle = '#1e293b';
+          ctx.beginPath();
+          ctx.moveTo(_bx + _br, _by - _bh); ctx.lineTo(_bx + _bw - _br, _by - _bh);
+          ctx.quadraticCurveTo(_bx + _bw, _by - _bh, _bx + _bw, _by - _bh + _br);
+          ctx.lineTo(_bx + _bw, _by - _br); ctx.quadraticCurveTo(_bx + _bw, _by, _bx + _bw - _br, _by);
+          const _ax = Math.min(Math.max(_cx, _bx + 10), _bx + _bw - 10);
+          ctx.lineTo(_ax + 5, _by); ctx.lineTo(_ax, _by + _arr); ctx.lineTo(_ax - 5, _by);
+          ctx.lineTo(_bx + _br, _by); ctx.quadraticCurveTo(_bx, _by, _bx, _by - _br);
+          ctx.lineTo(_bx, _by - _bh + _br); ctx.quadraticCurveTo(_bx, _by - _bh, _bx + _br, _by - _bh);
+          ctx.closePath(); ctx.fill();
+          ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+          if (_sdDateLbl) {
+            const _ty1 = _by - _bh + 11;
+            let _tx = _bx + (_bw - _nw - _sw) / 2;
+            ctx.font = 'bold 10px Inter, sans-serif'; ctx.fillStyle = '#34d399'; ctx.fillText(_numStr, _tx, _ty1); _tx += _nw;
+            ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.fillText(' passos', _tx, _ty1);
+            ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#6ee7b7';
+            ctx.textAlign = 'center'; ctx.fillText(_sdDateLbl, _bx + _bw / 2, _by - _bh + 25);
+          } else {
+            const _ty = _by - _bh / 2; let _tx = _bx + (_bw - _nw - _sw) / 2;
+            ctx.font = 'bold 10px Inter, sans-serif'; ctx.fillStyle = '#34d399'; ctx.fillText(_numStr, _tx, _ty); _tx += _nw;
+            ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.fillText(' passos', _tx, _ty);
+          }
+        }
+      }
+      // Hover crosshair + tooltip
+      if (hovIdx >= 0) {
+        const _hRow = rows[hovIdx];
+        const _hCx = padL + slot * hovIdx + slot / 2;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(100,116,139,0.55)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(_hCx, padT); ctx.lineTo(_hCx, H - padB); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        const _hNum = _hRow.v.toLocaleString('pt-BR');
+        const _ptBrWH = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+        const _mAbrH = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+        const [_hy, _hmo, _hdd] = _hRow.day.split('-').map(Number);
+        const _hDateLbl = _isYearView ? '' : `${_ptBrWH[new Date(_hy, _hmo - 1, _hdd).getDay()]}, ${_hdd} ${_mAbrH[_hmo - 1]}`;
+        ctx.font = 'bold 10px Inter, sans-serif'; const _hnw = ctx.measureText(_hNum).width;
+        ctx.font = '9px Inter, sans-serif'; const _hsw = ctx.measureText(' passos').width;
+        const _hdlw = _hDateLbl ? ctx.measureText(_hDateLbl).width : 0;
+        const _hbw = Math.max(_hnw + _hsw + 18, _hdlw + 18, 76), _hbh = _hDateLbl ? 34 : 20, _harr = 5;
+        let _hbx = _hCx - _hbw / 2;
+        if (_hbx < padL) _hbx = padL;
+        if (_hbx + _hbw > padL + gw) _hbx = padL + gw - _hbw;
+        const _hby = padT - _harr - 2, _hbr = 4;
+        ctx.fillStyle = '#14532d';
+        ctx.beginPath();
+        ctx.moveTo(_hbx + _hbr, _hby - _hbh); ctx.lineTo(_hbx + _hbw - _hbr, _hby - _hbh);
+        ctx.quadraticCurveTo(_hbx + _hbw, _hby - _hbh, _hbx + _hbw, _hby - _hbh + _hbr);
+        ctx.lineTo(_hbx + _hbw, _hby - _hbr); ctx.quadraticCurveTo(_hbx + _hbw, _hby, _hbx + _hbw - _hbr, _hby);
+        const _hax = Math.min(Math.max(_hCx, _hbx + 10), _hbx + _hbw - 10);
+        ctx.lineTo(_hax + 5, _hby); ctx.lineTo(_hax, _hby + _harr); ctx.lineTo(_hax - 5, _hby);
+        ctx.lineTo(_hbx + _hbr, _hby); ctx.quadraticCurveTo(_hbx, _hby, _hbx, _hby - _hbr);
+        ctx.lineTo(_hbx, _hby - _hbh + _hbr); ctx.quadraticCurveTo(_hbx, _hby - _hbh, _hbx + _hbr, _hby - _hbh);
+        ctx.closePath(); ctx.fill();
+        ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+        if (_hDateLbl) {
+          const _hty1 = _hby - _hbh + 11;
+          let _htx = _hbx + (_hbw - _hnw - _hsw) / 2;
+          ctx.font = 'bold 10px Inter, sans-serif'; ctx.fillStyle = '#86efac'; ctx.fillText(_hNum, _htx, _hty1); _htx += _hnw;
+          ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#bbf7d0'; ctx.fillText(' passos', _htx, _hty1);
+          ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#6ee7b7';
+          ctx.textAlign = 'center'; ctx.fillText(_hDateLbl, _hbx + _hbw / 2, _hby - _hbh + 25);
+        } else {
+          const _hty = _hby - _hbh / 2; let _htx = _hbx + (_hbw - _hnw - _hsw) / 2;
+          ctx.font = 'bold 10px Inter, sans-serif'; ctx.fillStyle = '#86efac'; ctx.fillText(_hNum, _htx, _hty); _htx += _hnw;
+          ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#bbf7d0'; ctx.fillText(' passos', _htx, _hty);
+        }
+      }
+    };
+    canvas._passHovIdx = -1;
+    canvas.onmousemove = (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = W / Math.max(1, rect.width);
+      const x = (ev.clientX - rect.left) * sx;
+      let newIdx = -1;
+      hitBoxes.forEach((b, i) => { if (x >= b.x0 && x <= b.x1) newIdx = i; });
+      if (newIdx !== canvas._passHovIdx) {
+        canvas._passHovIdx = newIdx;
+        if (canvas.__drawPassHover) canvas.__drawPassHover(newIdx);
+      }
+    };
+    canvas.onmouseleave = () => {
+      if (canvas._passHovIdx !== -1) {
+        canvas._passHovIdx = -1;
+        if (canvas.__drawPassHover) canvas.__drawPassHover(-1);
+      }
+    };
+
+    // Scroll to show the most recent (rightmost) day
+    if (_passChartView && !passosSelectedDayIso) {
+      _passChartView.scrollLeft = Math.max(0, W - containerW);
+    }
+    }); // end requestAnimationFrame
+    return;
+  }
+
+  if (currentVitalDetail && currentVitalDetail.tipo === 'Glicemia') {
+    const _isYearView = vitalDefaultPeriod === 'year';
+    const _is7dView = vitalDefaultPeriod === '7d';
+    const glicDayRows = _isYearView ? aggregateGlicemiaByMonth(historico) : aggregateGlicemiaByDay(historico);
+    if (glicDayRows.length === 0) return;
+
+    const _glicChartView = document.getElementById('pressaoHistoricoView');
+    if (_glicChartView) {
+      _glicChartView.style.overflowX = 'auto';
+      _glicChartView.style.overflowY = 'hidden';
+      _glicChartView.style.webkitOverflowScrolling = 'touch';
+    }
+
+    requestAnimationFrame(() => {
+      const dpr = window.devicePixelRatio || 1;
+      const n = glicDayRows.length;
+      const containerW = _glicChartView ? _glicChartView.offsetWidth : (canvas.parentElement ? canvas.parentElement.offsetWidth : 320);
+      const padL = 32, padR = 12, padT = 44, padB = 20;
+      const minColW = 36;
+      const W = Math.max(containerW, padL + n * minColW + padR);
+      const H = 180;
+      const gw = W - padL - padR;
+      const gh = H - padT - padB;
+
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+
+      const allAvgs = glicDayRows.map((r) => r.avg);
+      const yLow = 0;
+      const yHigh = Math.max(Math.max(...allAvgs) * 1.15, 145);
+      const span = yHigh - yLow;
+      const toY = (v) => padT + ((yHigh - v) / span) * gh;
+
+      const slot = gw / Math.max(1, n);
+      const barW = Math.min(18, Math.max(7, slot * 0.58));
+      const barR = Math.min(5, barW / 2 - 0.5);
+      const selIso = glicemiaSelectedDayIso;
+
+      const _gCtx = canvas.getContext('2d');
+      _gCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      _gCtx.clearRect(0, 0, W, H);
+      _gCtx.fillStyle = '#F8F9FA';
+      _gCtx.fillRect(0, 0, W, H);
+
+      // Ideal zone band (70??"99)
+      const idealLow = 70, idealHigh = 99;
+      _gCtx.fillStyle = 'rgba(34, 197, 94, 0.10)';
+      _gCtx.fillRect(padL, toY(idealHigh), gw, toY(idealLow) - toY(idealHigh));
+      _gCtx.strokeStyle = 'rgba(34, 197, 94, 0.35)';
+      _gCtx.lineWidth = 1;
+      _gCtx.setLineDash([3, 3]);
+      _gCtx.beginPath(); _gCtx.moveTo(padL, toY(idealHigh)); _gCtx.lineTo(padL + gw, toY(idealHigh)); _gCtx.stroke();
+      _gCtx.beginPath(); _gCtx.moveTo(padL, toY(idealLow)); _gCtx.lineTo(padL + gw, toY(idealLow)); _gCtx.stroke();
+      _gCtx.setLineDash([]);
+
+      // Bars
+      const hitBoxes = [];
+      glicDayRows.forEach((row, i) => {
+        const isSelected = !_isYearView && row.day === selIso;
+        const cx = padL + slot * i + slot / 2;
+        const x0 = cx - barW / 2;
+        const yTop = toY(row.avg);
+        const yBot = toY(0);
+        const hBar = Math.max(1, yBot - yTop);
+
+        const g2 = _gCtx.createLinearGradient(0, yTop, 0, yBot);
+        if (row.avg > 125) {
+          g2.addColorStop(0, isSelected ? '#dc2626' : '#f87171');
+          g2.addColorStop(1, isSelected ? '#991b1b' : '#ef4444');
+        } else if (row.avg > 99) {
+          g2.addColorStop(0, isSelected ? '#d97706' : '#fbbf24');
+          g2.addColorStop(1, isSelected ? '#92400e' : '#f59e0b');
+        } else {
+          g2.addColorStop(0, isSelected ? '#6d28d9' : '#8b5cf6');
+          g2.addColorStop(1, isSelected ? '#4c1d95' : '#7c3aed');
+        }
+        _gCtx.fillStyle = g2;
+        _gCtx.globalAlpha = !_isYearView && selIso && !isSelected ? 0.35 : 1;
+        if (typeof _gCtx.roundRect === 'function') {
+          _gCtx.beginPath();
+          _gCtx.roundRect(x0, yTop, barW, hBar, [barR, barR, 2, 2]);
+          _gCtx.fill();
+        } else {
+          _gCtx.fillRect(x0, yTop, barW, hBar);
+        }
+        _gCtx.globalAlpha = 1;
+        hitBoxes.push({ x0: padL + slot * i, x1: padL + slot * i + slot, dayIso: _isYearView ? null : row.day });
+      });
+
+      // Tooltip bubble for selected day
+      if (selIso) {
+        const selIdx = glicDayRows.findIndex((r) => r.day === selIso);
+        if (selIdx >= 0) {
+          const selRow = glicDayRows[selIdx];
+          const _cx = padL + slot * selIdx + slot / 2;
+          const _avgStr = String(selRow.avg);
+          _gCtx.font = 'bold 10px Inter, sans-serif';
+          const _nw = _gCtx.measureText(_avgStr).width;
+          _gCtx.font = '9px Inter, sans-serif';
+          const _sw = _gCtx.measureText(' mg/dL').width;
+          const _bw = Math.max(_nw + _sw + 18, 76);
+          const _bh = 20;
+          const _arr = 5;
+          let _bx = _cx - _bw / 2;
+          if (_bx < padL) _bx = padL;
+          if (_bx + _bw > padL + gw) _bx = padL + gw - _bw;
+          const _by = padT - _arr - 2;
+          const _br = 4;
+          _gCtx.fillStyle = '#1e293b';
+          _gCtx.beginPath();
+          _gCtx.moveTo(_bx + _br, _by - _bh);
+          _gCtx.lineTo(_bx + _bw - _br, _by - _bh);
+          _gCtx.quadraticCurveTo(_bx + _bw, _by - _bh, _bx + _bw, _by - _bh + _br);
+          _gCtx.lineTo(_bx + _bw, _by - _br);
+          _gCtx.quadraticCurveTo(_bx + _bw, _by, _bx + _bw - _br, _by);
+          const _ax = Math.min(Math.max(_cx, _bx + 10), _bx + _bw - 10);
+          _gCtx.lineTo(_ax + 5, _by); _gCtx.lineTo(_ax, _by + _arr); _gCtx.lineTo(_ax - 5, _by);
+          _gCtx.lineTo(_bx + _br, _by);
+          _gCtx.quadraticCurveTo(_bx, _by, _bx, _by - _br);
+          _gCtx.lineTo(_bx, _by - _bh + _br);
+          _gCtx.quadraticCurveTo(_bx, _by - _bh, _bx + _br, _by - _bh);
+          _gCtx.closePath(); _gCtx.fill();
+          const _ty = _by - _bh / 2;
+          let _tx = _bx + (_bw - _nw - _sw) / 2;
+          _gCtx.textBaseline = 'middle'; _gCtx.textAlign = 'left';
+          _gCtx.font = 'bold 10px Inter, sans-serif';
+          _gCtx.fillStyle = '#c4b5fd'; _gCtx.fillText(_avgStr, _tx, _ty); _tx += _nw;
+          _gCtx.font = '9px Inter, sans-serif';
+          _gCtx.fillStyle = '#94a3b8'; _gCtx.fillText(' mg/dL', _tx, _ty);
+        }
+      }
+
+      // Y labels (ideal zone boundaries)
+      _gCtx.fillStyle = '#94a3b8';
+      _gCtx.font = '8px sans-serif';
+      _gCtx.textAlign = 'right';
+      _gCtx.textBaseline = 'middle';
+      _gCtx.fillText('70', padL - 4, toY(idealLow));
+      _gCtx.fillText('99', padL - 4, toY(idealHigh));
+
+      // X labels
+      const _ptBrMonths = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const _ptBrWeekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+      const labelEvery = _isYearView ? 1 : Math.max(1, Math.ceil(n / 8));
+      _gCtx.fillStyle = '#666';
+      _gCtx.font = '8px sans-serif';
+      _gCtx.textAlign = 'center';
+      _gCtx.textBaseline = 'alphabetic';
+      glicDayRows.forEach((row, i) => {
+        if (i % labelEvery !== 0 && i !== n - 1) return;
+        const cx = padL + slot * i + slot / 2;
+        let _xLabel = '';
+        if (_isYearView) {
+          const mIdx = parseInt((row.month || '').split('-')[1] || '1', 10) - 1;
+          _xLabel = _ptBrMonths[mIdx] || '';
+        } else if (_is7dView) {
+          const _d = new Date((row.day || '') + 'T12:00:00');
+          _xLabel = isNaN(_d.getTime()) ? '' : _ptBrWeekdays[_d.getDay()];
+        } else {
+          const parts = (row.day || '').split('-');
+          _xLabel = parts.length === 3 ? String(Number(parts[2])) : '';
+        }
+        _gCtx.fillText(_xLabel, cx, H - 4);
+      });
+
+      canvas.style.cursor = 'pointer';
+      canvas.onclick = (ev) => {
+        const rect = canvas.getBoundingClientRect();
+        const sx = W / Math.max(1, rect.width);
+        const x = (ev.clientX - rect.left) * sx;
+        const hit = hitBoxes.find((b) => x >= b.x0 && x <= b.x1);
+        if (hit && hit.dayIso) selectGlicemiaDay(hit.dayIso);
+      };
+
+      // Hover: crosshair dotted line + tooltip
+      canvas.__drawGlicHover = function(hovIdx) {
+        // Redraw base: clear + bg + ideal zone + bars + sel tooltip + labels
+        _gCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        _gCtx.clearRect(0, 0, W, H);
+        _gCtx.fillStyle = '#F8F9FA';
+        _gCtx.fillRect(0, 0, W, H);
+        _gCtx.fillStyle = 'rgba(34, 197, 94, 0.10)';
+        _gCtx.fillRect(padL, toY(idealHigh), gw, toY(idealLow) - toY(idealHigh));
+        _gCtx.strokeStyle = 'rgba(34, 197, 94, 0.35)';
+        _gCtx.lineWidth = 1;
+        _gCtx.setLineDash([3, 3]);
+        _gCtx.beginPath(); _gCtx.moveTo(padL, toY(idealHigh)); _gCtx.lineTo(padL + gw, toY(idealHigh)); _gCtx.stroke();
+        _gCtx.beginPath(); _gCtx.moveTo(padL, toY(idealLow)); _gCtx.lineTo(padL + gw, toY(idealLow)); _gCtx.stroke();
+        _gCtx.setLineDash([]);
+        // Bars
+        glicDayRows.forEach((row, i) => {
+          const isSelected = !_isYearView && row.day === glicemiaSelectedDayIso;
+          const isHov = i === hovIdx;
+          const cx2 = padL + slot * i + slot / 2;
+          const x02 = cx2 - barW / 2;
+          const yTop2 = toY(row.avg);
+          const yBot2 = toY(0);
+          const hBar2 = Math.max(1, yBot2 - yTop2);
+          const g3 = _gCtx.createLinearGradient(0, yTop2, 0, yBot2);
+          if (row.avg > 125) { g3.addColorStop(0, isSelected ? '#dc2626' : '#f87171'); g3.addColorStop(1, isSelected ? '#991b1b' : '#ef4444'); }
+          else if (row.avg > 99) { g3.addColorStop(0, isSelected ? '#d97706' : '#fbbf24'); g3.addColorStop(1, isSelected ? '#92400e' : '#f59e0b'); }
+          else { g3.addColorStop(0, isSelected ? '#6d28d9' : '#8b5cf6'); g3.addColorStop(1, isSelected ? '#4c1d95' : '#7c3aed'); }
+          _gCtx.fillStyle = g3;
+          _gCtx.globalAlpha = !_isYearView && glicemiaSelectedDayIso && !isSelected ? 0.35 : (hovIdx >= 0 && !isSelected && !isHov ? 0.5 : 1);
+          if (typeof _gCtx.roundRect === 'function') { _gCtx.beginPath(); _gCtx.roundRect(x02, yTop2, barW, hBar2, [barR, barR, 2, 2]); _gCtx.fill(); }
+          else { _gCtx.fillRect(x02, yTop2, barW, hBar2); }
+          _gCtx.globalAlpha = 1;
+        });
+        // Y labels
+        _gCtx.fillStyle = '#94a3b8'; _gCtx.font = '8px sans-serif'; _gCtx.textAlign = 'right'; _gCtx.textBaseline = 'middle';
+        _gCtx.fillText('70', padL - 4, toY(70));
+        _gCtx.fillText('99', padL - 4, toY(99));
+        // X labels
+        const _ptBrMonths2 = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        const _ptBrWeekdays2 = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+        const _labelEvery2 = _isYearView ? 1 : Math.max(1, Math.ceil(n / 8));
+        _gCtx.fillStyle = '#666'; _gCtx.font = '8px sans-serif'; _gCtx.textAlign = 'center'; _gCtx.textBaseline = 'alphabetic';
+        glicDayRows.forEach((row, i) => {
+          if (i % _labelEvery2 !== 0 && i !== n - 1) return;
+          const cx3 = padL + slot * i + slot / 2;
+          let _xl = '';
+          if (_isYearView) { const mi = parseInt((row.month || '').split('-')[1] || '1', 10) - 1; _xl = _ptBrMonths2[mi] || ''; }
+          else if (_is7dView) { const _d2 = new Date((row.day || '') + 'T12:00:00'); _xl = isNaN(_d2.getTime()) ? '' : _ptBrWeekdays2[_d2.getDay()]; }
+          else { const p2 = (row.day || '').split('-'); _xl = p2.length === 3 ? String(Number(p2[2])) : ''; }
+          _gCtx.fillText(_xl, cx3, H - 4);
+        });
+        // Sel-day tooltip bubble (same as original)
+        const _selIso2 = glicemiaSelectedDayIso;
+        if (_selIso2 && !_isYearView) {
+          const _si2 = glicDayRows.findIndex(r => r.day === _selIso2);
+          if (_si2 >= 0 && _si2 !== hovIdx) {
+            const _sr2 = glicDayRows[_si2];
+            const _cx2 = padL + slot * _si2 + slot / 2;
+            const _as2 = String(_sr2.avg);
+            _gCtx.font = 'bold 10px Inter, sans-serif'; const _nw2 = _gCtx.measureText(_as2).width;
+            _gCtx.font = '9px Inter, sans-serif'; const _sw2 = _gCtx.measureText(' mg/dL').width;
+            const _bw2 = Math.max(_nw2 + _sw2 + 18, 76);
+            const _bh2 = 20, _arr2 = 5;
+            let _bx2 = _cx2 - _bw2 / 2;
+            if (_bx2 < padL) _bx2 = padL;
+            if (_bx2 + _bw2 > padL + gw) _bx2 = padL + gw - _bw2;
+            const _by2 = padT - _arr2 - 2, _br2 = 4;
+            _gCtx.fillStyle = '#1e293b';
+            _gCtx.beginPath();
+            _gCtx.moveTo(_bx2 + _br2, _by2 - _bh2); _gCtx.lineTo(_bx2 + _bw2 - _br2, _by2 - _bh2);
+            _gCtx.quadraticCurveTo(_bx2 + _bw2, _by2 - _bh2, _bx2 + _bw2, _by2 - _bh2 + _br2);
+            _gCtx.lineTo(_bx2 + _bw2, _by2 - _br2); _gCtx.quadraticCurveTo(_bx2 + _bw2, _by2, _bx2 + _bw2 - _br2, _by2);
+            const _ax2 = Math.min(Math.max(_cx2, _bx2 + 10), _bx2 + _bw2 - 10);
+            _gCtx.lineTo(_ax2 + 5, _by2); _gCtx.lineTo(_ax2, _by2 + _arr2); _gCtx.lineTo(_ax2 - 5, _by2);
+            _gCtx.lineTo(_bx2 + _br2, _by2); _gCtx.quadraticCurveTo(_bx2, _by2, _bx2, _by2 - _br2);
+            _gCtx.lineTo(_bx2, _by2 - _bh2 + _br2); _gCtx.quadraticCurveTo(_bx2, _by2 - _bh2, _bx2 + _br2, _by2 - _bh2);
+            _gCtx.closePath(); _gCtx.fill();
+            const _ty2 = _by2 - _bh2 / 2; let _tx2 = _bx2 + (_bw2 - _nw2 - _sw2) / 2;
+            _gCtx.textBaseline = 'middle'; _gCtx.textAlign = 'left';
+            _gCtx.font = 'bold 10px Inter, sans-serif'; _gCtx.fillStyle = '#c4b5fd'; _gCtx.fillText(_as2, _tx2, _ty2); _tx2 += _nw2;
+            _gCtx.font = '9px Inter, sans-serif'; _gCtx.fillStyle = '#94a3b8'; _gCtx.fillText(' mg/dL', _tx2, _ty2);
+          }
+        }
+        // Hover crosshair + tooltip
+        if (hovIdx >= 0) {
+          const _hRow = glicDayRows[hovIdx];
+          const _hCx = padL + slot * hovIdx + slot / 2;
+          const _hYTop = toY(_hRow.avg);
+          // Dotted vertical line
+          _gCtx.save();
+          _gCtx.strokeStyle = 'rgba(100,116,139,0.55)';
+          _gCtx.lineWidth = 1;
+          _gCtx.setLineDash([3, 3]);
+          _gCtx.beginPath(); _gCtx.moveTo(_hCx, padT); _gCtx.lineTo(_hCx, H - padB); _gCtx.stroke();
+          _gCtx.setLineDash([]);
+          _gCtx.restore();
+          // Tooltip bubble
+          const _hAs = String(_hRow.avg);
+          const _ptBrMH = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+          const _ptBrWH = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+          let _hDateLbl = '';
+          if (!_isYearView && _hRow.day) {
+            const _hd = new Date(_hRow.day + 'T12:00:00');
+            if (!isNaN(_hd.getTime())) _hDateLbl = _ptBrWH[_hd.getDay()] + ', ' + _hd.getDate() + ' ' + _ptBrMH[_hd.getMonth()];
+          }
+          _gCtx.font = 'bold 10px Inter, sans-serif'; const _hnw = _gCtx.measureText(_hAs).width;
+          _gCtx.font = '9px Inter, sans-serif'; const _hsw = _gCtx.measureText(' mg/dL').width;
+          _gCtx.font = '9px Inter, sans-serif'; const _hdlw = _hDateLbl ? _gCtx.measureText(_hDateLbl).width : 0;
+          const _hbh = _hDateLbl ? 34 : 22, _harr = 5;
+          const _hbw = Math.max(_hnw + _hsw + 18, _hdlw + 18, 76);
+          let _hbx = _hCx - _hbw / 2;
+          if (_hbx < padL) _hbx = padL;
+          if (_hbx + _hbw > padL + gw) _hbx = padL + gw - _hbw;
+          const _hby = padT - _harr - 2, _hbr = 4;
+          _gCtx.fillStyle = '#4c1d95';
+          _gCtx.beginPath();
+          _gCtx.moveTo(_hbx + _hbr, _hby - _hbh); _gCtx.lineTo(_hbx + _hbw - _hbr, _hby - _hbh);
+          _gCtx.quadraticCurveTo(_hbx + _hbw, _hby - _hbh, _hbx + _hbw, _hby - _hbh + _hbr);
+          _gCtx.lineTo(_hbx + _hbw, _hby - _hbr); _gCtx.quadraticCurveTo(_hbx + _hbw, _hby, _hbx + _hbw - _hbr, _hby);
+          const _hax = Math.min(Math.max(_hCx, _hbx + 10), _hbx + _hbw - 10);
+          _gCtx.lineTo(_hax + 5, _hby); _gCtx.lineTo(_hax, _hby + _harr); _gCtx.lineTo(_hax - 5, _hby);
+          _gCtx.lineTo(_hbx + _hbr, _hby); _gCtx.quadraticCurveTo(_hbx, _hby, _hbx, _hby - _hbr);
+          _gCtx.lineTo(_hbx, _hby - _hbh + _hbr); _gCtx.quadraticCurveTo(_hbx, _hby - _hbh, _hbx + _hbr, _hby - _hbh);
+          _gCtx.closePath(); _gCtx.fill();
+          _gCtx.textBaseline = 'middle'; _gCtx.textAlign = 'left';
+          if (_hDateLbl) {
+            const _hty1 = _hby - _hbh + 11; let _htx = _hbx + (_hbw - _hnw - _hsw) / 2;
+            _gCtx.font = 'bold 10px Inter, sans-serif'; _gCtx.fillStyle = '#e9d5ff'; _gCtx.fillText(_hAs, _htx, _hty1); _htx += _hnw;
+            _gCtx.font = '9px Inter, sans-serif'; _gCtx.fillStyle = '#c4b5fd'; _gCtx.fillText(' mg/dL', _htx, _hty1);
+            const _hty2 = _hby - _hbh + 25; const _hdtx = _hbx + (_hbw - _hdlw) / 2;
+            _gCtx.font = '9px Inter, sans-serif'; _gCtx.fillStyle = '#a78bfa'; _gCtx.fillText(_hDateLbl, _hdtx, _hty2);
+          } else {
+            const _hty = _hby - _hbh / 2; let _htx = _hbx + (_hbw - _hnw - _hsw) / 2;
+            _gCtx.font = 'bold 10px Inter, sans-serif'; _gCtx.fillStyle = '#e9d5ff'; _gCtx.fillText(_hAs, _htx, _hty); _htx += _hnw;
+            _gCtx.font = '9px Inter, sans-serif'; _gCtx.fillStyle = '#c4b5fd'; _gCtx.fillText(' mg/dL', _htx, _hty);
+          }
+        }
+      };
+      canvas._glicHovIdx = -1;
+      canvas.onmousemove = (ev) => {
+        const rect = canvas.getBoundingClientRect();
+        const sx = W / Math.max(1, rect.width);
+        const x = (ev.clientX - rect.left) * sx;
+        let newIdx = -1;
+        hitBoxes.forEach((b, i) => { if (x >= b.x0 && x <= b.x1) newIdx = i; });
+        if (newIdx !== canvas._glicHovIdx) {
+          canvas._glicHovIdx = newIdx;
+          if (canvas.__drawGlicHover) canvas.__drawGlicHover(newIdx);
+        }
+      };
+      canvas.onmouseleave = () => {
+        if (canvas._glicHovIdx !== -1) {
+          canvas._glicHovIdx = -1;
+          if (canvas.__drawGlicHover) canvas.__drawGlicHover(-1);
+        }
+      };
+
+      // Scroll to show most recent (rightmost) bars
+      if (_glicChartView && !selIso) {
+        _glicChartView.scrollLeft = Math.max(0, W - containerW);
+      }
+    }); // end rAF
+    return;
+  }
+
+  if (currentVitalDetail && currentVitalDetail.tipo === 'Sono') {
+    // Aggregate by day: keep max sleep duration per day
+    var _sonoByDay = new Map();
+    historico.forEach(function(h) {
+      var dayIso = typeof historicoEntryDayISO === 'function' ? historicoEntryDayISO(h) : String(h.data || '').slice(0, 10);
+      if (!dayIso) return;
+      var v = parseFloat(h.valor);
+      if (!Number.isFinite(v)) return;
+      if (!_sonoByDay.has(dayIso) || v > _sonoByDay.get(dayIso).v) {
+        _sonoByDay.set(dayIso, { day: dayIso, v: v, status: h.status });
+      }
+    });
+    var _sonoRows = Array.from(_sonoByDay.values()).sort(function(a, b) { return a.day.localeCompare(b.day); });
+    if (_sonoRows.length === 0) return;
+
+    var _sonoIdealLow = 7, _sonoIdealHigh = 9;
+    if (currentVitalDetail.ideal && typeof currentVitalDetail.ideal === 'string') {
+      var _sonoIm = currentVitalDetail.ideal.match(/(\d+)[??"\-](\d+)/);
+      if (_sonoIm) { _sonoIdealLow = Number(_sonoIm[1]); _sonoIdealHigh = Number(_sonoIm[2]); }
+    }
+
+    var _sonoChartView = document.getElementById('pressaoHistoricoView');
+    if (_sonoChartView) {
+      _sonoChartView.style.overflowX = 'auto';
+      _sonoChartView.style.overflowY = 'hidden';
+      _sonoChartView.style.webkitOverflowScrolling = 'touch';
+    }
+
+    requestAnimationFrame(function() {
+      var dpr = window.devicePixelRatio || 1;
+      var n = _sonoRows.length;
+      var containerW = _sonoChartView ? _sonoChartView.offsetWidth : (canvas.parentElement ? canvas.parentElement.offsetWidth : 320);
+      var padL = 26, padR = 12, padT = 44, padB = 20;
+      var minColW = Math.max(10, (containerW - padL - padR) / Math.max(1, n));
+      var W = Math.max(containerW, padL + Math.ceil(n * minColW) + padR);
+      var H = 180;
+      var gw = W - padL - padR;
+      var gh = H - padT - padB;
+
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+
+      var allVals = _sonoRows.map(function(r) { return r.v; });
+      var yHigh = Math.max(Math.max.apply(null, allVals) * 1.1, _sonoIdealHigh * 1.25, 12);
+      var yLow = 0;
+      var span = yHigh - yLow;
+      var toY = function(v) { return padT + ((yHigh - v) / span) * gh; };
+
+      var slot = gw / Math.max(1, n);
+      var barW = Math.min(18, Math.max(7, slot * 0.58));
+      var barR = Math.min(5, barW / 2 - 0.5);
+
+      var _sonoHitBoxes = [];
+      var _ptBrDS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+      var _mAbrDS = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+      function _fmtSonoV(v) {
+        var hh = Math.floor(v), mm = Math.round((v - hh) * 60);
+        return hh + 'h' + (mm > 0 ? ' ' + String(mm).padStart(2, '0') + 'm' : '');
+      }
+
+      function _drawSonoBase(hovIdx) {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#F8F9FA';
+        ctx.fillRect(0, 0, W, H);
+
+        // Ideal zone
+        ctx.fillStyle = 'rgba(124, 58, 237, 0.07)';
+        ctx.fillRect(padL, toY(_sonoIdealHigh), gw, toY(_sonoIdealLow) - toY(_sonoIdealHigh));
+        ctx.strokeStyle = 'rgba(124, 58, 237, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(padL, toY(_sonoIdealHigh)); ctx.lineTo(padL + gw, toY(_sonoIdealHigh)); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(padL, toY(_sonoIdealLow)); ctx.lineTo(padL + gw, toY(_sonoIdealLow)); ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Bars
+        _sonoRows.forEach(function(row, i) {
+          var isHov = i === hovIdx;
+          var cx = padL + slot * i + slot / 2;
+          var x0 = cx - barW / 2;
+          var yTop = toY(row.v);
+          var yBot = toY(0);
+          var hBar = Math.max(1, yBot - yTop);
+          var isIdeal = row.v >= _sonoIdealLow && row.v <= _sonoIdealHigh;
+          var g = ctx.createLinearGradient(0, yTop, 0, yBot);
+          if (isIdeal) {
+            g.addColorStop(0, isHov ? '#c4b5fd' : '#a78bfa');
+            g.addColorStop(1, isHov ? '#8b5cf6' : '#7c3aed');
+          } else if (row.v < _sonoIdealLow) {
+            g.addColorStop(0, isHov ? '#fca5a5' : '#f87171');
+            g.addColorStop(1, isHov ? '#f87171' : '#ef4444');
+          } else {
+            g.addColorStop(0, isHov ? '#fcd34d' : '#fbbf24');
+            g.addColorStop(1, isHov ? '#f59e0b' : '#d97706');
+          }
+          ctx.fillStyle = g;
+          ctx.globalAlpha = hovIdx >= 0 && !isHov ? 0.45 : 1;
+          if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath(); ctx.roundRect(x0, yTop, barW, hBar, [barR, barR, 2, 2]); ctx.fill();
+          } else {
+            ctx.fillRect(x0, yTop, barW, hBar);
+          }
+          ctx.globalAlpha = 1;
+        });
+
+        // Y labels
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '8px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(_sonoIdealLow + 'h', padL - 4, toY(_sonoIdealLow));
+        ctx.fillText(_sonoIdealHigh + 'h', padL - 4, toY(_sonoIdealHigh));
+
+        // X labels
+        var labelEvery = Math.max(1, Math.ceil(n / 8));
+        ctx.fillStyle = '#666';
+        ctx.font = '8px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        _sonoRows.forEach(function(row, i) {
+          if (i % labelEvery !== 0 && i !== n - 1) return;
+          var cx2 = padL + slot * i + slot / 2;
+          var parts = (row.day || '').split('-');
+          ctx.fillText(parts.length === 3 ? String(Number(parts[2])) : '', cx2, H - 4);
+        });
+
+        // Hover crosshair + tooltip bubble
+        if (hovIdx >= 0) {
+          var hRow = _sonoRows[hovIdx];
+          var hCx = padL + slot * hovIdx + slot / 2;
+          ctx.save();
+          ctx.strokeStyle = 'rgba(124,58,237,0.45)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.moveTo(hCx, padT); ctx.lineTo(hCx, H - padB); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+
+          var _hValStr = _fmtSonoV(hRow.v);
+          var _hUnitStr = ' horas';
+          var _hDL = '';
+          if (hRow.day) {
+            var _hp = hRow.day.split('-').map(Number);
+            var _hd = new Date(_hp[0], _hp[1] - 1, _hp[2]);
+            _hDL = _ptBrDS[_hd.getDay()] + ', ' + _hp[2] + ' ' + _mAbrDS[_hp[1] - 1];
+          }
+          ctx.font = 'bold 10px Inter, sans-serif'; var _hnw = ctx.measureText(_hValStr).width;
+          ctx.font = '9px Inter, sans-serif'; var _husw = ctx.measureText(_hUnitStr).width;
+          var _hdlw = _hDL ? ctx.measureText(_hDL).width : 0;
+          var _hbh = _hDL ? 34 : 22, _harr = 5;
+          var _hbw = Math.max(_hnw + _husw + 18, _hdlw + 18, 80);
+          var _hbx = hCx - _hbw / 2;
+          if (_hbx < padL) _hbx = padL;
+          if (_hbx + _hbw > padL + gw) _hbx = padL + gw - _hbw;
+          var _hby = padT - _harr - 2, _hbr = 4;
+          ctx.fillStyle = '#4c1d95';
+          ctx.beginPath();
+          ctx.moveTo(_hbx + _hbr, _hby - _hbh); ctx.lineTo(_hbx + _hbw - _hbr, _hby - _hbh);
+          ctx.quadraticCurveTo(_hbx + _hbw, _hby - _hbh, _hbx + _hbw, _hby - _hbh + _hbr);
+          ctx.lineTo(_hbx + _hbw, _hby - _hbr); ctx.quadraticCurveTo(_hbx + _hbw, _hby, _hbx + _hbw - _hbr, _hby);
+          var _hax = Math.min(Math.max(hCx, _hbx + 10), _hbx + _hbw - 10);
+          ctx.lineTo(_hax + 5, _hby); ctx.lineTo(_hax, _hby + _harr); ctx.lineTo(_hax - 5, _hby);
+          ctx.lineTo(_hbx + _hbr, _hby); ctx.quadraticCurveTo(_hbx, _hby, _hbx, _hby - _hbr);
+          ctx.lineTo(_hbx, _hby - _hbh + _hbr); ctx.quadraticCurveTo(_hbx, _hby - _hbh, _hbx + _hbr, _hby - _hbh);
+          ctx.closePath(); ctx.fill();
+          ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+          if (_hDL) {
+            var _hty1 = _hby - _hbh + 11;
+            var _htx = _hbx + (_hbw - _hnw - _husw) / 2;
+            ctx.font = 'bold 10px Inter, sans-serif'; ctx.fillStyle = '#e9d5ff'; ctx.fillText(_hValStr, _htx, _hty1); _htx += _hnw;
+            ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#c4b5fd'; ctx.fillText(_hUnitStr, _htx, _hty1);
+            ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#a78bfa';
+            ctx.textAlign = 'center'; ctx.fillText(_hDL, _hbx + _hbw / 2, _hby - _hbh + 25);
+          } else {
+            var _hty = _hby - _hbh / 2;
+            var _htx2 = _hbx + (_hbw - _hnw - _husw) / 2;
+            ctx.font = 'bold 10px Inter, sans-serif'; ctx.fillStyle = '#e9d5ff'; ctx.fillText(_hValStr, _htx2, _hty); _htx2 += _hnw;
+            ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#c4b5fd'; ctx.fillText(_hUnitStr, _htx2, _hty);
+          }
+        }
+      }
+
+      // Build hit boxes
+      _sonoRows.forEach(function(row, i) {
+        _sonoHitBoxes.push({ x0: padL + slot * i, x1: padL + slot * (i + 1), idx: i });
+      });
+
+      _drawSonoBase(-1);
+      canvas.style.cursor = 'pointer';
+
+      canvas._sonoHovIdx = -1;
+      canvas.onmousemove = function(ev) {
+        var rect = canvas.getBoundingClientRect();
+        var sx = W / Math.max(1, rect.width);
+        var x = (ev.clientX - rect.left) * sx;
+        var newIdx = -1;
+        _sonoHitBoxes.forEach(function(b) { if (x >= b.x0 && x <= b.x1) newIdx = b.idx; });
+        if (newIdx !== canvas._sonoHovIdx) {
+          canvas._sonoHovIdx = newIdx;
+          _drawSonoBase(newIdx);
+        }
+      };
+      canvas.onmouseleave = function() {
+        if (canvas._sonoHovIdx !== -1) {
+          canvas._sonoHovIdx = -1;
+          _drawSonoBase(-1);
+        }
+      };
+
+      if (_sonoChartView) _sonoChartView.scrollLeft = Math.max(0, W - containerW);
+    });
+    return;
+  }
+
+  if (currentVitalDetail && currentVitalDetail.tipo === 'Oxigenação') {
+    var _oxigByDay = new Map();
+    historico.forEach(function(h) {
+      var dayIso = typeof historicoEntryDayISO === 'function' ? historicoEntryDayISO(h) : String(h.data || '').slice(0, 10);
+      if (!dayIso) return;
+      var v = parseFloat(h.valor);
+      if (!Number.isFinite(v)) return;
+      if (!_oxigByDay.has(dayIso) || v < _oxigByDay.get(dayIso).v) {
+        _oxigByDay.set(dayIso, { day: dayIso, v: v, status: h.status });
+      }
+    });
+    var _oxigRows = Array.from(_oxigByDay.values()).sort(function(a, b) { return a.day.localeCompare(b.day); });
+    if (_oxigRows.length === 0) return;
+
+    var _oxigIdealLow = 95, _oxigIdealHigh = 100;
+    if (currentVitalDetail.ideal && typeof currentVitalDetail.ideal === 'string') {
+      var _oxigIm = currentVitalDetail.ideal.match(/(\d+)[\u2013\-](\d+)/);
+      if (_oxigIm) { _oxigIdealLow = Number(_oxigIm[1]); _oxigIdealHigh = Number(_oxigIm[2]); }
+    }
+
+    var _oxigChartView = document.getElementById('pressaoHistoricoView');
+    if (_oxigChartView) {
+      _oxigChartView.style.overflowX = 'auto';
+      _oxigChartView.style.overflowY = 'hidden';
+      _oxigChartView.style.webkitOverflowScrolling = 'touch';
+    }
+
+    requestAnimationFrame(function() {
+      var dpr = window.devicePixelRatio || 1;
+      var n = _oxigRows.length;
+      var containerW = _oxigChartView ? _oxigChartView.offsetWidth : (canvas.parentElement ? canvas.parentElement.offsetWidth : 320);
+      var padL = 32, padR = 12, padT = 44, padB = 20;
+      var minColW = Math.max(10, (containerW - padL - padR) / Math.max(1, n));
+      var W = Math.max(containerW, padL + Math.ceil(n * minColW) + padR);
+      var H = 180;
+      var gw = W - padL - padR;
+      var gh = H - padT - padB;
+
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+
+      var allVals = _oxigRows.map(function(r) { return r.v; });
+      var yLow = Math.max(80, Math.min.apply(null, allVals) - 3);
+      var yHigh = 101;
+      var span = yHigh - yLow;
+      var toY = function(v) { return padT + ((yHigh - v) / span) * gh; };
+
+      var slot = gw / Math.max(1, n);
+      var barW = Math.min(18, Math.max(7, slot * 0.58));
+      var barR = Math.min(5, barW / 2 - 0.5);
+      var _oxigHitBoxes = [];
+      var _ptBrDO = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+      var _mAbrDO = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+      function _drawOxigBase(hovIdx) {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#F8F9FA';
+        ctx.fillRect(0, 0, W, H);
+        // Ideal zone
+        ctx.fillStyle = 'rgba(22,163,74,0.08)';
+        ctx.fillRect(padL, toY(yHigh), gw, toY(_oxigIdealLow) - toY(yHigh));
+        ctx.strokeStyle = 'rgba(22,163,74,0.4)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(padL, toY(_oxigIdealLow)); ctx.lineTo(padL + gw, toY(_oxigIdealLow)); ctx.stroke();
+        ctx.setLineDash([]);
+        // Y labels
+        ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        ctx.fillText(_oxigIdealLow + '%', padL - 4, toY(_oxigIdealLow));
+        ctx.fillText('100%', padL - 4, toY(100));
+        // Bars
+        _oxigRows.forEach(function(row, i) {
+          var isHov = i === hovIdx;
+          var cx = padL + slot * i + slot / 2;
+          var x0 = cx - barW / 2;
+          var yTop = toY(row.v);
+          var yBot = toY(yLow);
+          var hBar = Math.max(1, yBot - yTop);
+          var barColor = row.v >= _oxigIdealLow ? '#16a34a' : (row.v >= 90 ? '#f59e0b' : '#ef4444');
+          var barColorDim = row.v >= _oxigIdealLow ? 'rgba(22,163,74,0.22)' : (row.v >= 90 ? 'rgba(245,158,11,0.25)' : 'rgba(239,68,68,0.25)');
+          if (hovIdx !== -1 && !isHov) {
+            ctx.fillStyle = barColorDim;
+          } else {
+            var grad = ctx.createLinearGradient(0, yTop, 0, yBot);
+            grad.addColorStop(0, barColor);
+            grad.addColorStop(1, barColor + 'bb');
+            ctx.fillStyle = grad;
+          }
+          if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath(); ctx.roundRect(x0, yTop, barW, hBar, [barR, barR, 0, 0]); ctx.fill();
+          } else { ctx.fillRect(x0, yTop, barW, hBar); }
+          var pp = row.day.split('-').map(Number);
+          ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+          ctx.fillText(String(pp[2]), cx, H - padB + 3);
+        });
+        // Hover tooltip
+        if (hovIdx >= 0 && hovIdx < _oxigRows.length) {
+          var hRow = _oxigRows[hovIdx];
+          var hCx = padL + slot * hovIdx + slot / 2;
+          var _hValStr = String(hRow.v);
+          var _hUnitStr = '%';
+          var _hDL = '';
+          if (hRow.day) {
+            var _hp = hRow.day.split('-').map(Number);
+            var _hd = new Date(_hp[0], _hp[1] - 1, _hp[2]);
+            _hDL = _ptBrDO[_hd.getDay()] + ', ' + _hp[2] + ' ' + _mAbrDO[_hp[1] - 1];
+          }
+          ctx.font = 'bold 10px Inter, sans-serif'; var _hnw = ctx.measureText(_hValStr).width;
+          ctx.font = '9px Inter, sans-serif'; var _husw = ctx.measureText(_hUnitStr).width;
+          var _hdlw = _hDL ? ctx.measureText(_hDL).width : 0;
+          var _hbh = _hDL ? 34 : 22, _harr = 5;
+          var _hbw = Math.max(_hnw + _husw + 18, _hdlw + 18, 70);
+          var _hbx = hCx - _hbw / 2;
+          if (_hbx < padL) _hbx = padL;
+          if (_hbx + _hbw > padL + gw) _hbx = padL + gw - _hbw;
+          var _hby = padT - _harr - 2, _hbr = 4;
+          ctx.fillStyle = '#14532d';
+          ctx.beginPath();
+          ctx.moveTo(_hbx + _hbr, _hby - _hbh); ctx.lineTo(_hbx + _hbw - _hbr, _hby - _hbh);
+          ctx.quadraticCurveTo(_hbx + _hbw, _hby - _hbh, _hbx + _hbw, _hby - _hbh + _hbr);
+          ctx.lineTo(_hbx + _hbw, _hby - _hbr); ctx.quadraticCurveTo(_hbx + _hbw, _hby, _hbx + _hbw - _hbr, _hby);
+          var _hax = Math.min(Math.max(hCx, _hbx + 10), _hbx + _hbw - 10);
+          ctx.lineTo(_hax + 5, _hby); ctx.lineTo(_hax, _hby + _harr); ctx.lineTo(_hax - 5, _hby);
+          ctx.lineTo(_hbx + _hbr, _hby); ctx.quadraticCurveTo(_hbx, _hby, _hbx, _hby - _hbr);
+          ctx.lineTo(_hbx, _hby - _hbh + _hbr); ctx.quadraticCurveTo(_hbx, _hby - _hbh, _hbx + _hbr, _hby - _hbh);
+          ctx.closePath(); ctx.fill();
+          ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+          if (_hDL) {
+            var _hty1 = _hby - _hbh + 11;
+            var _htx = _hbx + (_hbw - _hnw - _husw) / 2;
+            ctx.font = 'bold 10px Inter, sans-serif'; ctx.fillStyle = '#bbf7d0'; ctx.fillText(_hValStr, _htx, _hty1); _htx += _hnw;
+            ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#86efac'; ctx.fillText(_hUnitStr, _htx, _hty1);
+            ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#4ade80';
+            ctx.textAlign = 'center'; ctx.fillText(_hDL, _hbx + _hbw / 2, _hby - _hbh + 25);
+          } else {
+            var _hty = _hby - _hbh / 2;
+            var _htx2 = _hbx + (_hbw - _hnw - _husw) / 2;
+            ctx.font = 'bold 10px Inter, sans-serif'; ctx.fillStyle = '#bbf7d0'; ctx.fillText(_hValStr, _htx2, _hty); _htx2 += _hnw;
+            ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#86efac'; ctx.fillText(_hUnitStr, _htx2, _hty);
+          }
+        }
+      }
+
+      _oxigRows.forEach(function(row, i) {
+        _oxigHitBoxes.push({ x0: padL + slot * i, x1: padL + slot * (i + 1), idx: i });
+      });
+      _drawOxigBase(-1);
+      canvas.style.cursor = 'pointer';
+      canvas._oxigHovIdx = -1;
+      canvas.onmousemove = function(ev) {
+        var rect = canvas.getBoundingClientRect();
+        var sx = W / Math.max(1, rect.width);
+        var x = (ev.clientX - rect.left) * sx;
+        var newIdx = -1;
+        _oxigHitBoxes.forEach(function(b) { if (x >= b.x0 && x <= b.x1) newIdx = b.idx; });
+        if (newIdx !== canvas._oxigHovIdx) { canvas._oxigHovIdx = newIdx; _drawOxigBase(newIdx); }
+      };
+      canvas.onmouseleave = function() {
+        if (canvas._oxigHovIdx !== -1) { canvas._oxigHovIdx = -1; _drawOxigBase(-1); }
+      };
+      if (_oxigChartView) _oxigChartView.scrollLeft = Math.max(0, W - containerW);
+    });
+    return;
+  }
+
+  if (currentVitalDetail && currentVitalDetail.tipo === 'Hidratação') {
+    var _hidByDay = new Map();
+    historico.forEach(function(h) {
+      var dayIso = typeof historicoEntryDayISO === 'function' ? historicoEntryDayISO(h) : String(h.data || '').slice(0, 10);
+      if (!dayIso) return;
+      var v = parseFloat(h.valor);
+      if (!Number.isFinite(v) || v < 0) return;
+      if (!_hidByDay.has(dayIso) || v > _hidByDay.get(dayIso).v) {
+        _hidByDay.set(dayIso, { day: dayIso, v: v, status: h.status });
+      }
+    });
+    var _hidRows = Array.from(_hidByDay.values()).sort(function(a, b) { return a.day.localeCompare(b.day); });
+    if (_hidRows.length === 0) return;
+
+    var _hidGoal = 2000;
+    if (currentVitalDetail.ideal && typeof currentVitalDetail.ideal === 'string') {
+      var _hidIm = currentVitalDetail.ideal.match(/(\d+)/);
+      if (_hidIm) _hidGoal = Number(_hidIm[1]);
+    }
+
+    var _hidChartView = document.getElementById('pressaoHistoricoView');
+    if (_hidChartView) {
+      _hidChartView.style.overflowX = 'auto';
+      _hidChartView.style.overflowY = 'hidden';
+      _hidChartView.style.webkitOverflowScrolling = 'touch';
+    }
+
+    requestAnimationFrame(function() {
+      var dpr = window.devicePixelRatio || 1;
+      var n = _hidRows.length;
+      var containerW = _hidChartView ? _hidChartView.offsetWidth : (canvas.parentElement ? canvas.parentElement.offsetWidth : 320);
+      var padL = 36, padR = 12, padT = 44, padB = 20;
+      var minColW = Math.max(10, (containerW - padL - padR) / Math.max(1, n));
+      var W = Math.max(containerW, padL + Math.ceil(n * minColW) + padR);
+      var H = 180;
+      var gw = W - padL - padR;
+      var gh = H - padT - padB;
+
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+
+      var allVals = _hidRows.map(function(r) { return r.v; });
+      var yLow = 0;
+      var yHigh = Math.max(_hidGoal * 1.3, Math.max.apply(null, allVals) * 1.1);
+      yHigh = Math.ceil(yHigh / 500) * 500;
+      var span = yHigh - yLow;
+      var toY = function(v) { return padT + ((yHigh - v) / span) * gh; };
+
+      var slot = gw / Math.max(1, n);
+      var barW = Math.min(18, Math.max(7, slot * 0.58));
+      var barR = Math.min(5, barW / 2 - 0.5);
+      var _hidHitBoxes = [];
+      var _ptBrDH = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+      var _mAbrDH = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+      function _fmtMlH(ml) {
+        return ml >= 1000 ? (ml / 1000).toFixed(1).replace('.0', '') + ' L' : ml + ' ml';
+      }
+
+      function _drawHidBase(hovIdx) {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#F8F9FA';
+        ctx.fillRect(0, 0, W, H);
+        // Goal zone (above goal line)
+        ctx.fillStyle = 'rgba(34,197,94,0.06)';
+        ctx.fillRect(padL, toY(yHigh), gw, toY(_hidGoal) - toY(yHigh));
+        // Goal line
+        ctx.strokeStyle = 'rgba(34,197,94,0.5)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(padL, toY(_hidGoal)); ctx.lineTo(padL + gw, toY(_hidGoal)); ctx.stroke();
+        ctx.setLineDash([]);
+        // Y labels
+        ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        ctx.fillText(_fmtMlH(_hidGoal), padL - 4, toY(_hidGoal));
+        ctx.fillText(_fmtMlH(yHigh), padL - 4, toY(yHigh));
+        // Bars
+        _hidRows.forEach(function(row, i) {
+          var isHov = i === hovIdx;
+          var cx = padL + slot * i + slot / 2;
+          var x0 = cx - barW / 2;
+          var yTop = toY(row.v);
+          var yBot = toY(yLow);
+          var hBar = Math.max(1, yBot - yTop);
+          var barColor = row.v >= _hidGoal ? '#22c55e' : (row.v >= _hidGoal * 0.6 ? '#3b82f6' : '#f59e0b');
+          var barColorDim = row.v >= _hidGoal ? 'rgba(34,197,94,0.22)' : (row.v >= _hidGoal * 0.6 ? 'rgba(59,130,246,0.22)' : 'rgba(245,158,11,0.25)');
+          if (hovIdx !== -1 && !isHov) {
+            ctx.fillStyle = barColorDim;
+          } else {
+            var grad = ctx.createLinearGradient(0, yTop, 0, yBot);
+            grad.addColorStop(0, barColor);
+            grad.addColorStop(1, barColor + 'bb');
+            ctx.fillStyle = grad;
+          }
+          if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath(); ctx.roundRect(x0, yTop, barW, hBar, [barR, barR, 0, 0]); ctx.fill();
+          } else { ctx.fillRect(x0, yTop, barW, hBar); }
+          var pp = row.day.split('-').map(Number);
+          ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+          ctx.fillText(String(pp[2]), cx, H - padB + 3);
+        });
+        // Hover tooltip
+        if (hovIdx >= 0 && hovIdx < _hidRows.length) {
+          var hRow = _hidRows[hovIdx];
+          var hCx = padL + slot * hovIdx + slot / 2;
+          var _hValStr = _fmtMlH(hRow.v);
+          var _hDL = '';
+          if (hRow.day) {
+            var _hp = hRow.day.split('-').map(Number);
+            var _hd = new Date(_hp[0], _hp[1] - 1, _hp[2]);
+            _hDL = _ptBrDH[_hd.getDay()] + ', ' + _hp[2] + ' ' + _mAbrDH[_hp[1] - 1];
+          }
+          ctx.font = 'bold 10px Inter, sans-serif'; var _hnw = ctx.measureText(_hValStr).width;
+          ctx.font = '9px Inter, sans-serif'; var _hdlw = _hDL ? ctx.measureText(_hDL).width : 0;
+          var _hbh = _hDL ? 34 : 22, _harr = 5;
+          var _hbw = Math.max(_hnw + 18, _hdlw + 18, 70);
+          var _hbx = hCx - _hbw / 2;
+          if (_hbx < padL) _hbx = padL;
+          if (_hbx + _hbw > padL + gw) _hbx = padL + gw - _hbw;
+          var _hby = padT - _harr - 2, _hbr = 4;
+          ctx.fillStyle = '#1e3a5f';
+          ctx.beginPath();
+          ctx.moveTo(_hbx + _hbr, _hby - _hbh); ctx.lineTo(_hbx + _hbw - _hbr, _hby - _hbh);
+          ctx.quadraticCurveTo(_hbx + _hbw, _hby - _hbh, _hbx + _hbw, _hby - _hbh + _hbr);
+          ctx.lineTo(_hbx + _hbw, _hby - _hbr); ctx.quadraticCurveTo(_hbx + _hbw, _hby, _hbx + _hbw - _hbr, _hby);
+          var _hax = Math.min(Math.max(hCx, _hbx + 10), _hbx + _hbw - 10);
+          ctx.lineTo(_hax + 5, _hby); ctx.lineTo(_hax, _hby + _harr); ctx.lineTo(_hax - 5, _hby);
+          ctx.lineTo(_hbx + _hbr, _hby); ctx.quadraticCurveTo(_hbx, _hby, _hbx, _hby - _hbr);
+          ctx.lineTo(_hbx, _hby - _hbh + _hbr); ctx.quadraticCurveTo(_hbx, _hby - _hbh, _hbx + _hbr, _hby - _hbh);
+          ctx.closePath(); ctx.fill();
+          ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+          if (_hDL) {
+            var _hty1 = _hby - _hbh + 11;
+            var _htx = _hbx + (_hbw - _hnw) / 2;
+            ctx.font = 'bold 10px Inter, sans-serif'; ctx.fillStyle = '#bae6fd'; ctx.fillText(_hValStr, _htx, _hty1);
+            ctx.font = '9px Inter, sans-serif'; ctx.fillStyle = '#7dd3fc';
+            ctx.textAlign = 'center'; ctx.fillText(_hDL, _hbx + _hbw / 2, _hby - _hbh + 25);
+          } else {
+            var _hty = _hby - _hbh / 2;
+            var _htx2 = _hbx + (_hbw - _hnw) / 2;
+            ctx.font = 'bold 10px Inter, sans-serif'; ctx.fillStyle = '#bae6fd'; ctx.fillText(_hValStr, _htx2, _hty);
+          }
+        }
+      }
+
+      _hidRows.forEach(function(row, i) {
+        _hidHitBoxes.push({ x0: padL + slot * i, x1: padL + slot * (i + 1), idx: i });
+      });
+      _drawHidBase(-1);
+      canvas.style.cursor = 'pointer';
+      canvas._hidHovIdx = -1;
+      canvas.onmousemove = function(ev) {
+        var rect = canvas.getBoundingClientRect();
+        var sx = W / Math.max(1, rect.width);
+        var x = (ev.clientX - rect.left) * sx;
+        var newIdx = -1;
+        _hidHitBoxes.forEach(function(b) { if (x >= b.x0 && x <= b.x1) newIdx = b.idx; });
+        if (newIdx !== canvas._hidHovIdx) { canvas._hidHovIdx = newIdx; _drawHidBase(newIdx); }
+      };
+      canvas.onmouseleave = function() {
+        if (canvas._hidHovIdx !== -1) { canvas._hidHovIdx = -1; _drawHidBase(-1); }
+      };
+      if (_hidChartView) _hidChartView.scrollLeft = Math.max(0, W - containerW);
+    });
     return;
   }
 
@@ -8372,8 +11315,8 @@ function renderSparklineChart(historico) {
 }
 
 /**
- * Uma linha da lista do modal de Batimento (hora do dia ou data agregada — sem coluna de status).
- * `hourDetail`: vista dia hora a hora — formato “61 a 89 bpm” em cima, intervalo em baixo (como lista de registos).
+ * Uma linha da lista do modal de Batimento (hora do dia ou data agregada ??" sem coluna de status).
+ * `hourDetail`: vista dia hora a hora ??" formato ??o61 a 89 bpm??? em cima, intervalo em baixo (como lista de registos).
  */
 function htmlVitalBatimentoListRow(opts) {
   const { rowClass, clickAttr = '', primaryLine, badgeHtml = '', valueHtml, hourDetail } = opts;
@@ -8449,7 +11392,7 @@ function renderVitalDetailContent(historico) {
           bucket.max != null &&
           Number.isFinite(bucket.min) &&
           Number.isFinite(bucket.max);
-        const measureLine = hasRange ? formatBatimentoBpmRangeLine(bucket.min, bucket.max) : '—';
+        const measureLine = hasRange ? formatBatimentoBpmRangeLine(bucket.min, bucket.max) : '??"';
         const badgeHtml = batimentoBucketContextBadgeHtml(bucket);
         const bg = hasRange ? batimentoHourlyBucketRowBgClass(bucket) : '';
         let rowClass = 'vital-list-item vital-list-item--hour-bucket';
@@ -8477,7 +11420,7 @@ function renderVitalDetailContent(historico) {
           badgeHtml,
           hourDetail: {
             measureLine,
-            timeLine: dateTxt ? `${dateTxt} · ${labelHora}` : labelHora,
+            timeLine: dateTxt ? `${dateTxt} às ${labelHora}` : labelHora,
             trailHtml
           }
         });
@@ -8505,7 +11448,7 @@ function renderVitalDetailContent(historico) {
     const dailyRows = buildBatimentoHistoricoDailyRows(currentVitalHistoricoView);
     if (dailyRows.length === 0) {
       document.getElementById('vitalDetailContent').innerHTML =
-        '<div class="empty-state"><div class="empty-text">Nenhum valor numérico no período</div></div>';
+        '<div class="empty-state"><div class="empty-text">Nenhum valor numAcrico no período</div></div>';
       return;
     }
     const buildRow = (row) => {
@@ -8513,7 +11456,7 @@ function renderVitalDetailContent(historico) {
       const badgeHtml = row.ctxBadge ? `<span class="vital-context-badge">${row.ctxBadge}</span>` : '';
       const rowClass = `vital-list-item vital-list-item--day-nav vital-list-item--hour-bucket${row.rowBgClass ? ` ${row.rowBgClass}` : ''}`;
       const clickAttr = ` role="button" tabindex="0" onclick="selectBatimentoDayFromList('${row.day}')"`;
-      const trailHtml = '<span class="vital-list-chevron" aria-hidden="true">›</span>';
+      const trailHtml = '<span class="vital-list-chevron" aria-hidden="true">???</span>';
       const dateTxt = formatDateForUI(row.day);
       return htmlVitalBatimentoListRow({
         rowClass,
@@ -8561,7 +11504,7 @@ function renderVitalDetailContent(historico) {
         .filter(Boolean);
       const sisMax = pares.length ? Math.max(...pares.map((p) => p.s)) : null;
       const diaMin = pares.length ? Math.min(...pares.map((p) => p.d)) : null;
-      const resumo = (sisMax != null && diaMin != null) ? `${sisMax}/${diaMin}` : '—';
+      const resumo = (sisMax != null && diaMin != null) ? `${sisMax}/${diaMin}` : '??"';
       const dateTxt = formatDateForUI(dayIso);
       const coletasHtml = entries
         .slice()
@@ -8582,8 +11525,8 @@ function renderVitalDetailContent(historico) {
               : '';
           const hr = getHeartRateForPressureEntry(h);
           const hrLabel = Number.isFinite(hr) ? `FC ${Math.round(hr)} bpm` : '';
-          const extra = [ctxLabel, medLabel].filter(Boolean).join(' · ');
-          const coletaTimeLine = `${dateTxt} · ${hora}`;
+          const extra = [ctxLabel, medLabel].filter(Boolean).join(' às ');
+          const coletaTimeLine = `${dateTxt} às ${hora}`;
           return `
             <div class="pressao-coleta-item">
               <div class="pressao-coleta-valor">${valorFormatado} mmHg</div>
@@ -8601,7 +11544,7 @@ function renderVitalDetailContent(historico) {
               <div class="pressao-dia-medida">${resumo} <span class="pressao-dia-unit">mmHg</span></div>
               <div class="pressao-dia-data">${dateTxt}</div>
             </div>
-            <span class="pressao-dia-chevron" aria-hidden="true">›</span>
+            <span class="pressao-dia-chevron" aria-hidden="true">???</span>
           </button>
           <div class="pressao-dia-coletas" id="pressaoColetas-${dayKey}" style="display:${openByDefault ? 'block' : 'none'};">${coletasHtml}</div>
         </div>`;
@@ -8618,62 +11561,272 @@ function renderVitalDetailContent(historico) {
         '<div class="empty-state"><div class="empty-text">Nenhum registro encontrado</div></div>';
       return;
     }
-    const selectedExists = passosSelectedDayIso && dayRows.some((r) => r.day === passosSelectedDayIso);
-    const selectedDay = selectedExists ? passosSelectedDayIso : dayRows[0].day;
-    passosSelectedDayIso = selectedDay;
-    const selectedRow = dayRows.find((r) => r.day === selectedDay) || dayRows[0];
-    const selectedHourValid = Number.isInteger(passosSelectedHour) && passosSelectedHour >= 0 && passosSelectedHour <= 23;
-    const daySteps = Math.max(0, Math.round(Number(selectedRow?.total || 0)));
-    const dayPct = goal > 0 ? Math.max(0, Math.min(999, Math.round((daySteps / goal) * 100))) : 0;
-    const dayDistKm = (daySteps * 0.00075).toFixed(2).replace('.', ',');
-    const dayKcal = Math.round(daySteps * 0.04);
-    const dayElevacaoM = Math.max(0, Math.round((daySteps / 1200) * 3));
-
-    const hourlyBuckets = buildPassosHourlyBucketsForDay(selectedRow?.entries || []);
-    const hourSteps = selectedHourValid
-      ? Math.max(0, Math.round(Number(hourlyBuckets[passosSelectedHour] || 0)))
-      : null;
-    const hourDistKm = hourSteps != null ? (hourSteps * 0.00075).toFixed(2).replace('.', ',') : null;
-    const hourKcal = hourSteps != null ? Math.round(hourSteps * 0.04) : null;
-    const hourElevacaoM = hourSteps != null ? Math.max(0, Math.round((hourSteps / 1200) * 3)) : null;
-    const hourInfoHtml = selectedHourValid
-      ? `
-        <div class="passos-footer-hour">${String(passosSelectedHour).padStart(2, '0')}:00–${String(passosSelectedHour).padStart(2, '0')}:59</div>
-        <div class="passos-footer-meta">
-          <span>${hourDistKm} km</span>
-          <span>${hourKcal} kcal</span>
-          <span>${hourElevacaoM} m elevação</span>
-        </div>`
-      : '<div class="passos-footer-empty">Toque em uma barra do gráfico por hora para ver distância, calorias e elevação da hora.</div>';
-
-    document.getElementById('vitalDetailContent').innerHTML = `
-      <div class="passos-resumo-card">
-        <div class="passos-resumo-head">
-          <div class="passos-resumo-num">${daySteps.toLocaleString('pt-BR')} passos</div>
-        </div>
-        <div class="passos-resumo-bar"><span style="width:${Math.max(0, Math.min(100, dayPct))}%;"></span></div>
-        <div class="passos-resumo-scale">
-          <span>0</span>
-          <span>Meta: ${goal.toLocaleString('pt-BR')}</span>
-        </div>
-        <div class="passos-resumo-meta">
-          <span>${dayDistKm} km</span>
-          <span>${dayKcal} kcal</span>
-          <span>${dayElevacaoM} m elevação</span>
-        </div>
-      </div>
-      <div class="passos-hourly-card">
-        <div class="passos-hourly-title">Passos por hora do dia</div>
-        <div id="passosHourlySubtitle" class="passos-hourly-subtitle"></div>
-        <canvas id="passosHourlyCanvas" class="passos-hourly-canvas" width="720" height="180"></canvas>
-      </div>
-      <div class="passos-footer-note">${hourInfoHtml}</div>
-    `;
-    renderPassosHourlyCanvas(selectedDay, selectedRow?.entries || [], goal);
+    // Flat list of days ??" filtered by chart selection if any
+    const _dias3 = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const _meses3 = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const _filteredRows = passosSelectedDayIso
+      ? dayRows.filter(function(r) { return r.day === passosSelectedDayIso; })
+      : dayRows; // aggregatePassosByDay járetorna do mais recente ao mais antigo
+    let _clearFilterBtn = '';
+    if (passosSelectedDayIso) {
+      _clearFilterBtn = '<div style="text-align:center;padding:8px 0 4px;"><button type="button" onclick="setPassosDayFromChart(null)" style="font-size:13px;color:#3b82f6;background:none;border:none;cursor:pointer;padding:4px 8px;">Ver todos os dias</button></div>';
+    }
+    const _dayListHtml = _filteredRows.map(function(row) {
+      const _steps = Math.max(0, Math.round(Number(row.total || 0)));
+      const _pp = row.day.split('-').map(Number);
+      const _do = new Date(_pp[0], _pp[1] - 1, _pp[2]);
+      const _dl = _dias3[_do.getDay()] + ', ' + String(_pp[2]).padStart(2, '0') + ' ' + _meses3[_pp[1] - 1];
+      const _pct = goal > 0 ? Math.round((_steps / goal) * 100) : 0;
+      return '<div class="vital-list-item vital-list-item--day-nav vital-list-item--hour-bucket" role="button" tabindex="0" onclick="openPassosDiaDetail(\'' + row.day + '\')">' +
+        '<div class="vital-list-main vital-list-main--hour-detail">' +
+          '<div class="vital-list-measure-line">' + _steps.toLocaleString('pt-BR') + ' <span style="font-size:13px;font-weight:500;color:#64748b;">passos</span></div>' +
+          '<div class="vital-list-time-line">' + _dl + ' às ' + _pct + '% da meta</div>' +
+        '</div>' +
+        '<div class="vital-list-trail"><span class="vital-list-chevron" aria-hidden="true">???</span></div>' +
+      '</div>';
+    }).join('');
+    document.getElementById('vitalDetailContent').innerHTML = _clearFilterBtn + _dayListHtml;
     return;
   }
 
-  const html = currentVitalHistoricoView.map((h, idx) => {
+  if (currentVitalDetail?.tipo === 'Glicemia') {
+    const _glicRows = aggregateGlicemiaByDay(currentVitalHistoricoView);
+    if (_glicRows.length === 0) {
+      document.getElementById('vitalDetailContent').innerHTML =
+        '<div class="empty-state"><div class="empty-text">Nenhum registro encontrado</div></div>';
+      return;
+    }
+    const _dias3g = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const _meses3g = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const _selIsoG = glicemiaSelectedDayIso;
+    const _glicFiltered = _selIsoG
+      ? _glicRows.filter(function(r) { return r.day === _selIsoG; })
+      : _glicRows.slice().reverse();
+    let _glicClearBtn = '';
+    if (_selIsoG) {
+      _glicClearBtn = '<div style="text-align:center;padding:8px 0 4px;"><button type="button" onclick="clearGlicemiaDaySelection()" style="font-size:13px;color:#7c3aed;background:none;border:none;cursor:pointer;padding:4px 8px;">Ver todas as medições</button></div>';
+    }
+    const _glicRowsHtml = _glicFiltered.map(function(row) {
+      const _pp = row.day.split('-').map(Number);
+      const _do = new Date(_pp[0], _pp[1] - 1, _pp[2]);
+      const _dl = _dias3g[_do.getDay()] + ', ' + String(_pp[2]).padStart(2, '0') + ' ' + _meses3g[_pp[1] - 1];
+      const _avg = row.avg;
+      let _vColor = '#7c3aed';
+      let _sLabel = 'Normal';
+      if (_avg > 125) { _vColor = '#ef4444'; _sLabel = 'Alto'; }
+      else if (_avg > 99) { _vColor = '#f59e0b'; _sLabel = 'Atenção'; }
+      const _rangeHtml = (row.min !== row.max)
+        ? '<span style="font-size:11px;color:#94a3b8;margin-left:4px;">(' + row.min + '??"' + row.max + ')</span>'
+        : '';
+      return '<div class="vital-list-item vital-list-item--day-nav vital-list-item--hour-bucket" role="button" tabindex="0" onclick="selectGlicemiaDay(\'' + row.day + '\')">' +
+        '<div class="vital-list-main vital-list-main--hour-detail">' +
+          '<div class="vital-list-measure-line">' +
+            '<span style="color:' + _vColor + ';font-weight:600;">' + _avg + '</span>' +
+            ' <span style="font-size:13px;font-weight:500;color:#64748b;">mg/dL</span>' +
+            _rangeHtml +
+          '</div>' +
+          '<div class="vital-list-time-line">' + _dl + ' às ' + _sLabel + '</div>' +
+        '</div>' +
+        '<div class="vital-list-trail"><span class="vital-list-chevron" aria-hidden="true">???</span></div>' +
+      '</div>';
+    }).join('');
+    document.getElementById('vitalDetailContent').innerHTML = _glicClearBtn + _glicRowsHtml;
+    return;
+  }
+
+  if (currentVitalDetail?.tipo === 'Sono') {
+    const _sonoIdealL = 7, _sonoIdealH = 9;
+    const _diasSono = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const _mesesSono = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    // Aggregate by day: most recent entry per day
+    const _sonoByDayMap = new Map();
+    currentVitalHistoricoView.forEach(function(h) {
+      const dayIso = typeof historicoEntryDayISO === 'function' ? historicoEntryDayISO(h) : String(h.data || '').slice(0, 10);
+      if (!dayIso) return;
+      const existing = _sonoByDayMap.get(dayIso);
+      const hMs = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(h) : 0;
+      const exMs = existing ? (typeof historicoEntryToMs === 'function' ? historicoEntryToMs(existing) : 0) : -Infinity;
+      if (!existing || hMs > exMs) _sonoByDayMap.set(dayIso, h);
+    });
+    const _sonoDayEntries = Array.from(_sonoByDayMap.entries())
+      .sort(function(a, b) { return b[0].localeCompare(a[0]); })
+      .map(function(e) { return e[1]; });
+
+    function _sonoFmtVal(h) {
+      const hrs = parseFloat(h.valor);
+      if (!Number.isFinite(hrs)) return '??"';
+      const hh = Math.floor(hrs), mm = Math.round((hrs - hh) * 60);
+      return hh + 'h' + (mm > 0 ? ' ' + String(mm).padStart(2, '0') + 'm' : '');
+    }
+    function _sonoStatusLabel(h) {
+      const hrs = parseFloat(h.valor);
+      if (!Number.isFinite(hrs)) return '';
+      if (hrs >= _sonoIdealL && hrs <= _sonoIdealH) return 'Ideal';
+      if (hrs < _sonoIdealL) return 'Pouco sono';
+      return 'Muito sono';
+    }
+    function _sonoDayLabel(dayIso) {
+      const pp = dayIso.split('-').map(Number);
+      const d = new Date(pp[0], pp[1] - 1, pp[2]);
+      return _diasSono[d.getDay()] + ', ' + String(pp[2]).padStart(2, '0') + ' ' + _mesesSono[pp[1] - 1];
+    }
+
+    const _sonoListHtml = _sonoDayEntries.map(function(h) {
+      const dayIso = typeof historicoEntryDayISO === 'function' ? historicoEntryDayISO(h) : String(h.data || '').slice(0, 10);
+      const _fv = _sonoFmtVal(h);
+      const _sl = _sonoStatusLabel(h);
+      const _dl = dayIso ? _sonoDayLabel(dayIso) : (h.data || '');
+      const hrs = parseFloat(h.valor);
+      const _col = Number.isFinite(hrs) && hrs >= _sonoIdealL && hrs <= _sonoIdealH ? '#7c3aed' : (Number.isFinite(hrs) && hrs < _sonoIdealL ? '#ef4444' : '#f59e0b');
+      const _slClass = _sl === 'Ideal' ? 'ideal' : (_sl === 'Pouco sono' ? 'pouco' : 'muito');
+      return '<div class="vital-list-item vital-list-item--day-nav vital-list-item--hour-bucket">' +
+        '<div class="vital-list-main vital-list-main--hour-detail">' +
+          '<div class="vital-list-measure-line">' +
+            '<span style="color:' + _col + ';font-weight:700;">' + _fv + '</span>' +
+          '</div>' +
+          '<div class="vital-list-time-line">' + _dl + (_sl ? ' <span class="sono-status-chip sono-status-chip--' + _slClass + '">' + _sl + '</span>' : '') + '</div>' +
+        '</div>' +
+        '<div class="vital-list-trail"><span class="vital-list-chevron" aria-hidden="true">???</span></div>' +
+      '</div>';
+    }).join('');
+
+    const _sonoSummary = typeof buildSonoDetailPanel === 'function' ? buildSonoDetailPanel(currentVitalDetail) : '';
+    const _emptyMsg = _sonoDayEntries.length === 0
+      ? '<div class="empty-state"><div class="empty-text">Nenhum registro encontrado</div></div>'
+      : '';
+    document.getElementById('vitalDetailContent').innerHTML = _sonoSummary + (_emptyMsg || _sonoListHtml);
+    return;
+  }
+
+  if (currentVitalDetail?.tipo === 'Oxigenação') {
+    const _oxigIdealL = 95;
+    const _diasOxig = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    const _mesesOxig = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    const _oxigByDayMap = new Map();
+    currentVitalHistoricoView.forEach(function(h) {
+      const dayIso = typeof historicoEntryDayISO === 'function' ? historicoEntryDayISO(h) : String(h.data || '').slice(0, 10);
+      if (!dayIso) return;
+      const existing = _oxigByDayMap.get(dayIso);
+      const hMs = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(h) : 0;
+      const exMs = existing ? (typeof historicoEntryToMs === 'function' ? historicoEntryToMs(existing) : 0) : -Infinity;
+      if (!existing || hMs > exMs) _oxigByDayMap.set(dayIso, h);
+    });
+    const _oxigDayEntries = Array.from(_oxigByDayMap.entries())
+      .sort(function(a, b) { return b[0].localeCompare(a[0]); })
+      .map(function(e) { return e[1]; });
+
+    function _oxigStatusLabel(h) {
+      const v = parseFloat(h.valor);
+      if (!Number.isFinite(v)) return '';
+      if (v >= _oxigIdealL) return 'Normal';
+      if (v >= 90) return 'Atenção';
+      return 'Crítico';
+    }
+    function _oxigDayLabel(dayIso) {
+      const pp = dayIso.split('-').map(Number);
+      const d = new Date(pp[0], pp[1] - 1, pp[2]);
+      return _diasOxig[d.getDay()] + ', ' + String(pp[2]).padStart(2, '0') + ' ' + _mesesOxig[pp[1] - 1];
+    }
+
+    const _oxigListHtml = _oxigDayEntries.map(function(h) {
+      const dayIso = typeof historicoEntryDayISO === 'function' ? historicoEntryDayISO(h) : String(h.data || '').slice(0, 10);
+      const v = parseFloat(h.valor);
+      const _fv = Number.isFinite(v) ? v + '%' : '??"';
+      const _sl = _oxigStatusLabel(h);
+      const _dl = dayIso ? _oxigDayLabel(dayIso) : (h.data || '');
+      const _col = Number.isFinite(v) && v >= _oxigIdealL ? '#16a34a' : (Number.isFinite(v) && v >= 90 ? '#f59e0b' : '#ef4444');
+      const _slClass = _sl === 'Normal' ? 'normal' : (_sl === 'Atenção' ? 'atencao' : 'critico');
+      return '<div class="vital-list-item vital-list-item--day-nav vital-list-item--hour-bucket">' +
+        '<div class="vital-list-main vital-list-main--hour-detail">' +
+          '<div class="vital-list-measure-line">' +
+            '<span style="color:' + _col + ';font-weight:700;">' + _fv + '</span>' +
+          '</div>' +
+          '<div class="vital-list-time-line">' + _dl + (_sl ? ' <span class="oxig-status-chip oxig-status-chip--' + _slClass + '">' + _sl + '</span>' : '') + '</div>' +
+        '</div>' +
+        '<div class="vital-list-trail"><span class="vital-list-chevron" aria-hidden="true">???</span></div>' +
+      '</div>';
+    }).join('');
+
+    const _oxigSummary = typeof buildOxigDetailPanel === 'function' ? buildOxigDetailPanel(currentVitalDetail) : '';
+    const _emptyOxig = _oxigDayEntries.length === 0
+      ? '<div class="empty-state"><div class="empty-text">Nenhum registro encontrado</div></div>'
+      : '';
+    document.getElementById('vitalDetailContent').innerHTML = _oxigSummary + (_emptyOxig || _oxigListHtml);
+    return;
+  }
+
+  if (currentVitalDetail?.tipo === 'Hidratação') {
+    var _hidGoalL = 2000;
+    if (currentVitalDetail.ideal && typeof currentVitalDetail.ideal === 'string') {
+      var _hidGoalM = currentVitalDetail.ideal.match(/(\d+)/);
+      if (_hidGoalM) _hidGoalL = Number(_hidGoalM[1]);
+    }
+    var _hidLowThr = _hidGoalL * 0.6;
+    const _diasHid = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    const _mesesHid = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+    const _hidByDayMap = new Map();
+    currentVitalHistoricoView.forEach(function(h) {
+      const dayIso = typeof historicoEntryDayISO === 'function' ? historicoEntryDayISO(h) : String(h.data || '').slice(0, 10);
+      if (!dayIso) return;
+      const v = parseFloat(h.valor);
+      if (!Number.isFinite(v)) return;
+      const existing = _hidByDayMap.get(dayIso);
+      if (!existing || v > parseFloat(existing.valor)) _hidByDayMap.set(dayIso, h);
+    });
+    const _hidDayEntries = Array.from(_hidByDayMap.entries())
+      .sort(function(a, b) { return b[0].localeCompare(a[0]); })
+      .map(function(e) { return e[1]; });
+
+    function _hidFmtMl(ml) {
+      return ml >= 1000 ? (ml / 1000).toFixed(1).replace('.0', '') + ' L' : ml + ' ml';
+    }
+    function _hidStatusLabel(h) {
+      const v = parseFloat(h.valor);
+      if (!Number.isFinite(v)) return '';
+      if (v >= _hidGoalL) return 'Meta atingida';
+      if (v >= _hidLowThr) return 'Abaixo da meta';
+      return 'Muito baixo';
+    }
+    function _hidDayLabel(dayIso) {
+      const pp = dayIso.split('-').map(Number);
+      const d = new Date(pp[0], pp[1] - 1, pp[2]);
+      return _diasHid[d.getDay()] + ', ' + String(pp[2]).padStart(2, '0') + ' ' + _mesesHid[pp[1] - 1];
+    }
+
+    const _hidListHtml = _hidDayEntries.map(function(h) {
+      const dayIso = typeof historicoEntryDayISO === 'function' ? historicoEntryDayISO(h) : String(h.data || '').slice(0, 10);
+      const v = parseFloat(h.valor);
+      const _fv = Number.isFinite(v) ? _hidFmtMl(v) : '??"';
+      const _sl = _hidStatusLabel(h);
+      const _dl = dayIso ? _hidDayLabel(dayIso) : (h.data || '');
+      const _col = Number.isFinite(v) && v >= _hidGoalL ? '#22c55e' : (Number.isFinite(v) && v >= _hidLowThr ? '#3b82f6' : '#f59e0b');
+      const _slClass = _sl === 'Meta atingida' ? 'ok' : (_sl === 'Abaixo da meta' ? 'baixo' : 'muito');
+      return '<div class="vital-list-item vital-list-item--day-nav vital-list-item--hour-bucket">' +
+        '<div class="vital-list-main vital-list-main--hour-detail">' +
+          '<div class="vital-list-measure-line">' +
+            '<span style="color:' + _col + ';font-weight:700;">' + _fv + '</span>' +
+          '</div>' +
+          '<div class="vital-list-time-line">' + _dl + (_sl ? ' <span class="hidra-chip hidra-chip--' + _slClass + '">' + _sl + '</span>' : '') + '</div>' +
+        '</div>' +
+        '<div class="vital-list-trail"><span class="vital-list-chevron" aria-hidden="true">???</span></div>' +
+      '</div>';
+    }).join('');
+
+    const _hidSummary = typeof buildHidraDetailPanel === 'function' ? buildHidraDetailPanel(currentVitalDetail) : '';
+    const _emptyHid = _hidDayEntries.length === 0
+      ? '<div class="empty-state"><div class="empty-text">Nenhum registro encontrado</div></div>'
+      : '';
+    document.getElementById('vitalDetailContent').innerHTML = _hidSummary + (_emptyHid || _hidListHtml);
+    return;
+  }
+
+  const sortedView = currentVitalHistoricoView.slice().sort(function(a, b) {
+    var ta = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(a) : 0;
+    var tb = typeof historicoEntryToMs === 'function' ? historicoEntryToMs(b) : 0;
+    return tb - ta; // mais recente primeiro
+  });
+  const html = sortedView.map((h, idx) => {
     const dataFormatada = formatDateForUI(h.data);
     const hora = h.hora ? ` ${h.hora}` : '';
     const fullDateTimeLine = `${dataFormatada}${hora}`.trim();
@@ -8689,13 +11842,13 @@ function renderVitalDetailContent(historico) {
         ? ` title="${String(fullDateTimeLine).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`
         : '';
     const dateRowClass = !showFullDateInRow ? ' vital-list-date--time-only' : '';
-    const statusIcon = h.status === 'normal' ? '🟢' : '🔴';
+    const statusIcon = h.status === 'normal' ? 'OK' : 'AL';
     const valorFormatado = typeof formatHistoricValue === 'function'
       ? formatHistoricValue(currentVitalDetail?.tipo, h)
       : h.valor;
     let pmed = '';
-    if (currentVitalDetail?.tipo === 'Pressão Arterial' && h.medicamentoPressao && h.medicamentoPressao !== 'nenhum') {
-      pmed = h.medicamentoPressao === 'tomados' ? ' · 💊 Tomados' : ' · 💊 Não tomados';
+    if (currentVitalDetail?.tipo === 'Pressao Arterial' && h.medicamentoPressao && h.medicamentoPressao !== 'nenhum') {
+      pmed = h.medicamentoPressao === 'tomados' ? ' | Tomados' : ' | Nao tomados';
     }
 
     const ctxLabel = typeof getLabelContextoColetaHistorico === 'function' ? getLabelContextoColetaHistorico(h) : '';
@@ -8722,13 +11875,21 @@ function renderVitalDetailContent(historico) {
           <div class="vital-list-date${dateRowClass}"${dateRowTitle}>${primaryDateTimeLine}</div>
           ${badgeHtml}
         </div>
-        <div class="vital-list-value">${valorFormatado}${pmed}${isExercicio ? ' <span class="vital-list-chevron" aria-hidden="true">›</span>' : ''}</div>
+        <div class="vital-list-value">${valorFormatado}${pmed}${isExercicio ? ' <span class="vital-list-chevron" aria-hidden="true">???</span>' : ''}</div>
         <div class="vital-list-status">${statusIcon}</div>
       </div>
     `;
   }).join('');
 
-  document.getElementById('vitalDetailContent').innerHTML = html;
+  var _summaryPanel = '';
+  if (currentVitalDetail && currentVitalDetail.tipo === 'Sono' && typeof buildSonoDetailPanel === 'function') {
+    _summaryPanel = buildSonoDetailPanel(currentVitalDetail);
+  } else if (currentVitalDetail && currentVitalDetail.tipo === 'Oxigenação' && typeof buildOxigDetailPanel === 'function') {
+    _summaryPanel = buildOxigDetailPanel(currentVitalDetail);
+  } else if (currentVitalDetail && currentVitalDetail.tipo === 'Hidratação' && typeof buildHidraDetailPanel === 'function') {
+    _summaryPanel = buildHidraDetailPanel(currentVitalDetail);
+  }
+  document.getElementById('vitalDetailContent').innerHTML = _summaryPanel + html;
 }
 
 function filterVitalDetail() {
@@ -9293,7 +12454,7 @@ function confirmRescheduleMeasurement() {
   const dateObj = new Date(input.value);
   const dateTxt = formatDateForUI(input.value.slice(0, 10));
   const timeTxt = `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
-  showFeedbackModal(`Reagendado para ${dateTxt} às ${timeTxt}. ${notify ? 'Notificacao ativada.' : 'Sem notificacao.'}`, 'success');
+  showFeedbackModal(`Reagendado para ${dateTxt} às${timeTxt}. ${notify ? 'Notificacao ativada.' : 'Sem notificacao.'}`, 'success');
 }
 
 function formatPressureValueForUI(value) {
@@ -9332,14 +12493,14 @@ function renderMoodHistory() {
 
   list.innerHTML = merged.map(item => {
     const dateBR = formatDateForUI(item.date);
-    const timeTxt = item.time ? ` • ${item.time}` : '';
+    const timeTxt = item.time ? ` ??? ${item.time}` : '';
     const pTxt = `PA ${formatPressureValueForUI(item.pressure)}`;
     const hTxt = item.heartRate != null ? `FC ${item.heartRate} bpm` : 'FC --';
     return `
       <div class="mood-history-item">
         <div class="mood-history-left">
           <div class="mood-history-date">${dateBR}${timeTxt}</div>
-          <div class="mood-history-values">${pTxt} • ${hTxt}</div>
+          <div class="mood-history-values">${pTxt} ??? ${hTxt}</div>
         </div>
       </div>
     `;
